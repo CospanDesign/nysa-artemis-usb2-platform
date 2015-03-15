@@ -1,0 +1,5 @@
+include *.md
+include *.txt
+recursive-include artemis *.json
+recursive-include artemis *.ucf
+recursive-include artemis *.png

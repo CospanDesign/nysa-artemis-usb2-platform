@@ -1,0 +1,10 @@
+
+name: nysa-artemis-usb2-platform
+Version: 0.5.0
+Summary: Artemis board support for interfacing with Nysa toolchain
+Home-page: http://artemis.cospandesign.com
+Author: Cospan Design
+Author-email: dave.mccoy@cospandesign.com
+License: LICENSE
+
+

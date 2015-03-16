@@ -7,7 +7,7 @@ import json
 import datetime
 
 PATH_NAME = "paths.json"
-BOARD_NAME = "artemis"
+BOARD_NAME = "artemis-usb2"
 SITE_NYSA = os.path.join(site.getuserbase(), "nysa")
 SITE_PATH = os.path.join(SITE_NYSA, PATH_NAME)
 PLATFORM_PATH = os.path.abspath(os.path.dirname(__file__))

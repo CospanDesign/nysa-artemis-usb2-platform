@@ -1,5 +1,5 @@
 include *.md
 include *.txt
-recursive-include artemis *.json
-recursive-include artemis *.ucf
-recursive-include artemis *.png
+recursive-include artemis-usb2 *.json
+recursive-include artemis-usb2 *.ucf
+recursive-include artemis-usb2 *.png

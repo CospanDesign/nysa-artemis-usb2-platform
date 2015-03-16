@@ -39,12 +39,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
 
 import nysa
 from nysa.ibuilder.lib.xilinx_utils import find_xilinx_path
-from artemis import Artemis
+from artemis_usb2 import Artemis
 
-class ArtemisPlatform(Platform):
+class ArtemisUSB2Platform(Platform):
 
     def __init__(self, status = None):
-        super (ArtemisPlatform, self).__init__(status)
+        super (ArtemisUSB2Platform, self).__init__(status)
         self.vendor = 0x0403
         self.product = 0x8530
 

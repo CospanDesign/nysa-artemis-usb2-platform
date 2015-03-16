@@ -5,7 +5,7 @@
   "fpga_part_number":"xc6slx45tfgg484-2",
   "host_inteface":"ft_master_interface",
   "default_constraint_files":[
-    "artemis.ucf"
+    "artemis-usb2.ucf"
     ],
   "dependent_boards":"artemis",
   "image":"artemis.png",

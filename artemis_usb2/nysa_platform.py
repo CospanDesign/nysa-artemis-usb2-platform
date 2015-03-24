@@ -36,7 +36,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
                              os.pardir,
                              os.pardir))
 
-
 import nysa
 from nysa.ibuilder.lib.xilinx_utils import find_xilinx_path
 from artemis_usb2 import Artemis
@@ -46,21 +45,17 @@ class ArtemisUSB2Platform(Platform):
     def __init__(self, status = None):
         super (ArtemisUSB2Platform, self).__init__(status)
         self.vendor = 0x0403
-        self.product = 0x8530
+        self.product = 0x8531
 
     def get_type(self):
-        return "Artemis"
+        return "artemis_usb2"
 
     def scan(self):
-        #print ("Scanning...")
         self.status.Verbose("Scanning")
         devices = usb.core.find(find_all = True)
         for device in devices:
             if device.idVendor == self.vendor and device.idProduct == self.product:
-                #sernum = usb.util.get_string(device, 64, device.iSerialNumber)
-                #print "Found a Artemis Device: Serial Number: %s" % sernum
-
-                self.add_device_dict(device.serial_number, Artemis(idVendor = self.vendor, 
+                self.add_device_dict(device.serial_number, Artemis(idVendor = self.vendor,
                                                       idProduct = self.product,
                                                       sernum = device.serial_number,
                                                       status = self.status))
@@ -70,4 +65,3 @@ class ArtemisUSB2Platform(Platform):
         if find_xilinx_path() is None:
             return False
         return True
-

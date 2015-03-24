@@ -106,7 +106,6 @@ def reset(ftdi, status = None):
 def list_ioctl(status = None):
         pass
 
-
 def set_sync_fifo_mode(vendor, product, serial_numbe):
     """
     Change the mode of the FIFO to a synchronous FIFO
@@ -140,11 +139,9 @@ def set_debug_mode(vendor, product, serial_number):
     fifo = FifoController(vendor, product)
     fifo.set_async_fifo()
 
-
-
 class Controller(object):
 
-    def __init__(self, dev = None, vendor_id = 0x0403, product_id = 0x8530, status = None):
+    def __init__(self, dev = None, vendor_id = 0x0403, product_id = 0x8531, status = None):
         super (Controller, self).__init__()
 
         self.vendor = vendor_id
@@ -197,7 +194,6 @@ class Controller(object):
         if binf_str != binf:
             raise NysaError("Image Verification Failed!, data written is not the same as data read")
 
-
     def program(self):
         """
         Send a program signal to the board, the FPGA will attempt to read the
@@ -224,7 +220,6 @@ class Controller(object):
         bbc.program_high()
         bbc.pins_on()
         bbc.set_pins_to_input()
-
 
     def read_bin_file(self, filepath):
         """
@@ -276,7 +271,6 @@ class Controller(object):
         bbc.pins_on()
         bbc.set_pins_to_input()
 
-
     def set_sync_fifo_mode(self):
         """
         Change the mode of the FIFO to a synchronous FIFO
@@ -309,7 +303,6 @@ class Controller(object):
         """
         fifo = FifoController(self.vendor, self.product)
         fifo.set_async_fifo()
-
 
     def open_dev(self):
         """_open_dev
@@ -352,7 +345,6 @@ class Controller(object):
         #Set the hardware flow control
         self.dev.set_flowctrl('hw')
         self.dev.purge_buffers()
-
 
     def ioctl(self, name, arg = None):
         raise AssertionError("%s not implemented" % sys._getframe().f_code.co_name)

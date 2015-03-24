@@ -136,6 +136,7 @@ class SerialFlashManager(object):
             #print "Found Numonyx Device"
             return numonyx_flash.NumonyxFlashDevice(spi, ids[2])
         
+        print "id: %s" % str(ids)
         raise SerialFlashUnknownJedec(ids[1])
 
 

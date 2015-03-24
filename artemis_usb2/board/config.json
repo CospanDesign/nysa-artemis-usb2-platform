@@ -11,10 +11,17 @@
   "image":"artemis.png",
   "default_project":"default.json",
   "invert_reset":true,
+
   "build_flags":{
     "bitgen":{
       "config":{
         "Binary":"Yes"
+       }
+    },
+    "xst":{
+      "flags":{
+        "-sd":"{cores}",
+        "-netlist_hierarchy":"rebuilt"
       }
     }
   }

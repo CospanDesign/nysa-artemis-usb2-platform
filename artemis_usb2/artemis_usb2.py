@@ -85,7 +85,7 @@ ARTEMIS_MEMORY_OFFSET = 0x0100000000
 
 _artemis_instances = {}
 
-def Artemis(idVendor = 0x0403, idProduct = 0x8530, sernum = None, status = False):
+def Artemis(idVendor = 0x0403, idProduct = 0x8531, sernum = None, status = False):
     global _artemis_instances
     if sernum in _artemis_instances:
         return _artemis_instances[sernum]
@@ -475,7 +475,7 @@ class _Artemis (Nysa):
     Concrete Class that implemented Artemis specific communication functions
     """
 
-    def __init__(self, idVendor = 0x0403, idProduct = 0x8530, sernum = None, status = False):
+    def __init__(self, idVendor = 0x0403, idProduct = 0x8531, sernum = None, status = False):
         Nysa.__init__(self, status)
         self.vendor = idVendor
         self.product = idProduct

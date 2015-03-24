@@ -26,8 +26,8 @@ from pyftdi.pyftdi.ftdi import Ftdi
 __author__ = 'dave.mccoy@cospandesign.com (Dave McCoy)'
 
 class BitBangController(object):
-    PROGRAM_PIN     = 0x20
-    SOFT_RESET_PIN    = 0x40
+    PROGRAM_PIN     = 0x40
+    SOFT_RESET_PIN    = 0x80
 
     def __init__(self, vendor_id, product_id, interface, debug = False):
         self.vendor = vendor_id

@@ -37,7 +37,6 @@ class BitBangController(object):
         self.debug = True
         self.f.open_bitbang(vendor_id, product_id, interface)
 
-
     def hiz(self):
         pass
 

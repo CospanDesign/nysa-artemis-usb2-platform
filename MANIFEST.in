@@ -3,3 +3,4 @@ include *.txt
 recursive-include artemis-usb2 *.json
 recursive-include artemis-usb2 *.ucf
 recursive-include artemis-usb2 *.png
+recursive-include artemis-usb2 *.rules

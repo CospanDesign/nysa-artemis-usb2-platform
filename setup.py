@@ -23,7 +23,7 @@ setup(
     author_email='dave.mccoy@cospandesign.com',
     packages=find_packages('.'),
     url="http://artemis.cospandesign.com",
-    package_data={'' : ["*.json", "*.png", "*.ucf"]},
+    package_data={'' : ["*.json", "*.png", "*.ucf", "*.rules"]},
     requires=['pyusb (>= 1.0.0b1)',
               'pyserial (>= 2.6)'],
     install_requires=['nysa',

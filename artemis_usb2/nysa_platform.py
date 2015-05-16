@@ -26,6 +26,7 @@ __author__ = 'dave.mccoy@cospandesign.com (Dave McCoy)'
 
 import sys
 import os
+import subprocess
 
 from nysa.host.nysa_platform import Platform
 import usb.core
@@ -65,3 +66,18 @@ class ArtemisUSB2Platform(Platform):
         if find_xilinx_path() is None:
             return False
         return True
+
+    def setup_platform(self):
+        if SYSTEM_NAME == "Linux":
+            print "linux distribution: %s" % SYSTEM_DIST[0]
+            source_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "board", "66-artemis-usb2.rules"))
+            if SYSTEM_DIST[0] == "Ubuntu":
+                print "Found Ubuntu platform, copying over rules, make sure to restart udev rules"
+                dest_path = "/etc/udev/rules.d/66-artemis-usb2.rules"
+                cmd = ["sudo", "cp", source_path, dest_path]
+                v = subprocess.call(cmd)
+
+        if SYSTEM_NAME == "Windows":
+            print "Windows box!"
+        return
+

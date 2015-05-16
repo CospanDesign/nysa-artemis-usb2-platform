@@ -29,6 +29,9 @@ import os
 import subprocess
 
 from nysa.host.nysa_platform import Platform
+from nysa.host.nysa_platform import SYSTEM_NAME
+from nysa.host.nysa_platform import SYSTEM_DIST
+
 import usb.core
 import usb.util
 from ftdi import Ftdi

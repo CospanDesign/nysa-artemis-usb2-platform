@@ -51,7 +51,7 @@ from nysa.host.nysa import Nysa
 from nysa.common import status
 from nysa.host.nysa import NysaCommError
 
-from pyftdi.pyftdi.ftdi import Ftdi
+from ftdi import Ftdi
 from array import array as Array
 
 from bitbang.bitbang import BitBangController

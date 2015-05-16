@@ -1,4 +1,6 @@
-from pyftdi.pyftdi import spi
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+from spi import SpiController
+
 from array import array as Array
 import serialflash
 import time

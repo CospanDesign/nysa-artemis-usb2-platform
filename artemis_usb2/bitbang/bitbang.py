@@ -18,9 +18,8 @@
 import os
 import sys
 from array import array as Array
-from pyftdi.pyftdi.ftdi import Ftdi
-#sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
-#from artemis.pyftdi.pyftdi.ftdi import Ftdi
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+from ftdi import Ftdi
 
 
 __author__ = 'dave.mccoy@cospandesign.com (Dave McCoy)'

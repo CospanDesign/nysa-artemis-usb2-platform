@@ -14,7 +14,6 @@ from bitbang.bitbang import BitBangController
 
 from nysa.host.nysa import NysaError
 
-
 def upload(vendor, product, serial_number, filepath, status):
         """
         Read a binary file found at filepath and write the binary image into the Flash
@@ -36,7 +35,7 @@ def upload(vendor, product, serial_number, filepath, status):
         s = status
         binf = ""
 
-        f = open(filepath, "r")
+        f = open(filepath, "rb")
         binf = f.read()
         f.close()
 

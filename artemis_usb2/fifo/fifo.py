@@ -4,8 +4,8 @@ Nysa FIFO Control
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-from ftdi import Ftdi
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+from artemis_usb2.ftdi import Ftdi
 from array import array as Array
 
 
@@ -19,7 +19,6 @@ class FifoController(object):
         Ftdi.type = 'ft2232h'
         Ftdi.frequency_max = 30.0E6
         self.f = Ftdi()
-
 
     def set_sync_fifo(self, frequency = 30.0E6, latency = 2):
         """Configure the interface for synchronous FIFO mode"""

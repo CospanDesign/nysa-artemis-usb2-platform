@@ -742,6 +742,10 @@ class Ftdi(object):
         self.interface = config[(ifnum-1, 0)]
         endpoints = sorted([ep.bEndpointAddress for ep in self.interface])
         self.in_ep, self.out_ep = endpoints[:2]
+        if os.name == "nt":
+            #self.usb_dev.set_configuration(config)
+            self.usb_dev.set_configuration()
+        #    self.usb_dev.set_interface_altsetting(self.interface)
 
     def _reset_device(self):
         """Reset the ftdi device"""

@@ -1,0 +1,148 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+CLK_HALF_PERIOD	sim/tb_wishbone_master.v	/^`define CLK_HALF_PERIOD 10$/;"	c
+CLK_PERIOD	sim/tb_wishbone_master.v	/^`define CLK_PERIOD (2 * `CLK_HALF_PERIOD)$/;"	c
+CLOCK_RATE	sim/project_defines.v	/^`define CLOCK_RATE 50000000$/;"	c
+ConfigurationError	site_scons/utils.py	/^class ConfigurationError(Exception):$/;"	c	inherits:Exception
+DEFAULT_BUILD_DIR	site_scons/utils.py	/^DEFAULT_BUILD_DIR = "build"$/;"	v
+DEFAULT_CONFIG_FILE	site_scons/utils.py	/^DEFAULT_CONFIG_FILE = "config.json"$/;"	v
+INPUT_FILE	sim/tb_wishbone_master.v	/^`define INPUT_FILE "sim\/master_input_test_data.txt"$/;"	c
+LINUX_XILINX_DEFAULT_BASE	site_scons/utils.py	/^LINUX_XILINX_DEFAULT_BASE = "\/opt\/Xilinx"$/;"	v
+OUTPUT_FILE	sim/tb_wishbone_master.v	/^`define OUTPUT_FILE "sim\/master_output_test_data.txt"$/;"	c
+PROJECT_BASE	site_scons/utils.py	/^PROJECT_BASE = os.path.abspath($/;"	v
+SIM	sim/project_defines.v	/^`define SIM$/;"	c
+SLEEP_CLK	sim/tb_wishbone_master.v	/^`define SLEEP_CLK(x)  #(x * `CLK_PERIOD)$/;"	c
+SLEEP_FULL_CLK	sim/tb_wishbone_master.v	/^`define SLEEP_FULL_CLK #(`CLK_PERIOD)$/;"	c
+SLEEP_HALF_CLK	sim/tb_wishbone_master.v	/^`define SLEEP_HALF_CLK #(`CLK_HALF_PERIOD)$/;"	c
+TIMEOUT_COUNT	sim/tb_wishbone_master.v	/^`define TIMEOUT_COUNT 40$/;"	c
+TOOL_TYPES	site_scons/utils.py	/^TOOL_TYPES=("ise",$/;"	v
+WINDOWS_XILINX_DEFAULT_BASE	site_scons/utils.py	/^WINDOWS_XILINX_DEFAULT_BASE = "Xilinx"$/;"	v
+__DEVICE_TABLE_DEFINES__	sim/project_defines.v	/^`define __DEVICE_TABLE_DEFINES__$/;"	c
+ch	sim/tb_wishbone_master.v	/^integer           ch;$/;"	r
+clk	rtl/wb_artemis_usb2_platform.v	/^  input               clk,$/;"	p
+clk	sim/tb_wishbone_master.v	/^reg               clk             = 0;$/;"	r
+command_finished	sim/tb_wishbone_master.v	/^reg               command_finished;$/;"	r
+data_count	sim/tb_wishbone_master.v	/^integer           data_count;$/;"	r
+data_read_count	sim/tb_wishbone_master.v	/^reg     [27:0]    data_read_count;$/;"	r
+data_write_count	sim/tb_wishbone_master.v	/^reg     [27:0]    data_write_count;$/;"	r
+execute_command	sim/tb_wishbone_master.v	/^reg               execute_command;$/;"	r
+fd_in	sim/tb_wishbone_master.v	/^integer           fd_in;$/;"	r
+fd_out	sim/tb_wishbone_master.v	/^integer           fd_out;$/;"	r
+find_license_dir	site_scons/utils.py	/^def find_license_dir(path = ""):$/;"	f	access:public
+find_xilinx_path	site_scons/utils.py	/^def find_xilinx_path(path = "", build_tool = "ISE", version_number = ""):$/;"	f	access:public
+get_project_base	site_scons/utils.py	/^def get_project_base():$/;"	f	access:public
+get_window_drives	site_scons/utils.py	/^def get_window_drives():$/;"	f	access:public
+i_gtp0_clk_n	rtl/wb_artemis_usb2_platform.v	/^  input               i_gtp0_clk_n,$/;"	p
+i_gtp1_clk_n	rtl/wb_artemis_usb2_platform.v	/^  input               i_gtp1_clk_n$/;"	p
+i_pcie_disparity_mode	rtl/wb_artemis_usb2_platform.v	/^  input       [3:0]   i_pcie_disparity_mode,$/;"	p
+i_pcie_phy_rx_n	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_phy_rx_n,$/;"	p
+i_pcie_tx_char_is_k	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_tx_char_is_k,$/;"	p
+i_pcie_tx_data	rtl/wb_artemis_usb2_platform.v	/^  input       [31:0]  i_pcie_tx_data,$/;"	p
+i_pcie_tx_detect_rx	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_tx_detect_rx,$/;"	p
+i_pcie_tx_elec_idle	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_tx_elec_idle,$/;"	p
+i_rx_pre_amp	rtl/wb_artemis_usb2_platform.v	/^  input       [2:0]   i_rx_pre_amp,$/;"	p
+i_sata_phy_rx_n	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_phy_rx_n,$/;"	p
+i_sata_reset	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_reset,$/;"	p
+i_sata_tx_comm_type	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_tx_comm_type,$/;"	p
+i_wbs_adr	rtl/wb_artemis_usb2_platform.v	/^  input       [31:0]  i_wbs_adr,$/;"	p
+i_wbs_sel	rtl/wb_artemis_usb2_platform.v	/^  input       [3:0]   i_wbs_sel,$/;"	p
+i_wbs_stb	rtl/wb_artemis_usb2_platform.v	/^  input               i_wbs_stb,$/;"	p
+i_wbs_we	rtl/wb_artemis_usb2_platform.v	/^  input               i_wbs_we,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_gtp0_clk_p,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_gtp1_clk_p,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_phy_rx_p,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_reset,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_pcie_rx_polarity,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_phy_rx_p,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_rx_reset,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_tx_char_is_k,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_tx_comm_start,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_sata_tx_elec_idle,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               i_wbs_cyc,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input               rst,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input       [31:0]  i_sata_tx_data,$/;"	p
+input	rtl/wb_artemis_usb2_platform.v	/^  input       [31:0]  i_wbs_dat,$/;"	p
+o_pcie_clk_correct_count	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_clk_correct_count,$/;"	p
+o_pcie_data_out	rtl/wb_artemis_usb2_platform.v	/^  output      [31:0]  o_pcie_data_out,$/;"	p
+o_pcie_disperity_error	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_disperity_error,$/;"	p
+o_pcie_phy_rx_p	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_phy_rx_p,$/;"	p
+o_pcie_phy_rx_valid	rtl/wb_artemis_usb2_platform.v	/^  output      [1:0]   o_pcie_phy_rx_valid,$/;"	p
+o_pcie_rx_char_is_k	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_rx_char_is_k,$/;"	p
+o_pcie_rx_not_in_table	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_rx_not_in_table,$/;"	p
+o_sata_75mhz_clk	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_75mhz_clk,$/;"	p
+o_sata_char_is_comma	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_char_is_comma,$/;"	p
+o_sata_dcm_locked	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_dcm_locked,$/;"	p
+o_sata_elec_idle	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_elec_idle,$/;"	p
+o_sata_phy_tx_p	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_phy_tx_p,$/;"	p
+o_sata_pll_detect_k	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_pll_detect_k,$/;"	p
+o_sata_reset_done	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_reset_done,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_125mhz_clk,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_dcm_locked,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_elec_idle,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_phy_rx_n,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_pll_detect_k,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_pcie_reset_done,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_clk_correct_count,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_disperity_error,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_phy_tx_n,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_rx_char_is_k,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output              o_sata_rx_not_in_table,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output      [1:0]   o_pcie_phy_status,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output      [31:0]  o_sata_data_out,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output      [3:0]   i_tx_diff_swing,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output  reg         o_wbs_ack,$/;"	p
+output	rtl/wb_artemis_usb2_platform.v	/^  output  reg         o_wbs_int,$/;"	p
+prev_int	sim/tb_wishbone_master.v	/^reg               prev_int        = 0;$/;"	r
+r_ih_reset	sim/tb_wishbone_master.v	/^reg               r_ih_reset      = 0;$/;"	r
+r_in_address	sim/tb_wishbone_master.v	/^reg   [31:0]      r_in_address    = 32'h00000000;$/;"	r
+r_in_command	sim/tb_wishbone_master.v	/^reg   [31:0]      r_in_command    = 32'h00000000;$/;"	r
+r_in_data	sim/tb_wishbone_master.v	/^reg   [31:0]      r_in_data       = 32'h00000000;$/;"	r
+r_in_data_count	sim/tb_wishbone_master.v	/^reg   [27:0]      r_in_data_count = 0;$/;"	r
+r_in_ready	sim/tb_wishbone_master.v	/^reg               r_in_ready      = 0;$/;"	r
+r_out_ready	sim/tb_wishbone_master.v	/^reg               r_out_ready     = 0;$/;"	r
+read_count	sim/tb_wishbone_master.v	/^integer           read_count;$/;"	r
+reg	rtl/wb_artemis_usb2_platform.v	/^  output  reg [31:0]  o_wbs_dat,$/;"	p
+request_more_data	sim/tb_wishbone_master.v	/^reg               request_more_data;$/;"	r
+request_more_data_ack	sim/tb_wishbone_master.v	/^reg               request_more_data_ack;$/;"	r
+rst	sim/tb_wishbone_master.v	/^reg               rst             = 0;$/;"	r
+state	sim/tb_wishbone_master.v	/^reg [3:0]         state           =   IDLE;$/;"	r
+timeout_count	sim/tb_wishbone_master.v	/^integer           timeout_count;$/;"	r
+w_master_ready	sim/tb_wishbone_master.v	/^wire              w_master_ready;$/;"	n
+w_out_address	sim/tb_wishbone_master.v	/^wire  [31:0]      w_out_address;$/;"	n
+w_out_data	sim/tb_wishbone_master.v	/^wire  [31:0]      w_out_data;$/;"	n
+w_out_data_count	sim/tb_wishbone_master.v	/^wire  [27:0]      w_out_data_count;$/;"	n
+w_out_en	sim/tb_wishbone_master.v	/^wire              w_out_en;$/;"	n
+w_out_status	sim/tb_wishbone_master.v	/^wire  [31:0]      w_out_status;$/;"	n
+w_wbm_ack	sim/tb_wishbone_master.v	/^wire              w_wbm_ack;$/;"	n
+w_wbm_adr	sim/tb_wishbone_master.v	/^wire [31:0]       w_wbm_adr;$/;"	n
+w_wbm_cyc	sim/tb_wishbone_master.v	/^wire              w_wbm_cyc;$/;"	n
+w_wbm_dat_i	sim/tb_wishbone_master.v	/^wire [31:0]       w_wbm_dat_i;$/;"	n
+w_wbm_dat_o	sim/tb_wishbone_master.v	/^wire [31:0]       w_wbm_dat_o;$/;"	n
+w_wbm_int	sim/tb_wishbone_master.v	/^wire              w_wbm_int;$/;"	n
+w_wbm_sel	sim/tb_wishbone_master.v	/^wire [3:0]        w_wbm_sel;$/;"	n
+w_wbm_stb	sim/tb_wishbone_master.v	/^wire              w_wbm_stb;$/;"	n
+w_wbm_we	sim/tb_wishbone_master.v	/^wire              w_wbm_we;$/;"	n
+w_wbs0_ack	sim/tb_wishbone_master.v	/^wire              w_wbs0_ack;$/;"	n
+w_wbs0_adr	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs0_adr;$/;"	n
+w_wbs0_cyc	sim/tb_wishbone_master.v	/^wire              w_wbs0_cyc;$/;"	n
+w_wbs0_dat_i	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs0_dat_i;$/;"	n
+w_wbs0_dat_o	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs0_dat_o;$/;"	n
+w_wbs0_int	sim/tb_wishbone_master.v	/^wire              w_wbs0_int;$/;"	n
+w_wbs0_sel	sim/tb_wishbone_master.v	/^wire  [3:0]       w_wbs0_sel;$/;"	n
+w_wbs0_stb	sim/tb_wishbone_master.v	/^wire              w_wbs0_stb;$/;"	n
+w_wbs0_we	sim/tb_wishbone_master.v	/^wire              w_wbs0_we;$/;"	n
+w_wbs1_ack	sim/tb_wishbone_master.v	/^wire              w_wbs1_ack;$/;"	n
+w_wbs1_adr	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs1_adr;$/;"	n
+w_wbs1_cyc	sim/tb_wishbone_master.v	/^wire              w_wbs1_cyc;$/;"	n
+w_wbs1_dat_i	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs1_dat_i;$/;"	n
+w_wbs1_dat_o	sim/tb_wishbone_master.v	/^wire  [31:0]      w_wbs1_dat_o;$/;"	n
+w_wbs1_int	sim/tb_wishbone_master.v	/^wire              w_wbs1_int;$/;"	n
+w_wbs1_sel	sim/tb_wishbone_master.v	/^wire  [3:0]       w_wbs1_sel;$/;"	n
+w_wbs1_stb	sim/tb_wishbone_master.v	/^wire              w_wbs1_stb;$/;"	n
+w_wbs1_we	sim/tb_wishbone_master.v	/^wire              w_wbs1_we;$/;"	n
+wb_artemis_usb2_platform	rtl/wb_artemis_usb2_platform.v	/^module wb_artemis_usb2_platform ($/;"	m
+wishbone_master_tb	sim/tb_wishbone_master.v	/^module wishbone_master_tb ($/;"	m

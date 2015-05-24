@@ -44,7 +44,7 @@
             }
         }
     },
-    "REQUIRED_SLAVES":{
+    "SLAVES":{
         "gpio1":{
             "filename":"wb_gpio.v",
             "unique_id":1,

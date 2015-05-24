@@ -42,7 +42,7 @@ SOFTWARE.
   SDB_ABI_VERSION_MAJOR:0x022
 
   Set the ABI Minor Version (8-bits)
-  SDB_ABI_VERSION_MINOR:0x02
+  SDB_ABI_VERSION_MINOR:0x03
 
   Set the Module URL (63 Unicode Characters)
   SDB_MODULE_URL:http://www.artemis.cospandesign.com

@@ -30,8 +30,6 @@ NET o_pcie_phy_tx_p LOC=B8;
 NET o_pcie_phy_tx_n LOC=A8;
 
 
-
-
 INST artemis_usb_plat/aps/artemis_pcie_sata/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i LOC=GTPA1_DUAL_X0Y0;
 
 

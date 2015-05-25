@@ -9,8 +9,8 @@ module artemis_pcie_sata (
   output          o_sata_reset_done,
   output          o_pcie_reset_done,
 
-  output          o_sata_150mhz_clk,
-  output          o_pcie_125mhz_clk,
+  output          o_sata_75mhz_clk,
+  output          o_pcie_62p5mhz_clk,
 
   output          o_sata_dcm_locked,
   output          o_pcie_dcm_locked,
@@ -47,14 +47,14 @@ module artemis_pcie_sata (
   //------------------ Receive Ports - RX Polarity Control -------------------
   input           i_pcie_rx_polarity,
   //----------------- Transmit Ports - 8b10b Encoder Control -----------------
-  input   [3:0]   i_pcie_disparity_mode,
+  input   [1:0]   i_pcie_disparity_mode,
   input           i_sata_tx_char_is_k,
   input           i_pcie_tx_char_is_k,
   //---------------- Transmit Ports - TX Data Path interface -----------------
   input   [31:0]  i_sata_tx_data,
   input   [31:0]  i_pcie_tx_data,
   //------------- Transmit Ports - TX Driver and OOB signalling --------------
-  output  [3:0]   i_tx_diff_swing,
+  input   [3:0]   i_tx_diff_swing,
   output          o_sata_phy_tx_p,
   output          o_sata_phy_tx_n,
 

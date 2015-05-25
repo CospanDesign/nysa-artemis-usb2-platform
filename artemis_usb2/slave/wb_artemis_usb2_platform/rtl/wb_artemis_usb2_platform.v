@@ -63,6 +63,7 @@ SOFTWARE.
   SDB_SIZE:2
 */
 `include "artemis_usb2_platform_defines.v"
+`unconnected_drive pull0
 
 
 module wb_artemis_usb2_platform (
@@ -84,8 +85,8 @@ module wb_artemis_usb2_platform (
   output  reg         o_wbs_int,
 
   //------------------------------- PLL Ports --------------------------------
-  output              o_sata_150mhz_clk,
-  output              o_pcie_125mhz_clk,
+  output              o_sata_75mhz_clk,
+  output              o_pcie_62p5mhz_clk,
   //--------------------- Receive Ports - 8b10b Decoder ----------------------
   output              o_sata_char_is_comma,
   output              o_sata_rx_char_is_k,
@@ -110,7 +111,7 @@ module wb_artemis_usb2_platform (
   output      [1:0]   o_pcie_phy_rx_valid,
   //------------------ Receive Ports - RX Polarity Control -------------------
   //----------------- Transmit Ports - 8b10b Encoder Control -----------------
-  input       [3:0]   i_pcie_disparity_mode,
+  input       [1:0]   i_pcie_disparity_mode,
   input               i_sata_tx_char_is_k,
   input               i_pcie_tx_char_is_k,
   //---------------- Transmit Ports - TX Data Path interface -----------------
@@ -150,7 +151,7 @@ localparam     GTP_CONTROL  = 32'h00000000;
 localparam     GTP_STATUS   = 32'h00000001;
 
 //Local Registers/Wires
-reg   [31:0]        gtp_control;
+reg   [31:0]        gtp_control = 32'h00;
 wire  [31:0]        gtp_status;
 
 wire                pcie_rx_polarity;
@@ -182,8 +183,8 @@ artemis_pcie_sata aps(
   .o_sata_reset_done        (sata_reset_done          ),
   .o_pcie_reset_done        (pcie_reset_done          ),
 
-  .o_sata_150mhz_clk        (o_sata_150mhz_clk        ),
-  .o_pcie_125mhz_clk        (o_pcie_125mhz_clk        ),
+  .o_sata_75mhz_clk         (o_sata_75mhz_clk         ),
+  .o_pcie_62p5mhz_clk       (o_pcie_62p5mhz_clk       ),
 
   .o_sata_dcm_locked        (sata_dcm_locked          ),
   .o_pcie_dcm_locked        (pcie_dcm_locked          ),
@@ -238,9 +239,10 @@ artemis_pcie_sata aps(
 
 //Asynchronous Logic
 assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH:`GTP_RX_PRE_AMP_LOW];
-assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH:`GTP_TX_DIFF_SWING_HIGH];
+assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH:`GTP_TX_DIFF_SWING_LOW];
                                             
-assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
+//assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
+assign    pcie_rx_polarity                  = 1'b0;
 assign    pcie_rx_reset                     = rst || gtp_control[`PCIE_RX_RESET];
 assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
 assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
@@ -263,8 +265,8 @@ always @ (posedge clk) begin
   if (rst) begin
     o_wbs_dat     <=  32'h0;
     o_wbs_ack     <=  0;
-    o_wbs_int     <=  0;
     gtp_control   <=  0;
+    o_wbs_int     <=  0;
   end
 
   else begin

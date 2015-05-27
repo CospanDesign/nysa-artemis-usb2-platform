@@ -33,7 +33,7 @@ SOFTWARE.
   SDB_CORE_VERSION:00.000.001
 
   Set the Device Name: 19 UNICODE characters
-  SDB_NAME:wb_artemis_usb2_platform
+  SDB_NAME:artemis_usb2
 
   Set the class of the device (16 bits) Set as 0
   SDB_ABI_CLASS:0
@@ -240,7 +240,7 @@ artemis_pcie_sata aps(
 //Asynchronous Logic
 assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH:`GTP_RX_PRE_AMP_LOW];
 assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH:`GTP_TX_DIFF_SWING_LOW];
-                                            
+
 //assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
 assign    pcie_rx_polarity                  = 1'b0;
 assign    pcie_rx_reset                     = rst || gtp_control[`PCIE_RX_RESET];

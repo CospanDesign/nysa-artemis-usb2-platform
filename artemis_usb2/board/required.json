@@ -37,17 +37,12 @@
             "o_ftdi_siwu":{
                 "loc":"siwua",
                 "direction":"output"
-            },
-            "i_ftdi_suspend_n":{
-                "loc":"suspend_n",
-                "direction":"input"
             }
         }
     },
     "SLAVES":{
         "gpio1":{
             "filename":"wb_gpio.v",
-            "unique_id":1,
             "bind":{
                 "gpio_out[1:0]":{
                     "loc":"led[1:0]",

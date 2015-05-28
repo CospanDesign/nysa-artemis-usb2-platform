@@ -123,8 +123,8 @@ module wb_artemis_usb2_platform (
   input               i_sata_tx_elec_idle,
   input               i_pcie_tx_elec_idle,
   //------------------- Transmit Ports - TX Ports for SATA -------------------
-  input               i_sata_tx_comm_start,
-  input               i_sata_tx_comm_type,
+  input               i_sata_tx_comm_wake,
+  input               i_sata_tx_comm_reset,
 
   //Physical Signals
   input               i_gtp0_clk_p,
@@ -171,6 +171,11 @@ wire                pcie_reset_done;
 
 wire                sata_dcm_locked;
 wire                pcie_dcm_locked;
+
+reg                 sata_tx_comm_start = 0;
+reg                 sata_tx_comm_type= 0;
+
+
 
 //Submodules
 artemis_pcie_sata aps(
@@ -227,8 +232,8 @@ artemis_pcie_sata aps(
   .i_pcie_tx_detect_rx      (i_pcie_tx_detect_rx      ),
   .i_sata_tx_elec_idle      (i_sata_tx_elec_idle      ),
   .i_pcie_tx_elec_idle      (i_pcie_tx_elec_idle      ),
-  .i_sata_tx_comm_start     (i_sata_tx_comm_start     ),
-  .i_sata_tx_comm_type      (i_sata_tx_comm_type      ),
+  .i_sata_tx_comm_start     (sata_tx_comm_start       ),
+  .i_sata_tx_comm_type      (sata_tx_comm_type        ),
 
   .i_gtp0_clk_p             (i_gtp0_clk_p             ),
   .i_gtp0_clk_n             (i_gtp0_clk_n             ),
@@ -246,6 +251,23 @@ assign    pcie_rx_polarity                  = 1'b0;
 assign    pcie_rx_reset                     = rst || gtp_control[`PCIE_RX_RESET];
 assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
 assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
+
+assign    sata_tx_comm_start                = i_sata_tx_comm_init || i_sata_tx_comm_reset;
+assign    sata_tx_comm_type                 = i_sata_tx_comm_reset;
+
+always @ (o_sata_75mhz_clk) begin
+  if (sata_reset) begin
+    sata_tx_comm_start  <=  0;
+    sata_tx_comm_type   <=  0;
+  end
+  else begin
+    sata_tx_comm_start  <=  0;
+    sata_tx_comm_type   <=  i_sata_tx_comm_reset;
+    if (i_sata_tx_comm_init || i_sata_tx_comm_reset) begin
+      sata_tx_comm_start  <=  0;
+    end
+  end
+end
 
 
 assign    gtp_status[`SATA_PLL_DETECT_K]    = sata_pll_detect_k;

@@ -4,8 +4,10 @@
 #In order to use Xilinx libraris use the ${XILINX} to replace, the path will include ISE_DS
 #An example:
 #+incdir+${XILINX}/ISE/verilog/src
++incdir+rtl
 
 #Use the NYSA keyword to point to the nysa-verilog base directory
+
 
 ${NYSA}/verilog/sim/wishbone/interconnect/example_2port_interconnect/wishbone_interconnect.v
 #${NYSA}/verilog/wishbone/slave/device_rom_table/device_rom_table.v
@@ -17,7 +19,8 @@ ${NYSA}/verilog/wishbone/master/wishbone_master.v
 #The generic directory contains a lot of non-platform specific verilog code
 #${NYSA}/verilog/generic/<some name here>.v
 
-../../cores/sata_pcie/artemis_pcie_sata.v
+rtl/artemis_usb2_platform_defines.v
+cores/artemis_pcie_sata.v
 rtl/wb_artemis_usb2_platform.v
 sim/tb_wishbone_master.v
 

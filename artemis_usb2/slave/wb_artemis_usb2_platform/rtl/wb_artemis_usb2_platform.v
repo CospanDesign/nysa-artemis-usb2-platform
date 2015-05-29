@@ -83,49 +83,51 @@ module wb_artemis_usb2_platform (
   input       [31:0]  i_wbs_adr,
 
   output  reg         o_wbs_int,
+  output              o_platform_ready,
 
   //------------------------------- PLL Ports --------------------------------
   output              o_sata_75mhz_clk,
   output              o_pcie_62p5mhz_clk,
   //--------------------- Receive Ports - 8b10b Decoder ----------------------
-  output              o_sata_char_is_comma,
-  output              o_sata_rx_char_is_k,
-  output              o_pcie_rx_char_is_k,
-  output              o_sata_disperity_error,
-  output              o_pcie_disperity_error,
-  output              o_sata_rx_not_in_table,
-  output              o_pcie_rx_not_in_table,
+  output      [3:0]   o_sata_char_is_comma,
+  output      [3:0]   o_sata_rx_char_is_k,
+  output      [3:0]   o_pcie_rx_char_is_k,
+  output              o_sata_error,
+  output              o_pcie_error,
   //-------------------- Receive Ports - Clock Correction --------------------
-  output              o_sata_clk_correct_count,
-  output              o_pcie_clk_correct_count,
+  output      [2:0]   o_sata_clk_correct_count,
+  output      [2:0]   o_pcie_clk_correct_count,
   //----------------- Receive Ports - RX Data Path interface -----------------
-  output      [31:0]  o_sata_data_out,
-  output      [31:0]  o_pcie_data_out,
+  output      [31:0]  o_sata_rx_data,
+  output      [31:0]  o_pcie_rx_data,
   //----- Receive Ports - RX Driver,OOB signalling,Coupling and Eq.,CDR ------
   output              o_sata_rx_elec_idle,
   output              o_pcie_rx_elec_idle,
 
   //--------- Receive Ports - RX Elastic Buffer and Phase Alignment ----------
+  output              o_sata_tx_oob_complete,
+  output              o_sata_rx_comm_wake_detect,
+  output              o_sata_rx_comm_init_detect,
+
   //------------ Receive Ports - RX Pipe Control for PCI Express -------------
-  output      [1:0]   o_pcie_phy_status,
-  output      [1:0]   o_pcie_phy_rx_valid,
+  output              o_pcie_phy_status,
+  output              o_pcie_phy_rx_valid,
   //------------------ Receive Ports - RX Polarity Control -------------------
   //----------------- Transmit Ports - 8b10b Encoder Control -----------------
-  input       [1:0]   i_pcie_disparity_mode,
-  input               i_sata_tx_char_is_k,
-  input               i_pcie_tx_char_is_k,
+  input       [3:0]   i_pcie_disparity_mode,
+  input       [3:0]   i_sata_tx_char_is_k,
+  input       [3:0]   i_pcie_tx_char_is_k,
   //---------------- Transmit Ports - TX Data Path interface -----------------
   input       [31:0]  i_sata_tx_data,
   input       [31:0]  i_pcie_tx_data,
   //------------- Transmit Ports - TX Driver and OOB signalling --------------
+  input               i_sata_tx_comm_init,
+  input               i_sata_tx_comm_wake,
   //--------------- Transmit Ports - TX Ports for PCI Express ----------------
   input               i_pcie_tx_detect_rx,
   input               i_sata_tx_elec_idle,
   input               i_pcie_tx_elec_idle,
   //------------------- Transmit Ports - TX Ports for SATA -------------------
-  input               i_sata_tx_comm_wake,
-  input               i_sata_tx_comm_reset,
-
   //Physical Signals
   input               i_gtp0_clk_p,
   input               i_gtp0_clk_n,
@@ -160,7 +162,7 @@ wire                usr_cntrl_reset;
 wire                sata_reset;
 wire                pcie_reset;
 
-wire  [2:0]         rx_pre_amp;
+wire  [1:0]         rx_pre_amp;
 wire  [3:0]         tx_diff_swing;
 
 wire                sata_pll_detect_k;
@@ -173,7 +175,15 @@ wire                sata_dcm_locked;
 wire                pcie_dcm_locked;
 
 reg                 sata_tx_comm_start = 0;
-reg                 sata_tx_comm_type= 0;
+reg                 sata_tx_comm_type = 0;
+
+wire  [2:0]         sata_rx_status;
+wire  [2:0]         pcie_rx_status;
+
+wire  [3:0]         sata_disparity_error;
+wire  [3:0]         pcie_disparity_error;
+wire  [3:0]         sata_rx_not_in_table;
+wire  [3:0]         pcie_rx_not_in_table;
 
 
 
@@ -197,18 +207,21 @@ artemis_pcie_sata aps(
   .o_sata_char_is_comma     (o_sata_char_is_comma     ),
   .o_sata_rx_char_is_k      (o_sata_rx_char_is_k      ),
   .o_pcie_rx_char_is_k      (o_pcie_rx_char_is_k      ),
-  .o_sata_disperity_error   (o_sata_disperity_error   ),
-  .o_pcie_disperity_error   (o_pcie_disperity_error   ),
-  .o_sata_rx_not_in_table   (o_sata_rx_not_in_table   ),
-  .o_pcie_rx_not_in_table   (o_pcie_rx_not_in_table   ),
+  .o_sata_disparity_error   (sata_disparity_error     ),
+  .o_pcie_disparity_error   (pcie_disparity_error     ),
+  .o_sata_rx_not_in_table   (sata_rx_not_in_table     ),
+  .o_pcie_rx_not_in_table   (pcie_rx_not_in_table     ),
   .o_sata_clk_correct_count (o_sata_clk_correct_count ),
   .o_pcie_clk_correct_count (o_pcie_clk_correct_count ),
-  .o_sata_data_out          (o_sata_data_out          ),
-  .o_pcie_data_out          (o_pcie_data_out          ),
+  .o_sata_rx_data           (o_sata_rx_data           ),
+  .o_pcie_rx_data           (o_pcie_rx_data           ),
   .i_pcie_rx_reset          (pcie_rx_reset            ),
   .o_sata_rx_elec_idle      (o_sata_rx_elec_idle      ),
   .o_pcie_rx_elec_idle      (o_pcie_rx_elec_idle      ),
-  .i_rx_pre_amp             (rx_pre_amp               ),
+  .i_sata_rx_pre_amp        (rx_pre_amp               ),
+
+  .o_sata_rx_status         (sata_rx_status           ),
+  .o_pcie_rx_status         (pcie_rx_status           ),
 
   .i_sata_phy_rx_p          (i_sata_phy_rx_p          ),
   .i_sata_phy_rx_n          (i_sata_phy_rx_n          ),
@@ -250,10 +263,17 @@ assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIG
 assign    pcie_rx_polarity                  = 1'b0;
 assign    pcie_rx_reset                     = rst || gtp_control[`PCIE_RX_RESET];
 assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
+
 assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
 
-assign    sata_tx_comm_start                = i_sata_tx_comm_init || i_sata_tx_comm_reset;
-assign    sata_tx_comm_type                 = i_sata_tx_comm_reset;
+assign    o_sata_tx_oob_complete            = sata_rx_status[0];
+assign    o_sata_rx_comm_wake_detect        = sata_rx_status[1];
+assign    o_sata_rx_comm_init_detect        = sata_rx_status[2];
+
+assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0);
+assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0);
+
+assign    o_platform_ready                  = (!sata_reset && sata_pll_detect_k && sata_dcm_locked && sata_reset_done);
 
 always @ (o_sata_75mhz_clk) begin
   if (sata_reset) begin
@@ -262,9 +282,9 @@ always @ (o_sata_75mhz_clk) begin
   end
   else begin
     sata_tx_comm_start  <=  0;
-    sata_tx_comm_type   <=  i_sata_tx_comm_reset;
-    if (i_sata_tx_comm_init || i_sata_tx_comm_reset) begin
-      sata_tx_comm_start  <=  0;
+    sata_tx_comm_type   <=  i_sata_tx_comm_wake;
+    if (sata_tx_comm_type || i_sata_tx_comm_init) begin
+      sata_tx_comm_start  <=  1;
     end
   end
 end

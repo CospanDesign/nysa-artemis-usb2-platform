@@ -5,7 +5,7 @@
 `define PCIE_RESET              2
 `define SATA_RESET              3
 `define GTP_RX_PRE_AMP_LOW      4
-`define GTP_RX_PRE_AMP_HIGH     6
+`define GTP_RX_PRE_AMP_HIGH     5
 `define GTP_TX_DIFF_SWING_LOW   8
 `define GTP_TX_DIFF_SWING_HIGH  11
 `define PCIE_RX_POLARITY        12

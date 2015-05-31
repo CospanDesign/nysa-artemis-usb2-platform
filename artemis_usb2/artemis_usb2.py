@@ -77,6 +77,7 @@ ARTEMIS_WRITE = 2
 ARTEMIS_READ = 3
 ARTEMIS_PING = 4
 ARTEMIS_DUMP_CORE = 5
+ARTEMIS_IS_PROGRAMMED = 6
 
 ARTEMIS_RESP_OK = 0
 ARTEMIS_RESP_ERR = -1
@@ -143,6 +144,8 @@ class WorkerThread(threading.Thread):
 
                 if wdata == ARTEMIS_RESET:
                     self.reset()
+                elif wdata == ARTEMIS_IS_PROGRAMMED:
+                    self.is_programmed()
                 elif wdata == ARTEMIS_PING:
                     self.ping()
                 elif wdata == ARTEMIS_WRITE:
@@ -171,6 +174,15 @@ class WorkerThread(threading.Thread):
         bbc.soft_reset_low()
         time.sleep(.2)
         bbc.soft_reset_high()
+        bbc.pins_on()
+        bbc.set_pins_to_input()
+        self.hrq.put(ARTEMIS_RESP_OK)
+
+    def is_programmed(self):
+        vendor = self.d.data[0]
+        product = self.d.data[1]
+        bbc = BitBangController(vendor, product, 2)
+        self.d.data = bbc.read_done_pin()
         bbc.pins_on()
         bbc.set_pins_to_input()
         self.hrq.put(ARTEMIS_RESP_OK)
@@ -742,6 +754,25 @@ class _Artemis (Nysa):
             self.d.data = (self.vendor, self.product)
             self.hwq.put(ARTEMIS_RESET)
             self.ipc_comm_response("reset")
+
+    def is_programmed(self):
+        """
+        Check if the FPGA is programmed
+
+        Args:
+            Nothing
+
+        Return (Boolean):
+            True: FPGA is programmed
+            False: FPGA is not programmed
+
+        Raises:
+            NysaCommError: Failue in communication
+        """
+        with self.lock:
+            self.d.data = (self.vendor, self.product)
+            self.hwq.put(ARTEMIS_IS_PROGRAMMED)
+            return self.ipc_comm_response("is programmed")
 
     def dump_core(self):
         """ dump_core

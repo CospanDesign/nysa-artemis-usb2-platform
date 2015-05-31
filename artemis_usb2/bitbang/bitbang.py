@@ -17,6 +17,7 @@
 
 import os
 import sys
+import time
 from array import array as Array
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from ftdi import Ftdi
@@ -25,8 +26,9 @@ from ftdi import Ftdi
 __author__ = 'dave.mccoy@cospandesign.com (Dave McCoy)'
 
 class BitBangController(object):
-    PROGRAM_PIN     = 0x40
-    SOFT_RESET_PIN    = 0x80
+    DONE_PIN            = 0x10
+    PROGRAM_PIN         = 0x40
+    SOFT_RESET_PIN      = 0x80
 
     def __init__(self, vendor_id, product_id, interface, debug = False):
         self.vendor = vendor_id
@@ -50,6 +52,15 @@ class BitBangController(object):
 
     def read_soft_reset_pin(self):
         return (self.SOFT_RESET_PIN & self.f.read_pins() > 0)
+
+    def read_done_pin(self):
+        return (self.DONE_PIN & self.f.read_pins() > 0)
+
+    def wait_for_done(self):
+        while not self.read_done_pin():
+            print ".",
+            time.sleep(200)
+        print "Done"
 
     def soft_reset_high(self):
         pins = self.f.read_pins()

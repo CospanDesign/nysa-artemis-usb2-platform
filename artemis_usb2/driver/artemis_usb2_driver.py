@@ -63,6 +63,9 @@ SATA_RX_IDLE           = 6
 PCIE_RX_IDLE           = 7
 SATA_TX_IDLE           = 8
 PCIE_TX_IDLE           = 9
+SATA_LOSS_OF_SYNC      = 10
+PCIE_LOSS_OF_SYNC      = 11
+
 
 class ArtemisUSB2DriverError(Exception):
     pass
@@ -431,3 +434,35 @@ class ArtemisUSB2Driver(driver.Driver):
         """
         return self.is_register_bit_set(STATUS, PCIE_TX_IDLE)
 
+    def is_sata_lost_sync(self):
+        """
+        Returns True if SATA Receiver has lost synchronization with the hard
+        drive
+
+        Args:
+            Nothing
+
+        Returns (Boolean):
+            True: SATA Receiver has lost sync with the hard drive
+            False: SATA Receiver has not lost sync with the hard drive
+
+        Raises:
+            Nothing
+        """
+        return self.is_register_bit_set(STATUS, SATA_LOSS_OF_SYNC)
+
+    def is_pcie_lost_sync(self):
+        """
+        Returns True if PCIE Receiver has lost synchronization with the host
+
+        Args:
+            Nothing
+
+        Returns (Boolean):
+            True: PCIE Receiver has lost sync with the host
+            False: PCIE Receiver has not lost sync with the host
+
+        Raises:
+            Nothing
+        """
+        return self.is_register_bit_set(STATUS, PCIE_LOSS_OF_SYNC)

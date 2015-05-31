@@ -21,6 +21,8 @@
 `define PCIE_RX_IDLE            7
 `define SATA_TX_IDLE            8
 `define PCIE_TX_IDLE            9
+`define SATA_LOSS_OF_SYNC       10
+`define PCIE_LOSS_OF_SYNC       11
 
 
 `endif

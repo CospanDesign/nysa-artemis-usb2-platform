@@ -183,12 +183,12 @@ reg                 sata_tx_comm_type = 0;
 wire  [2:0]         sata_rx_status;
 wire  [2:0]         pcie_rx_status;
 
+wire                sata_loss_of_sync;
+wire                pcie_loss_of_sync;
 wire  [3:0]         sata_disparity_error;
 wire  [3:0]         pcie_disparity_error;
 wire  [3:0]         sata_rx_not_in_table;
 wire  [3:0]         pcie_rx_not_in_table;
-
-
 
 //Submodules
 artemis_pcie_sata aps(
@@ -206,6 +206,9 @@ artemis_pcie_sata aps(
 
   .o_sata_dcm_locked        (sata_dcm_locked          ),
   .o_pcie_dcm_locked        (pcie_dcm_locked          ),
+
+  .o_sata_loss_of_sync      (sata_loss_of_sync        ),
+  .o_pcie_loss_of_sync      (pcie_loss_of_sync        ),
 
   .o_sata_char_is_comma     (o_sata_char_is_comma     ),
   .o_sata_rx_char_is_k      (o_sata_rx_char_is_k      ),
@@ -271,11 +274,12 @@ assign    o_sata_tx_oob_complete            = sata_rx_status[0];
 assign    o_sata_rx_comm_wake_detect        = sata_rx_status[1];
 assign    o_sata_rx_comm_init_detect        = sata_rx_status[2];
 
-assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0);
-assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0);
+assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0) || sata_loss_of_sync;
+assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0) || pcie_loss_of_sync;
 
 assign    o_platform_ready                  = (!sata_reset && sata_pll_detect_k && sata_dcm_locked && sata_reset_done);
 
+//Translate SATA friendly signals to GTP Friendly signals
 always @ (posedge o_sata_75mhz_clk or posedge sata_reset) begin
   if (sata_reset) begin
     sata_tx_comm_start  <=  0;
@@ -307,6 +311,8 @@ assign    gtp_status[`SATA_RX_IDLE        ]  = o_sata_rx_elec_idle;
 assign    gtp_status[`PCIE_RX_IDLE        ]  = o_pcie_rx_elec_idle;
 assign    gtp_status[`SATA_TX_IDLE        ]  = i_sata_tx_elec_idle;
 assign    gtp_status[`PCIE_TX_IDLE        ]  = i_pcie_tx_elec_idle;
+assign    gtp_status[`SATA_LOSS_OF_SYNC   ]  = sata_loss_of_sync;
+assign    gtp_status[`PCIE_LOSS_OF_SYNC   ]  = pcie_loss_of_sync;
 
 //Synchronous Logic
 always @ (posedge clk) begin
@@ -317,12 +323,10 @@ always @ (posedge clk) begin
     o_wbs_int                   <=  0;
     gtp_control[`SATA_RESET]    <=  0;
     gtp_control[`PCIE_RESET]    <=  1;
-//    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
-//    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
-
+    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
+    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
 
   end
-
   else begin
     //when the master acks our ack, then put our ack down
     if (o_wbs_ack && ~i_wbs_stb)begin

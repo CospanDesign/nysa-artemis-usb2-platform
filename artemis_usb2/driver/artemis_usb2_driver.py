@@ -44,11 +44,10 @@ ARTEMIS_USB2_ID        = 0x03
 CONTROL                = 0x00
 STATUS                 = 0x01
 
-PCIE_RX_RESET          = 1
 PCIE_RESET             = 2
 SATA_RESET             = 3
 GTP_RX_PRE_AMP_LOW     = 4
-GTP_RX_PRE_AMP_HIGH    = 6
+GTP_RX_PRE_AMP_HIGH    = 5
 GTP_TX_DIFF_SWING_LOW  = 8
 GTP_TX_DIFF_SWING_HIGH = 11
 PCIE_RX_POLARITY       = 12
@@ -90,22 +89,6 @@ class ArtemisUSB2Driver(driver.Driver):
 
     def __del__(self):
         pass
-
-    def enable_pcie_rx_reset(self, enable):
-        """
-        Reset the receiver state machine of the PCIE GTP
-
-        Args:
-            enable: Reset
-            enable: Release Reset
-
-        Returns:
-            Nothing
-
-        Raises:
-            Nothing
-        """
-        self.enable_register_bit(CONTROL, PCIE_RX_RESET, enable)
 
     def enable_pcie_reset(self, enable):
         """
@@ -156,7 +139,7 @@ class ArtemisUSB2Driver(driver.Driver):
         """
 
         reg = self.read_register(CONTROL)
-        bitmask = (((1 << GTP_RX_PRE_AMP_HIGH)) - (1 << GTP_RX_PRE_AMP_LOW))
+        bitmask = (((1 << (GTP_RX_PRE_AMP_HIGH + 1))) - (1 << GTP_RX_PRE_AMP_LOW))
         reg &= ~(bitmask)
         reg |= value << GTP_RX_PRE_AMP_LOW
         self.write_register(CONTROL, reg)
@@ -176,7 +159,7 @@ class ArtemisUSB2Driver(driver.Driver):
         """
 
         reg = self.read_register(CONTROL)
-        bitmask = (((1 << GTP_TX_DIFF_SWING_HIGH)) - (1 << GTP_TX_DIFF_SWING_LOW))
+        bitmask = (((1 << (GTP_TX_DIFF_SWING_HIGH + 1))) - (1 << GTP_TX_DIFF_SWING_LOW))
         reg &= ~(bitmask)
         reg |= value << GTP_TX_DIFF_SWING_LOW
         self.write_register(CONTROL, reg)
@@ -196,24 +179,6 @@ class ArtemisUSB2Driver(driver.Driver):
             Nothing
         """
         self.enable_register_bit(CONTROL, PCIE_RX_POLARITY, not positive)
-        
-
-    def is_pcie_rx_reset(self):
-        """
-        Return true if  the Receive portion of the GTP Statemachine is in a
-        reset state
-
-        Args:
-            Nothing
-
-        Returns (Boolean):
-            True: PCIE rx state machine is in a reset state
-            False: PCIE rx state machine is not in a reset state
-
-        Raises:
-            Nothing
-        """
-        return self.is_register_bit_set(CONTROL, PCIE_RX_RESET)
 
     def is_pcie_reset(self):
         """
@@ -262,7 +227,7 @@ class ArtemisUSB2Driver(driver.Driver):
             Nothing
         """
         value = self.read_register(CONTROL)
-        bitmask = (((1 << GTP_RX_PRE_AMP_HIGH)) - (1 << GTP_RX_PRE_AMP_LOW))
+        bitmask = (((1 << (GTP_RX_PRE_AMP_HIGH + 1))) - (1 << GTP_RX_PRE_AMP_LOW))
         value = value & bitmask
         value = value >> GTP_RX_PRE_AMP_LOW
         return value
@@ -281,7 +246,7 @@ class ArtemisUSB2Driver(driver.Driver):
             Nothing
         """
         value = self.read_register(CONTROL)
-        bitmask = (((1 << GTP_TX_DIFF_SWING_HIGH)) - (1 << GTP_TX_DIFF_SWING_LOW))
+        bitmask = ((1 << (GTP_TX_DIFF_SWING_HIGH + 1)) - (1 << GTP_TX_DIFF_SWING_LOW))
         value = value & bitmask
         value = value >> GTP_TX_DIFF_SWING_LOW
         return value

@@ -89,49 +89,51 @@ module wb_artemis_usb2_platform #(
   output  reg         o_wbs_int,
   output              o_platform_ready,
 
-  //------------------------------- PLL Ports --------------------------------
+  //--SATA Interface--
   output              o_sata_75mhz_clk,
-  output              o_pcie_62p5mhz_clk,
-  //--------------------- Receive Ports - 8b10b Decoder ----------------------
-  output      [3:0]   o_sata_char_is_comma,
-  output      [3:0]   o_sata_rx_char_is_k,
-  output      [3:0]   o_pcie_rx_char_is_k,
   output              o_sata_error,
-  output              o_pcie_error,
-  //-------------------- Receive Ports - Clock Correction --------------------
-  output      [2:0]   o_sata_clk_correct_count,
-  output      [2:0]   o_pcie_clk_correct_count,
-  //----------------- Receive Ports - RX Data Path interface -----------------
-  output      [31:0]  o_sata_rx_data,
-  output      [31:0]  o_pcie_rx_data,
-  //----- Receive Ports - RX Driver,OOB signalling,Coupling and Eq.,CDR ------
-  output              o_sata_rx_elec_idle,
-  output              o_pcie_rx_elec_idle,
 
-  //--------- Receive Ports - RX Elastic Buffer and Phase Alignment ----------
+  //  GTP: Control/Data Interface
+  output      [3:0]   o_sata_rx_char_is_k,
+  output      [31:0]  o_sata_rx_data,
+  input       [3:0]   i_sata_tx_char_is_k,
+  input       [31:0]  i_sata_tx_data,
+
+  //  GTP: OOB Signals
   output              o_sata_tx_oob_complete,
+  input               i_sata_tx_elec_idle,
+  input               i_sata_tx_comm_init,
+  input               i_sata_tx_comm_wake,
+  output              o_sata_rx_elec_idle,
   output              o_sata_rx_comm_wake_detect,
   output              o_sata_rx_comm_init_detect,
 
-  //------------ Receive Ports - RX Pipe Control for PCI Express -------------
-  output              o_pcie_phy_status,
-  output              o_pcie_phy_rx_valid,
-  //------------------ Receive Ports - RX Polarity Control -------------------
-  //----------------- Transmit Ports - 8b10b Encoder Control -----------------
-  input       [3:0]   i_pcie_disparity_mode,
-  input       [3:0]   i_sata_tx_char_is_k,
+
+  //OPTIONAL
+  output      [2:0]   o_sata_clk_correct_count,
+  output      [3:0]   o_sata_char_is_comma,
+
+  //--PCIE Interface--
+  output              o_pcie_62p5mhz_clk,
+  output              o_pcie_error,
+
+  //  GTP: Control/Data Interface
+  output      [3:0]   o_pcie_rx_char_is_k,
   input       [3:0]   i_pcie_tx_char_is_k,
-  //---------------- Transmit Ports - TX Data Path interface -----------------
-  input       [31:0]  i_sata_tx_data,
+  output      [31:0]  o_pcie_rx_data,
   input       [31:0]  i_pcie_tx_data,
-  //------------- Transmit Ports - TX Driver and OOB signalling --------------
-  input               i_sata_tx_comm_init,
-  input               i_sata_tx_comm_wake,
-  //--------------- Transmit Ports - TX Ports for PCI Express ----------------
+  output              o_pcie_phy_rx_valid,
+
+  // GTP: OOB Signals
   input               i_pcie_tx_detect_rx,
-  input               i_sata_tx_elec_idle,
   input               i_pcie_tx_elec_idle,
-  //------------------- Transmit Ports - TX Ports for SATA -------------------
+  input       [3:0]   i_pcie_disparity_mode,
+  output              o_pcie_phy_status,
+  output              o_pcie_rx_elec_idle,
+
+  //OPTIONAL
+  output      [2:0]   o_pcie_clk_correct_count,
+
   //Physical Signals
   input               i_gtp0_clk_p,
   input               i_gtp0_clk_n,

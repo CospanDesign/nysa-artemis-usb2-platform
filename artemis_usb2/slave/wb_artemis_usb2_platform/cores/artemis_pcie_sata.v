@@ -15,6 +15,9 @@ module artemis_pcie_sata (
   output        o_sata_dcm_locked,
   output        o_pcie_dcm_locked,
 
+  //------------- Receive Ports - RX Loss-of-sync State Machine --------------
+  output        o_sata_loss_of_sync,
+  output        o_pcie_loss_of_sync,
   //--------------------- Receive Ports - 8b10b Decoder ----------------------
   output  [3:0] o_sata_char_is_comma,
   output  [3:0] o_sata_rx_char_is_k,
@@ -24,12 +27,11 @@ module artemis_pcie_sata (
   output  [3:0] o_sata_rx_not_in_table,
   output  [3:0] o_pcie_rx_not_in_table,
   //-------------------- Receive Ports - Clock Correction --------------------
-  output  [2:0]  o_sata_clk_correct_count,
-  output  [2:0]  o_pcie_clk_correct_count,
+  output  [2:0] o_sata_clk_correct_count,
+  output  [2:0] o_pcie_clk_correct_count,
   //----------------- Receive Ports - RX Data Path interface -----------------
   output  [31:0]o_sata_rx_data,
   output  [31:0]o_pcie_rx_data,
-  input         i_pcie_rx_reset,
   //----- Receive Ports - RX Driver,OOB signalling,Coupling and Eq.,CDR ------
   output        o_sata_rx_elec_idle,
   output        o_pcie_rx_elec_idle,

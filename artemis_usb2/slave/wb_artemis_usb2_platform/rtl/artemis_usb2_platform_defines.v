@@ -1,7 +1,6 @@
 `ifndef __ARTEMIS_USB2_PLATFORM_DEFINES__
 `define __ARTEMIS_USB2_PLATFORM_DEFINES__
 
-`define PCIE_RX_RESET           1
 `define PCIE_RESET              2
 `define SATA_RESET              3
 `define GTP_RX_PRE_AMP_LOW      4

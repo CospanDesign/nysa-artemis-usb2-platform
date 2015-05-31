@@ -27,7 +27,7 @@ SOFTWARE.
   SDB_VENDOR_ID:0x800000000000C594
 
   Set the Device ID (Hexcidecimal 32-bit Number)
-  SDB_DEVICE_ID:0x800000000000C594
+  SDB_DEVICE_ID:0x00000000
 
   Set the version of the Core XX.XXX.XXX Example: 01.000.000
   SDB_CORE_VERSION:00.000.001
@@ -66,7 +66,11 @@ SOFTWARE.
 `unconnected_drive pull0
 
 
-module wb_artemis_usb2_platform (
+module wb_artemis_usb2_platform #(
+//  parameter           RX_PREAMP = 2'h2,
+//  parameter           TX_DIFF   = 4'h4
+
+)(
   input               clk,
   input               rst,
 
@@ -157,7 +161,6 @@ reg   [31:0]        gtp_control = 32'h00;
 wire  [31:0]        gtp_status;
 
 wire                pcie_rx_polarity;
-wire                pcie_rx_reset;
 wire                usr_cntrl_reset;
 wire                sata_reset;
 wire                pcie_reset;
@@ -215,7 +218,6 @@ artemis_pcie_sata aps(
   .o_pcie_clk_correct_count (o_pcie_clk_correct_count ),
   .o_sata_rx_data           (o_sata_rx_data           ),
   .o_pcie_rx_data           (o_pcie_rx_data           ),
-  .i_pcie_rx_reset          (pcie_rx_reset            ),
   .o_sata_rx_elec_idle      (o_sata_rx_elec_idle      ),
   .o_pcie_rx_elec_idle      (o_pcie_rx_elec_idle      ),
   .i_sata_rx_pre_amp        (rx_pre_amp               ),
@@ -256,12 +258,11 @@ artemis_pcie_sata aps(
 );
 
 //Asynchronous Logic
-assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH:`GTP_RX_PRE_AMP_LOW];
-assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH:`GTP_TX_DIFF_SWING_LOW];
+assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ];
+assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ];
 
 //assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
 assign    pcie_rx_polarity                  = 1'b0;
-assign    pcie_rx_reset                     = rst || gtp_control[`PCIE_RX_RESET];
 assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
 
 assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
@@ -275,40 +276,51 @@ assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pci
 
 assign    o_platform_ready                  = (!sata_reset && sata_pll_detect_k && sata_dcm_locked && sata_reset_done);
 
-always @ (o_sata_75mhz_clk) begin
+always @ (posedge o_sata_75mhz_clk or posedge sata_reset) begin
   if (sata_reset) begin
     sata_tx_comm_start  <=  0;
     sata_tx_comm_type   <=  0;
   end
   else begin
-    sata_tx_comm_start  <=  0;
-    sata_tx_comm_type   <=  i_sata_tx_comm_wake;
-    if (sata_tx_comm_type || i_sata_tx_comm_init) begin
-      sata_tx_comm_start  <=  1;
+    if (!sata_reset_done) begin
+      sata_tx_comm_start  <=  0;
+      sata_tx_comm_type   <=  0;
+    end
+    else begin
+      sata_tx_comm_start  <=  0;
+      sata_tx_comm_type   <=  i_sata_tx_comm_wake;
+      if (sata_tx_comm_type || i_sata_tx_comm_init) begin
+        sata_tx_comm_start  <=  1;
+      end
     end
   end
 end
 
 
-assign    gtp_status[`SATA_PLL_DETECT_K]    = sata_pll_detect_k;
-assign    gtp_status[`PCIE_PLL_DETECT_K]    = pcie_pll_detect_k;
-assign    gtp_status[`SATA_RESET_DONE]      = sata_reset_done;
-assign    gtp_status[`PCIE_RESET_DONE]      = pcie_reset_done;
-assign    gtp_status[`SATA_DCM_PLL_LOCKED]  = sata_dcm_locked;
-assign    gtp_status[`PCIE_DCM_PLL_LOCKED]  = pcie_dcm_locked;
-assign    gtp_status[`SATA_RX_IDLE]         = o_sata_rx_elec_idle;
-assign    gtp_status[`PCIE_RX_IDLE]         = o_pcie_rx_elec_idle;
-assign    gtp_status[`SATA_TX_IDLE]         = i_sata_tx_elec_idle;
-assign    gtp_status[`PCIE_TX_IDLE]         = i_pcie_tx_elec_idle;
+assign    gtp_status[`SATA_PLL_DETECT_K   ]  = sata_pll_detect_k;
+assign    gtp_status[`PCIE_PLL_DETECT_K   ]  = pcie_pll_detect_k;
+assign    gtp_status[`SATA_RESET_DONE     ]  = sata_reset_done;
+assign    gtp_status[`PCIE_RESET_DONE     ]  = pcie_reset_done;
+assign    gtp_status[`SATA_DCM_PLL_LOCKED ]  = sata_dcm_locked;
+assign    gtp_status[`PCIE_DCM_PLL_LOCKED ]  = pcie_dcm_locked;
+assign    gtp_status[`SATA_RX_IDLE        ]  = o_sata_rx_elec_idle;
+assign    gtp_status[`PCIE_RX_IDLE        ]  = o_pcie_rx_elec_idle;
+assign    gtp_status[`SATA_TX_IDLE        ]  = i_sata_tx_elec_idle;
+assign    gtp_status[`PCIE_TX_IDLE        ]  = i_pcie_tx_elec_idle;
 
 //Synchronous Logic
-
 always @ (posedge clk) begin
   if (rst) begin
-    o_wbs_dat     <=  32'h0;
-    o_wbs_ack     <=  0;
-    gtp_control   <=  0;
-    o_wbs_int     <=  0;
+    o_wbs_dat                   <=  32'h0;
+    o_wbs_ack                   <=  0;
+    gtp_control                 <=  0;
+    o_wbs_int                   <=  0;
+    gtp_control[`SATA_RESET]    <=  0;
+    gtp_control[`PCIE_RESET]    <=  1;
+//    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
+//    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
+
+
   end
 
   else begin

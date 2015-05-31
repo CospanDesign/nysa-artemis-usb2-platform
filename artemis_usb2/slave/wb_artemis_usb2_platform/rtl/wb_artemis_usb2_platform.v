@@ -323,10 +323,10 @@ always @ (posedge clk) begin
     o_wbs_ack                   <=  0;
     gtp_control                 <=  0;
     o_wbs_int                   <=  0;
-    gtp_control[`SATA_RESET]    <=  0;
+    gtp_control[`SATA_RESET]    <=  1;
     gtp_control[`PCIE_RESET]    <=  1;
-    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
-    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
+//    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
+//    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
 
   end
   else begin

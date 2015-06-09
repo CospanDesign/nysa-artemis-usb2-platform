@@ -59,7 +59,7 @@ import artemis_utils
 
 
 ARTEMIS_QUEUE_TIMEOUT = 7
-ARTEMIS_PING_TIMEOUT = 0.1
+ARTEMIS_PING_TIMEOUT = 1
 ARTEMIS_WRITE_TIMEOUT = 5
 ARTEMIS_READ_TIMEOUT = 3
 
@@ -293,8 +293,10 @@ class WorkerThread(threading.Thread):
         self.hrq.put(ARTEMIS_RESP_OK)
 
     def ping(self):
+        self.dev.purge_buffers()
         data = Array('B')
-        data.extend([0xCD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        #data.extend([0xCD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        data.extend([0xCD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         #if self.s:
         #    self.s.Debug( "Sending ping...",)
 
@@ -304,34 +306,33 @@ class WorkerThread(threading.Thread):
         #Set up a response
         rsp = Array('B')
         temp = Array('B')
+        rsp = self.dev.read_data_bytes(1)
+        if len(rsp) > 0 and rsp[0] == 0xDC:
+            #Got a response
+            pass
+        else:
+            timeout = time.time() + ARTEMIS_PING_TIMEOUT
+            while time.time() < timeout:
+                rsp = self.dev.read_data_bytes(1)
+                if len(rsp) > 0 and rsp[0] == 0xDC:
+                    #Got a response
+                    break
 
-        timeout = time.time() + ARTEMIS_PING_TIMEOUT
-
-        while time.time() < timeout:
-            rsp = self.dev.read_data_bytes(5)
-            temp.extend(rsp)
-            if 0xDC in rsp:
-                #if self.s:
-                #    self.s.Debug( "Response to Ping")
-                #    self.s.Debug( "Resposne: %s" % str(temp))
-                break
-
-        if not 0xDC in rsp:
-            #if self.s:
-            #    self.s.Debug( "ID byte not found in response")
-            #raise NysaCommError("Ping response did not contain ID: %s" % str(temp))
+        if len(rsp) > 0:
+            if rsp[0] != 0xDC:
+                self.hrq.put(ARTEMIS_REP_ERR)
+                return
+        else:
             self.hrq.put(ARTEMIS_RESP_ERR)
             return
 
-        index = rsp.index (0xDC) + 1
-        read_data = Array('B')
-        read_data.extend(rsp[index:])
-
-        num = 3 - index
-        read_data.extend(self.dev.read_data_bytes(num))
-
-        #if self.s:
-        #    self.s.Debug( "Success")
+        read_count = 0
+        rsp = self.dev.read_data_bytes(12)
+        timeout = time.time() + ARTEMIS_PING_TIMEOUT
+        read_count = len(rsp)
+        while time.time() < timeout and read_count < 12:
+            rsp += self.dev.read_data_bytes(12 - read_count)
+            read_count = len(rsp)
 
         self.hrq.put(ARTEMIS_RESP_OK)
 
@@ -527,14 +528,14 @@ class _Artemis (Nysa):
         try:
             #XXX: Hack to fix a strange bug where FTDI
             #XXX: won't recognize Artemis until a read and reset occurs
-            self.ping()
+            #self.ping()
+            pass
 
         except NysaCommError:
             pass
 
+
         self.reset()
-
-
 
         '''
         #status = True
@@ -772,6 +773,7 @@ class _Artemis (Nysa):
         with self.lock:
             self.d.data = (self.vendor, self.product)
             self.hwq.put(ARTEMIS_IS_PROGRAMMED)
+            self.dev.purge_buffers()
             return self.ipc_comm_response("is programmed")
 
     def dump_core(self):

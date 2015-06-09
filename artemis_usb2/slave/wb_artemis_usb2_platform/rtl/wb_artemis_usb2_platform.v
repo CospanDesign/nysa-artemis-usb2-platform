@@ -63,12 +63,10 @@ SOFTWARE.
   SDB_SIZE:2
 */
 `include "artemis_usb2_platform_defines.v"
-`unconnected_drive pull0
-
 
 module wb_artemis_usb2_platform #(
-//  parameter           RX_PREAMP = 2'h2,
-//  parameter           TX_DIFF   = 4'h4
+  parameter           RX_PREAMP = 2'h2,
+  parameter           TX_DIFF   = 4'h4
 
 )(
   input               clk,
@@ -111,7 +109,7 @@ module wb_artemis_usb2_platform #(
 
   //OPTIONAL
   output      [2:0]   o_sata_clk_correct_count,
-  output      [3:0]   o_sata_char_is_comma,
+  output      [3:0]   o_sata_rx_char_is_comma,
 
   //--PCIE Interface--
   output              o_pcie_62p5mhz_clk,
@@ -212,7 +210,7 @@ artemis_pcie_sata aps(
   .o_sata_loss_of_sync      (sata_loss_of_sync        ),
   .o_pcie_loss_of_sync      (pcie_loss_of_sync        ),
 
-  .o_sata_char_is_comma     (o_sata_char_is_comma     ),
+  .o_sata_rx_char_is_comma  (o_sata_rx_char_is_comma  ),
   .o_sata_rx_char_is_k      (o_sata_rx_char_is_k      ),
   .o_pcie_rx_char_is_k      (o_pcie_rx_char_is_k      ),
   .o_sata_disparity_error   (sata_disparity_error     ),
@@ -263,14 +261,24 @@ artemis_pcie_sata aps(
 );
 
 //Asynchronous Logic
-assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ];
-assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ];
+//assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ];
+//assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ];
+/*
+assign    rx_pre_amp                        = 2'b10;
+assign    tx_diff_swing                     = 4'b100;
+*/
+assign    rx_pre_amp                        = 2'b00;
+assign    tx_diff_swing                     = 4'b000;
+
 
 //assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
 assign    pcie_rx_polarity                  = 1'b0;
-assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
 
-assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
+//assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
+//assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
+
+assign    sata_reset                        = 1'b0;
+assign    pcie_reset                        = 1'b0;
 
 assign    o_sata_tx_oob_complete            = sata_rx_status[0];
 assign    o_sata_rx_comm_wake_detect        = sata_rx_status[1];
@@ -282,7 +290,7 @@ assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pci
 assign    o_platform_ready                  = (!sata_reset && sata_pll_detect_k && sata_dcm_locked && sata_reset_done);
 
 //Translate SATA friendly signals to GTP Friendly signals
-always @ (posedge o_sata_75mhz_clk or posedge sata_reset) begin
+always @ (posedge o_sata_75mhz_clk) begin
   if (sata_reset) begin
     sata_tx_comm_start  <=  0;
     sata_tx_comm_type   <=  0;
@@ -325,8 +333,8 @@ always @ (posedge clk) begin
     o_wbs_int                   <=  0;
     gtp_control[`SATA_RESET]    <=  1;
     gtp_control[`PCIE_RESET]    <=  1;
-//    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
-//    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
+    gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
+    gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
 
   end
   else begin

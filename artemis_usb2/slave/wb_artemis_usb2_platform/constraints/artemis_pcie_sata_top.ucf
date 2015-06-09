@@ -17,20 +17,21 @@ NET i_gtp1_clk_n  LOC=D11;
 NET i_gtp1_clk_p  LOC=C11;
 
 
-#Oddly enough just don't declare these lines and let MAP handle where to put them
-#NET i_sata_phy_rx_p LOC=D7;
-#NET i_sata_phy_rx_n LOC=C7;
+######################### mgt clock module constraints ########################
+NET i_sata_phy_rx_p LOC=D7 | IOB = FALSE;
+NET i_sata_phy_rx_n LOC=C7 | IOB = FALSE;
 
-#NET i_pcie_phy_rx_p LOC=D9;
-#NET i_pcie_phy_rx_n LOC=C9;
+NET i_pcie_phy_rx_p LOC=D9 | IOB = FALSE;
+NET i_pcie_phy_rx_n LOC=C9 | IOB = FALSE;
 
-#NET o_sata_phy_tx_p LOC=B6;
-#NET o_sata_phy_tx_n LOC=A6;
+NET o_sata_phy_tx_p LOC=B6 | IOB = FALSE;
+NET o_sata_phy_tx_n LOC=A6 | IOB = FALSE;
 
-#NET o_pcie_phy_tx_p LOC=B8;
-#NET o_pcie_phy_tx_n LOC=A8;
+NET o_pcie_phy_tx_p LOC=B8 | IOB = FALSE;
+NET o_pcie_phy_tx_n LOC=A8 | IOB = FALSE;
 
 
+################################# mgt wrapper constraints #####################
 INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i LOC=GTPA1_DUAL_X0Y0;
 
 

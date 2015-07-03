@@ -23,6 +23,8 @@
 `define PCIE_TX_IDLE            9
 `define SATA_LOSS_OF_SYNC       10
 `define PCIE_LOSS_OF_SYNC       11
+`define SATA_BYTE_IS_ALIGNED    12
+`define PCIE_BYTE_IS_ALIGNED    13
 
 
 `endif

@@ -53,7 +53,7 @@ INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i
 ##TX Interface Attributes
 INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i CLK_OUT_GTP_SEL_0         = "REFCLKPLL0";
 INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i TX_TDCC_CFG_0             = 2'b11;
-INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i CLK_OUT_GTP_SEL_1         = "TXOUTCLK1";
+INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i CLK_OUT_GTP_SEL_1         = "REFCLKPLL1";
 INST artemis_usb2/aps/artemis_pcie_sata_i/tile0_artemis_pcie_sata_i/gtpa1_dual_i TX_TDCC_CFG_1             = 2'b11;
 
 ##TX Buffer and Phase Alignment Attributes

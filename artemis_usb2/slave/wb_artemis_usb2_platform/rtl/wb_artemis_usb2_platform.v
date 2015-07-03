@@ -60,13 +60,13 @@ SOFTWARE.
   SDB_WRITEABLE:True
 
   Device Size: Number of Registers
-  SDB_SIZE:2
+  SDB_SIZE:4
 */
 `include "artemis_usb2_platform_defines.v"
 
 module wb_artemis_usb2_platform #(
-  parameter           RX_PREAMP = 2'h2,
-  parameter           TX_DIFF   = 4'h4
+  parameter           RX_PREAMP = 2'h3,
+  parameter           TX_DIFF   = 4'h6
 
 )(
   input               clk,
@@ -94,17 +94,18 @@ module wb_artemis_usb2_platform #(
   //  GTP: Control/Data Interface
   output      [3:0]   o_sata_rx_char_is_k,
   output      [31:0]  o_sata_rx_data,
-  input       [3:0]   i_sata_tx_char_is_k,
+  input               i_sata_tx_char_is_k,
   input       [31:0]  i_sata_tx_data,
 
   //  GTP: OOB Signals
-  output              o_sata_tx_oob_complete,
   input               i_sata_tx_elec_idle,
   input               i_sata_tx_comm_init,
   input               i_sata_tx_comm_wake,
+  output              o_sata_tx_oob_complete,
   output              o_sata_rx_elec_idle,
   output              o_sata_rx_comm_wake_detect,
   output              o_sata_rx_comm_init_detect,
+  output              o_sata_rx_byte_is_aligned,
 
 
   //OPTIONAL
@@ -121,6 +122,7 @@ module wb_artemis_usb2_platform #(
   output      [31:0]  o_pcie_rx_data,
   input       [31:0]  i_pcie_tx_data,
   output              o_pcie_phy_rx_valid,
+  output              o_pcie_rx_byte_is_aligned,
 
   // GTP: OOB Signals
   input               i_pcie_tx_detect_rx,
@@ -153,8 +155,10 @@ module wb_artemis_usb2_platform #(
 );
 
 //Local Parameters
-localparam     GTP_CONTROL  = 32'h00000000;
-localparam     GTP_STATUS   = 32'h00000001;
+localparam     GTP_CONTROL        = 32'h00000000;
+localparam     GTP_STATUS         = 32'h00000001;
+localparam     SATA_CLK_COUNT     = 32'h00000002;
+localparam     SATA_FST_CLK_COUNT = 32'h00000003;
 
 //Local Registers/Wires
 reg   [31:0]        gtp_control = 32'h00;
@@ -177,8 +181,8 @@ wire                pcie_reset_done;
 wire                sata_dcm_locked;
 wire                pcie_dcm_locked;
 
-reg                 sata_tx_comm_start = 0;
-reg                 sata_tx_comm_type = 0;
+reg                 sata_tx_comm_start;
+reg                 sata_tx_comm_type;
 
 wire  [2:0]         sata_rx_status;
 wire  [2:0]         pcie_rx_status;
@@ -189,6 +193,13 @@ wire  [3:0]         sata_disparity_error;
 wire  [3:0]         pcie_disparity_error;
 wire  [3:0]         sata_rx_not_in_table;
 wire  [3:0]         pcie_rx_not_in_table;
+wire                sata_75mhz_clk;
+wire  [31:0]        second_value;
+wire  [31:0]        fst_second_value;
+
+reg                 reg_sata_tx_comm_wake;
+reg                 reg_sata_tx_comm_init;
+wire                sata_300mhz_clk;
 
 //Submodules
 artemis_pcie_sata aps(
@@ -201,7 +212,8 @@ artemis_pcie_sata aps(
   .o_sata_reset_done        (sata_reset_done          ),
   .o_pcie_reset_done        (pcie_reset_done          ),
 
-  .o_sata_75mhz_clk         (o_sata_75mhz_clk         ),
+  .o_sata_75mhz_clk         (sata_75mhz_clk           ),
+  .o_sata_300mhz_clk        (sata_300mhz_clk          ),
   .o_pcie_62p5mhz_clk       (o_pcie_62p5mhz_clk       ),
 
   .o_sata_dcm_locked        (sata_dcm_locked          ),
@@ -225,6 +237,8 @@ artemis_pcie_sata aps(
   .o_pcie_rx_elec_idle      (o_pcie_rx_elec_idle      ),
   .i_sata_rx_pre_amp        (rx_pre_amp               ),
 
+  .o_sata_rx_byte_is_aligned(o_sata_rx_byte_is_aligned),
+  .o_pcie_rx_byte_is_aligned(o_pcie_rx_byte_is_aligned),
   .o_sata_rx_status         (sata_rx_status           ),
   .o_pcie_rx_status         (pcie_rx_status           ),
 
@@ -260,51 +274,84 @@ artemis_pcie_sata aps(
   .i_gtp1_clk_n             (i_gtp1_clk_n             )
 );
 
-//Asynchronous Logic
-//assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ];
-//assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ];
-/*
-assign    rx_pre_amp                        = 2'b10;
-assign    tx_diff_swing                     = 4'b100;
-*/
-assign    rx_pre_amp                        = 2'b00;
-assign    tx_diff_swing                     = 4'b000;
+clock_counter #(
+  .REFCLK_SECOND_COUNTER    (32'h05F5E100             )
+) cc (
+  .clock_ref                (clk                      ),
+  .rst                      (rst                      ),
+  .clock_input              (sata_75mhz_clk           ),
+  .value                    (second_value             )
+);
+clock_counter #(
+  .REFCLK_SECOND_COUNTER    (32'h05F5E100             )
+) ccfst (
+  .clock_ref                (clk                      ),
+  .rst                      (rst                      ),
+  .clock_input              (sata_300mhz_clk          ),
+  .value                    (fst_second_value         )
+);
 
+
+
+
+//Asynchronous Logic
+assign    rx_pre_amp                        = gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ];
+assign    tx_diff_swing                     = gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ];
 
 //assign    pcie_rx_polarity                  = gtp_control[`PCIE_RX_POLARITY];
 assign    pcie_rx_polarity                  = 1'b0;
+assign    o_sata_75mhz_clk                  = sata_75mhz_clk;
 
-//assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
-//assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
-
-assign    sata_reset                        = 1'b0;
-assign    pcie_reset                        = 1'b0;
+assign    sata_reset                        = rst || gtp_control[`SATA_RESET];
+assign    pcie_reset                        = rst || gtp_control[`PCIE_RESET];
 
 assign    o_sata_tx_oob_complete            = sata_rx_status[0];
 assign    o_sata_rx_comm_wake_detect        = sata_rx_status[1];
 assign    o_sata_rx_comm_init_detect        = sata_rx_status[2];
 
-assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0) || sata_loss_of_sync;
-assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0) || pcie_loss_of_sync;
+//assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0) || sata_loss_of_sync;
+assign    o_sata_error                      = (sata_disparity_error > 0) || (sata_rx_not_in_table > 0) || !o_sata_rx_byte_is_aligned;
+//assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0) || pcie_loss_of_sync;
+assign    o_pcie_error                      = (pcie_disparity_error > 0) || (pcie_rx_not_in_table > 0) || !o_pcie_rx_byte_is_aligned;
 
 assign    o_platform_ready                  = (!sata_reset && sata_pll_detect_k && sata_dcm_locked && sata_reset_done);
 
 //Translate SATA friendly signals to GTP Friendly signals
-always @ (posedge o_sata_75mhz_clk) begin
+always @ (posedge sata_75mhz_clk) begin
   if (sata_reset) begin
-    sata_tx_comm_start  <=  0;
-    sata_tx_comm_type   <=  0;
+    sata_tx_comm_start      <=  0;
+    sata_tx_comm_type       <=  0;
+    reg_sata_tx_comm_wake   <=  0;
+    reg_sata_tx_comm_init   <=  0;
+
   end
   else begin
     if (!sata_reset_done) begin
-      sata_tx_comm_start  <=  0;
-      sata_tx_comm_type   <=  0;
+      sata_tx_comm_start    <=  0;
+      sata_tx_comm_type     <=  0;
+      reg_sata_tx_comm_wake <=  0;
+      reg_sata_tx_comm_init <=  0;
     end
     else begin
-      sata_tx_comm_start  <=  0;
-      sata_tx_comm_type   <=  i_sata_tx_comm_wake;
-      if (sata_tx_comm_type || i_sata_tx_comm_init) begin
-        sata_tx_comm_start  <=  1;
+      sata_tx_comm_start      <=  0;
+      //Change the incomming wake/init strobes into latched values
+      if (i_sata_tx_comm_wake) begin
+        reg_sata_tx_comm_wake  <=  1;
+        sata_tx_comm_type      <=  1;
+      end
+      if (i_sata_tx_comm_init) begin
+        reg_sata_tx_comm_init  <=  1;
+        sata_tx_comm_type      <=  0;
+      end
+
+      //Translate the command
+      else if (reg_sata_tx_comm_init) begin
+        sata_tx_comm_start     <=  1;
+        reg_sata_tx_comm_init  <=  0;
+      end
+      else if (reg_sata_tx_comm_wake) begin
+        sata_tx_comm_start     <=  1;
+        reg_sata_tx_comm_wake  <=  0;
       end
     end
   end
@@ -323,6 +370,8 @@ assign    gtp_status[`SATA_TX_IDLE        ]  = i_sata_tx_elec_idle;
 assign    gtp_status[`PCIE_TX_IDLE        ]  = i_pcie_tx_elec_idle;
 assign    gtp_status[`SATA_LOSS_OF_SYNC   ]  = sata_loss_of_sync;
 assign    gtp_status[`PCIE_LOSS_OF_SYNC   ]  = pcie_loss_of_sync;
+assign    gtp_status[`SATA_BYTE_IS_ALIGNED]  = o_sata_rx_byte_is_aligned;
+assign    gtp_status[`PCIE_BYTE_IS_ALIGNED]  = o_pcie_rx_byte_is_aligned;
 
 //Synchronous Logic
 always @ (posedge clk) begin
@@ -331,8 +380,8 @@ always @ (posedge clk) begin
     o_wbs_ack                   <=  0;
     gtp_control                 <=  0;
     o_wbs_int                   <=  0;
-    gtp_control[`SATA_RESET]    <=  1;
-    gtp_control[`PCIE_RESET]    <=  1;
+//    gtp_control[`SATA_RESET]    <=  1;
+//    gtp_control[`PCIE_RESET]    <=  1;
     gtp_control[`GTP_RX_PRE_AMP_HIGH      :`GTP_RX_PRE_AMP_LOW    ] <= RX_PREAMP;
     gtp_control[`GTP_TX_DIFF_SWING_HIGH   :`GTP_TX_DIFF_SWING_LOW ] <= TX_DIFF;
 
@@ -364,6 +413,12 @@ always @ (posedge clk) begin
             end
             GTP_STATUS: begin
               o_wbs_dat         <= gtp_status;
+            end
+            SATA_CLK_COUNT: begin
+              o_wbs_dat         <= second_value;
+            end
+            SATA_FST_CLK_COUNT: begin
+              o_wbs_dat         <= fst_second_value;
             end
             default: begin
             end

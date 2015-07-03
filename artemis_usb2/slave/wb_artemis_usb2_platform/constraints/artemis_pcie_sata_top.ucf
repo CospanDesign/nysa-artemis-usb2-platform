@@ -1,15 +1,17 @@
 # User Clock Constraints
-NET "artemis_usb2/aps/sata_300mhz_clk" TNM_NET = "tile0_txusrclk0_i";
-TIMESPEC "TS_tile0_txusrclk0_i" = PERIOD "tile0_txusrclk0_i" 3.333;
-
-NET "artemis_usb2/aps/o_sata_75mhz_clk" TNM_NET = "tile0_txusrclk20_i";
-TIMESPEC "TS_tile0_txusrclk20_i" = PERIOD "tile0_txusrclk20_i" 13.333;
-
-NET "artemis_usb2/aps/pcie_250mhz_clk" TNM_NET = "tile0_txusrclk1_i";
-TIMESPEC "TS_tile0_txusrclk1_i" = PERIOD "tile0_txusrclk1_i" 4.0;
-
-NET "artemis_usb2/aps/o_pcie_62p5mhz_clk" TNM_NET = "tile0_txusrclk21_i";
-TIMESPEC "TS_tile0_txusrclk21_i" = PERIOD "tile0_txusrclk21_i"16.0;
+#
+#NET "artemis_usb2/aps/sata_300mhz_clk" TNM_NET = "tile0_txusrclk0_i";
+#TIMESPEC "TS_tile0_txusrclk0_i" = PERIOD "tile0_txusrclk0_i" 3.333;
+#
+#NET "artemis_usb2/aps/sata_75mhz_clk" TNM_NET = "tile0_txusrclk20_i";
+#TIMESPEC "TS_tile0_txusrclk20_i" = PERIOD "tile0_txusrclk20_i" 13.333;
+#
+#NET "artemis_usb2/aps/pcie_250mhz_clk" TNM_NET = "tile0_txusrclk1_i";
+#TIMESPEC "TS_tile0_txusrclk1_i" = PERIOD "tile0_txusrclk1_i" 4.0;
+#
+#NET "artemis_usb2/aps/o_pcie_62p5mhz_clk" TNM_NET = "tile0_txusrclk21_i";
+#TIMESPEC "TS_tile0_txusrclk21_i" = PERIOD "tile0_txusrclk21_i" 16.0;
+#
 
 NET i_gtp0_clk_n  LOC=B10;
 NET i_gtp0_clk_p  LOC=A10;

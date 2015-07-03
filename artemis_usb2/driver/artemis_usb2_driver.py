@@ -43,6 +43,8 @@ ARTEMIS_USB2_ID        = 0x03
 #Register Constants
 CONTROL                = 0x00
 STATUS                 = 0x01
+SATA_CLK_COUNT         = 0x02
+SATA_FST_CLK_COUNT     = 0x03
 
 PCIE_RESET             = 2
 SATA_RESET             = 3
@@ -65,6 +67,8 @@ SATA_TX_IDLE           = 8
 PCIE_TX_IDLE           = 9
 SATA_LOSS_OF_SYNC      = 10
 PCIE_LOSS_OF_SYNC      = 11
+SATA_BYTE_IS_ALIGNED   = 12
+PCIE_BYTE_IS_ALIGNED   = 13
 
 
 class ArtemisUSB2DriverError(Exception):
@@ -466,3 +470,17 @@ class ArtemisUSB2Driver(driver.Driver):
             Nothing
         """
         return self.is_register_bit_set(STATUS, PCIE_LOSS_OF_SYNC)
+
+    def get_ref_clock_count(self):
+        return self.read_register(SATA_CLK_COUNT);
+
+    def get_ref_fst_clock_count(self):
+        return self.read_register(SATA_FST_CLK_COUNT);
+
+    def is_sata_byte_aligned(self):
+        return self.is_register_bit_set(STATUS, SATA_BYTE_IS_ALIGNED)
+
+    def is_pcie_byte_aligned(self):
+        return self.is_register_bit_set(STATUS, PCIE_BYTE_IS_ALIGNED)
+
+

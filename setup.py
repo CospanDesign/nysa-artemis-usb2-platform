@@ -24,15 +24,13 @@ setup(
     packages=find_packages('.'),
     url="http://artemis.cospandesign.com",
     package_data={'' : ["*.json", "*.png", "*.ucf", "*.rules"]},
-    requires=['pyusb (>= 1.0.0b1)',
+    requires=['nysa',
+              'pyusb (>= 1.0.0b1)',
               'pyserial (>= 2.6)'],
     install_requires=['nysa',
                       'pyusb>=1.0.0b1',
                       'pyserial>=2.6'
 
-    ],
-    dependency_links=[
-        "https://github.com/CospanDesign/nysa.git@egg=nysa-master"
     ],
     include_package_data = True,
     long_description=long_desc,

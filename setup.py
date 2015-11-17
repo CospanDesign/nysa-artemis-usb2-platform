@@ -31,6 +31,9 @@ setup(
                       'pyserial>=2.6'
 
     ],
+    dependency_links=[
+        "https://github.com/CospanDesign/nysa.git@egg=nysa"
+    ]
     include_package_data = True,
     long_description=long_desc,
     classifiers=[

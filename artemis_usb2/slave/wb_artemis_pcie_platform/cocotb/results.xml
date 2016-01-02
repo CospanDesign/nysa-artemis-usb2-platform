@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites name="results">
+  <testsuite name="all" package="all" tests="0">
+    <testcase classname="test_dut" name="test_local_buffer" time="0.7070407867431641" />
+    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.6569161415100098" />
+  </testsuite>
+</testsuites>

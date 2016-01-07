@@ -77,13 +77,21 @@ class Test (unittest.TestCase):
         self.s.Info("Attempting to set voltage range")
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.s.Info("Enable PCIE")
+        #self.driver.enable(False)
         self.driver.enable(True)
+        time.sleep(0.5)
         self.s.Info("Is PCIE Reset: %s" % self.driver.is_pcie_reset())
+        self.s.Info("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())
+        self.s.Info("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
+        self.s.Info("Is GTP RX Electrical Idle: %s" % self.driver.is_gtp_rx_elec_idle())
+        self.s.Info("Is PLL Locked: %s" % self.driver.is_pll_locked())
         self.s.Info("Is Linkup: %s" % self.driver.is_linkup())
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())
         self.s.Info("Get Device Number: 0x%08X" % self.driver.get_dev_num())
         self.s.Info("Get Function Number: 0x%08X" % self.driver.get_func_num())
+        self.s.Info("Clock: %d" % self.driver.get_pcie_clock_count())
+        self.s.Info("Debug Clock Data: %d" % self.driver.get_debug_pcie_clock_count())
 
 
 if __name__ == "__main__":

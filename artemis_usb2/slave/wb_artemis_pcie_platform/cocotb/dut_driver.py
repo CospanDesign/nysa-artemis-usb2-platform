@@ -27,12 +27,12 @@ except SyntaxError:
     pass
 
 #Register Constants
-CONTROL                         = 00
-STATUS                          = 01
-NUM_BLOCK_READ                  = 02
-LOCAL_BUFFER_SIZE               = 03
-
-
+CONTROL                         =   00
+STATUS                          =   01
+NUM_BLOCK_READ                  =   02
+LOCAL_BUFFER_SIZE               =   03
+PCIE_CLOCK_CNT                  =   04
+TEST_CLOCK                      =   05
 
 
 CTRL_BIT_ENABLE                 =   0
@@ -52,6 +52,10 @@ STS_BITS_PCIE_DEV_NUM_HIGH      =   19
 STS_BITS_PCIE_FUNC_NUM_LOW      =   20
 STS_BITS_PCIE_FUNC_NUM_HIGH     =   22
 STS_BIT_LOCAL_MEM_IDLE          =   24
+STS_BIT_GTP_PLL_LOCK_DETECT     =   25
+STS_BIT_PLL_LOCK_DETECT         =   26
+STS_BIT_GTP_RESET_DONE          =   27
+STS_BIT_RX_ELEC_IDLE            =   28
 
 LOCAL_BUFFER_OFFSET             =   0x100
 
@@ -118,6 +122,18 @@ class ArtemisPCIEDriver(driver.Driver):
     def is_hot_reset(self):
         return self.is_register_bit_set(STATUS, STS_BIT_RECEIVED_HOT_RESET)
 
+    def is_gtp_pll_locked(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_GTP_PLL_LOCK_DETECT)
+
+    def is_gtp_reset_done(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_GTP_RESET_DONE)
+
+    def is_gtp_rx_elec_idle(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_RX_ELEC_IDLE)
+
+    def is_pll_locked(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_PLL_LOCK_DETECT)
+
     def get_link_state(self):
         return self.read_register_bit_range(STATUS, STS_BITS_PCIE_LINK_STATE_HIGH, STS_BITS_PCIE_LINK_STATE_LOW)
 
@@ -125,15 +141,15 @@ class ArtemisPCIEDriver(driver.Driver):
         state = self.get_link_state()
         status = ""
         if state == 6:
-            status = "Link State: L0"
+            status = "Link State (0x%02X): L0" % state
         elif state == 5:
-            status = "Link State: L0s"
+            status = "Link State (0x%02X): L0s" % state
         elif state == 3:
-            status =  "Link State: L1"
+            status = "Link State (0x%02X): L1" % state
         elif state == 7:
-            stats = "Link state: In Transaciton"
+            status = "Link state (0x%02X): In Transaciton" % state
         else:
-            status = "Link State Unkown: 0x%02X" % state
+            status = "Link State (0x%02X): Unkown: 0x%02X" % state
 
         if local_print:
             print (status)
@@ -192,4 +208,9 @@ class ArtemisPCIEDriver(driver.Driver):
         """
         self.write(address + (LOCAL_BUFFER_OFFSET), data)
 
+    def get_pcie_clock_count(self):
+        return self.read_register(PCIE_CLOCK_CNT)
+
+    def get_debug_pcie_clock_count(self):
+        return self.read_register(TEST_CLOCK)
 

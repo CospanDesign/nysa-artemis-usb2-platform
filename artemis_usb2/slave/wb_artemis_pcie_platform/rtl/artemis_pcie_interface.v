@@ -49,6 +49,7 @@ module artemis_pcie_interface #(
 
   // Transaction (TRN) Interface
   output                    user_lnk_up,
+  output                    pcie_clk,
 
 
   // Flow Control
@@ -107,6 +108,10 @@ module artemis_pcie_interface #(
 
   // System Interface
   output                    pcie_reset,
+  output                    pll_lock_detect,
+  output                    gtp_pll_lock_detect,
+  output                    gtp_reset_done,
+  output                    rx_elec_idle,
   output                    received_hot_reset,
 
   input                     i_cmd_in_rd_stb,
@@ -179,7 +184,6 @@ wire  [31:0]                d_out_rd_data;
 
 
 wire                        axi_clk;
-wire                        axi_ppfifo_clk;
 
 //Control Signals
 wire                        c_in_axi_ready;
@@ -333,7 +337,12 @@ pcie_axi_bridge pcie_interface (
   .sys_reset                         (rst                     ),
   .user_clk_out                      (clk_62p5                ),
   .user_reset_out                    (pcie_reset              ),
-  .received_hot_reset                (received_hot_reset      )
+  .received_hot_reset                (received_hot_reset      ),
+
+  .pll_lock_detect                   (pll_lock_detect         ),
+  .gtp_pll_lock_detect               (gtp_pll_lock_detect     ),
+  .gtp_reset_done                    (gtp_reset_done          ),
+  .rx_elec_idle                      (rx_elec_idle            )
 );
 
 adapter_axi_stream_2_ppfifo cntrl_a2p (
@@ -348,7 +357,7 @@ adapter_axi_stream_2_ppfifo cntrl_a2p (
   .i_axi_valid      (c_in_axi_valid   ),
 
   //Ping Pong FIFO Write Controller
-  .o_ppfifo_clk     (axi_ppfifo_clk   ),
+  .o_ppfifo_clk     (axi_clk          ),
   .i_ppfifo_rdy     (c_in_wr_ready    ),
   .o_ppfifo_act     (c_in_wr_activate ),
   .i_ppfifo_size    (c_in_wr_size     ),
@@ -366,7 +375,7 @@ ppfifo #(
   .reset            (pcie_reset       ),
 
   //Write Side
-  .write_clock      (axi_ppfifo_clk   ),
+  .write_clock      (axi_clk          ),
   .write_ready      (c_in_wr_ready    ),
   .write_activate   (c_in_wr_activate ),
   .write_fifo_size  (c_in_wr_size     ),
@@ -402,7 +411,7 @@ ppfifo #(
   .starved          (                 ),
 
   //Read Size
-  .read_clock       (axi_ppfifo_clk   ),
+  .read_clock       (axi_clk          ),
   .read_strobe      (c_out_rd_stb     ),
   .read_ready       (c_out_rd_ready   ),
   .read_activate    (c_out_rd_activate),
@@ -416,7 +425,7 @@ adapter_ppfifo_2_axi_stream control_p2a (
   .rst              (pcie_reset       ),
 
   //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (axi_ppfifo_clk   ),
+  .i_ppfifo_clk     (axi_clk          ),
   .i_ppfifo_rdy     (c_out_rd_ready   ),
   .o_ppfifo_act     (c_out_rd_activate),
   .i_ppfifo_size    (c_out_rd_size    ),
@@ -463,7 +472,7 @@ ppfifo #(
   .reset            (pcie_reset       ),
 
   //Write Side
-  .write_clock      (axi_ppfifo_clk   ),
+  .write_clock      (axi_clk          ),
   .write_ready      (d_in_wr_ready    ),
   .write_activate   (d_in_wr_activate ),
   .write_fifo_size  (d_in_wr_size     ),
@@ -500,7 +509,7 @@ ppfifo #(
   .starved          (),
 
   //Read Size
-  .read_clock       (axi_ppfifo_clk   ),
+  .read_clock       (axi_clk          ),
   .read_strobe      (d_out_rd_stb     ),
   .read_ready       (d_out_rd_ready   ),
   .read_activate    (d_out_rd_activate),
@@ -513,7 +522,7 @@ adapter_ppfifo_2_axi_stream data_p2a (
   .rst              (pcie_reset       ),
 
   //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (axi_ppfifo_clk   ),
+  .i_ppfifo_clk     (axi_clk          ),
   .i_ppfifo_rdy     (d_out_rd_ready   ),
   .o_ppfifo_act     (d_out_rd_activate),
   .i_ppfifo_size    (d_out_rd_size    ),
@@ -532,6 +541,8 @@ adapter_ppfifo_2_axi_stream data_p2a (
 //asynchronous logic
 
 assign  axi_clk             = clk_62p5;
+assign  pcie_clk            = clk_62p5;
+
 
 //Map the PCIE to PPFIFO FIFO
 

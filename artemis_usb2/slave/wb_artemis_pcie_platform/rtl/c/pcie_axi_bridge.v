@@ -235,7 +235,11 @@ module pcie_axi_bridge #(
   input             sys_reset,
   output            user_clk_out,
   output            user_reset_out,
-  output            received_hot_reset
+  output            received_hot_reset,
+  output            pll_lock_detect,
+  output            gtp_pll_lock_detect,
+  output            gtp_reset_done,
+  output            rx_elec_idle
 );
 
 
@@ -419,7 +423,6 @@ wire          pipe_tx_rcvr_det_b;
 // GT->PLM PIPE Interface rx
 wire [1:0]    rx_char_is_k;
 wire [15:0]   rx_data;
-wire          rx_enter_elecidle;
 wire [2:0]    rx_status;
 wire          rx_polarity;
 
@@ -433,7 +436,6 @@ wire [15:0]   tx_data;
 wire          phystatus;
 
 // GT<->PLM PIPE Interface MGT Logic I/O
-wire          gt_reset_done;
 wire          gt_rx_valid;
 wire          gt_tx_elec_idle;
 wire [1:0]    gt_power_down;
@@ -479,16 +481,16 @@ PLL_BASE #(
 // Instantiate buffers where required                               //
 //******************************************************************//
 BUFG  mgt_bufg (
-  .O                              (mgt_clk                                    ),
-  .I                              (clk_125                                    )
+  .I                              (clk_125                                    ),
+  .O                              (mgt_clk                                    )
 );
 BUFG  mgt2x_bufg (
-  .O                              (mgt_clk_2x                                 ),
-  .I                              (clk_250                                    )
+  .I                              (clk_250                                    ),
+  .O                              (mgt_clk_2x                                 )
 );
 BUFG  phy_bufg (
-  .O                              (user_clk_out                               ),
-  .I                              (clk_62_5                                   )
+  .I                              (clk_62_5                                   ),
+  .O                              (user_clk_out                               )
 );
 
 //***************************************************************************
@@ -561,7 +563,7 @@ GTPA1_DUAL_WRAPPER #(
   .TILE0_PLLLKDET0_OUT          (                                              ),
   .TILE0_PLLLKDET1_OUT          (gt_plllkdet_out                               ),
   .TILE0_RESETDONE0_OUT         (                                              ),
-  .TILE0_RESETDONE1_OUT         (gt_reset_done                                 ),
+  .TILE0_RESETDONE1_OUT         (gtp_reset_done                                ),
   //--------------------- Receive Ports - 8b10b Decoder ----------------------
   .TILE0_RXCHARISK0_OUT         (                                              ),
   .TILE0_RXCHARISK1_OUT         ({rx_char_is_k[0], rx_char_is_k[1]}            ),
@@ -592,7 +594,7 @@ GTPA1_DUAL_WRAPPER #(
   .TILE0_IGNORESIGDET0_IN       (1'b0                                          ),
   .TILE0_IGNORESIGDET1_IN       (1'b0                                          ),
   .TILE0_RXELECIDLE0_OUT        (                                              ),
-  .TILE0_RXELECIDLE1_OUT        (rx_enter_elecidle                             ),
+  .TILE0_RXELECIDLE1_OUT        (rx_elec_idle                                  ),
   .TILE0_RXN0_IN                (1'b0                                          ),
   .TILE0_RXN1_IN                (pci_exp_rxn                                   ),
   .TILE0_RXP0_IN                (1'b0                                          ),
@@ -637,7 +639,9 @@ GTPA1_DUAL_WRAPPER #(
 );
 
 // Generate the reset for the PLL
-assign pll_rst = !gt_plllkdet_out || !sys_reset_n;
+assign  pll_rst             = !gt_plllkdet_out || !sys_reset_n;
+assign  gtp_pll_lock_detect = gt_plllkdet_out;
+assign  pll_lock_detect     = clock_locked;
 
 
 
@@ -1003,10 +1007,10 @@ generate if (!GTP_SEL) begin : PIPE_A_SEL
   // Signals from GTPA1_DUAL to PCIE_A1
   assign   pipe_rx_charisk_a         = rx_char_is_k;
   assign   pipe_rx_data_a            = rx_data;
-  assign   pipe_rx_enter_elec_idle_a = rx_enter_elecidle;
+  assign   pipe_rx_enter_elec_idle_a = rx_elec_idle;
   assign   pipe_rx_status_a          = rx_status;
   assign   pipe_phy_status_a         = phystatus;
-  assign   pipe_gt_reset_done_a      = gt_reset_done;
+  assign   pipe_gt_reset_done_a      = gtp_reset_done;
 
   // Unused PCIE_A1 inputs
   assign   pipe_rx_charisk_b         = 2'b0;
@@ -1031,10 +1035,10 @@ end else begin : PIPE_B_SEL
   // Signals from GTPA1_DUAL to PCIE_A1
   assign   pipe_rx_charisk_b         = rx_char_is_k;
   assign   pipe_rx_data_b            = rx_data;
-  assign   pipe_rx_enter_elec_idle_b = rx_enter_elecidle;
+  assign   pipe_rx_enter_elec_idle_b = rx_elec_idle;
   assign   pipe_rx_status_b          = rx_status;
   assign   pipe_phy_status_b         = phystatus;
-  assign   pipe_gt_reset_done_b      = gt_reset_done;
+  assign   pipe_gt_reset_done_b      = gtp_reset_done;
 
   // Unused PCIE_A1 inputs
   assign   pipe_rx_charisk_a         = 2'b0;

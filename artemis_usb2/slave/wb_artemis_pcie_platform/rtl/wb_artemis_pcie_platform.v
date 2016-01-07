@@ -62,6 +62,7 @@ SOFTWARE.
   Device Size: Number of Registers
   SDB_SIZE:3
 */
+`include "project_defines.v"
 
 `define CTRL_BIT_ENABLE             0
 `define CTRL_BIT_SEND_CONTROL_BLOCK 1
@@ -76,6 +77,10 @@ SOFTWARE.
 `define STS_BITS_PCIE_DEV_NUM       19:16
 `define STS_BITS_PCIE_FUNC_NUM      22:20
 `define STS_BITS_LOCAL_MEM_IDLE     24
+`define STS_BIT_GTP_PLL_LOCK_DETECT 25
+`define STS_BIT_PLL_LOCK_DETECT     26
+`define STS_BIT_GTP_RESET_DONE      27
+`define STS_BIT_RX_ELEC_IDLE        28
 
 
 `define LOCAL_BUFFER_OFFSET         24'h000100
@@ -122,12 +127,19 @@ localparam    CONTROL             = 00;
 localparam    STATUS              = 01;
 localparam    NUM_BLOCK_READ      = 02;
 localparam    LOCAL_BUFFER_SIZE   = 03;
+localparam    PCIE_CLOCK_CNT      = 04;
+localparam    TEST_CLOCK          = 05;
 
 //Local Registers/Wires
 
 wire      [31:0]        status;
 
 reg                     r_enable_pcie;
+reg       [31:0]        r_clock_1_sec;
+reg       [31:0]        r_clock_count;
+reg       [31:0]        r_host_clock_count;
+reg                     r_1sec_stb_100mhz;
+wire                    w_1sec_stb_65mhz;
 
 // Transaction (TRN) Interface
 wire                    user_lnk_up;
@@ -142,13 +154,13 @@ wire      [7:0]         fc_cplh;
 wire      [11:0]        fc_cpld;
 
 
-  // Host (CFG) Interface
+// Host (CFG) Interface
 wire      [31:0]        cfg_do;
 wire                    cfg_rd_wr_done;
 wire      [9:0]         cfg_dwaddr;
 wire                    cfg_rd_en;
 
-  // Configuration: Error
+// Configuration: Error
 wire                    cfg_err_ur;
 wire                    cfg_err_cor;
 wire                    cfg_err_ecrc;
@@ -159,7 +171,7 @@ wire                    cfg_err_locked;
 wire      [47:0]        cfg_err_tlp_cpl_header;
 wire                    cfg_err_cpl_rdy;
 
-  // Conifguration: Interrupt
+// Conifguration: Interrupt
 wire                    cfg_interrupt;
 wire                    cfg_interrupt_rdy;
 wire                    cfg_interrupt_assert;
@@ -168,12 +180,12 @@ wire      [7:0]         cfg_interrupt_di;
 wire      [2:0]         cfg_interrupt_mmenable;
 wire                    cfg_interrupt_msienable;
 
-  // Configuration: Power Management
+// Configuration: Power Management
 wire                    cfg_turnoff_ok;
 wire                    cfg_to_turnoff;
 wire                    cfg_pm_wake;
 
-  // Configuration: System/Status
+// Configuration: System/Status
 wire      [2:0]         cfg_pcie_link_state;
 reg                     r_cfg_trn_pending;
 wire      [7:0]         cfg_bus_number;
@@ -187,9 +199,10 @@ wire      [15:0]        cfg_dcommand;
 wire      [15:0]        cfg_lstatus;
 wire      [15:0]        cfg_lcommand;
 
-  // System Interface
-wire                    pcie_reset;
-wire                    received_hot_reset;
+// System Interface
+wire                              pcie_reset;
+wire                              pcie_clk;
+wire                              received_hot_reset;
 
 
 reg                               r_ppfifo_2_mem_en;
@@ -197,6 +210,10 @@ reg                               r_mem_2_ppfifo_stb;
 reg                               r_cancel_write_stb;
 wire  [31:0]                      w_num_reads;
 wire                              w_idle;
+wire                              pll_lock_detect;
+wire                              rx_elec_idle;
+wire                              gtp_pll_lock_detect;
+wire                              gtp_reset_done;
 
 //User Memory Interface
 reg                               r_lcl_mem_we;
@@ -251,6 +268,7 @@ artemis_pcie_interface #(
 
   // Transaction (TRN) Interface
   .user_lnk_up                    (user_lnk_up            ),
+  .pcie_clk                       (pcie_clk               ),
 
   // Flow Control
   .fc_sel                         (fc_sel                 ),
@@ -309,11 +327,15 @@ artemis_pcie_interface #(
   // System Interface
   .pcie_reset                     (pcie_reset             ),
   .received_hot_reset             (received_hot_reset     ),
+  .gtp_pll_lock_detect            (gtp_pll_lock_detect    ),
+  .gtp_reset_done                 (gtp_reset_done         ),
+  .pll_lock_detect                (pll_lock_detect        ),
+  .rx_elec_idle                   (rx_elec_idle           ),
 
   .i_cmd_in_rd_stb                (w_cmd_in_rd_stb        ),
   .o_cmd_in_rd_ready              (w_cmd_in_rd_ready      ),
   .i_cmd_in_rd_activate           (w_cmd_in_rd_activate   ),
-  .o_cmd_in_rd_count              (w_cmd_in_rd_size      ),
+  .o_cmd_in_rd_count              (w_cmd_in_rd_size       ),
   .o_cmd_in_rd_data               (w_cmd_in_rd_data       ),
 
   .o_cmd_out_wr_ready             (w_cmd_out_wr_ready     ),
@@ -371,6 +393,15 @@ adapter_dpb_ppfifo #(
   .o_read_stb                         (w_cmd_in_rd_stb        )
 );
 
+cross_clock_strobe clk_stb(
+  .rst                                (rst                    ),
+  .in_clk                             (clk                    ),
+  .in_stb                             (r_1sec_stb_100mhz      ),
+
+  .out_clk                            (pcie_clk               ),
+  .out_stb                            (w_1sec_stb_65mhz       )
+);
+
 
 //Asynchronous Logic
 assign  fc_sel                 = 3'h0;
@@ -408,6 +439,20 @@ assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
 //Synchronous Logic
+
+always @ (posedge pcie_clk) begin
+  if (rst) begin
+    r_clock_1_sec   <=  0;
+    r_clock_count   <=  0;
+  end
+  else begin
+    r_clock_count   <=  r_clock_count + 1;
+    if (w_1sec_stb_65mhz) begin
+      r_clock_1_sec   <=  r_clock_count;
+      r_clock_count   <=  0;
+    end
+  end
+end
 always @ (posedge clk) begin
 
   //Deassert Strobes
@@ -415,6 +460,7 @@ always @ (posedge clk) begin
   r_cancel_write_stb            <=  0;
   r_cfg_trn_pending             <=  0;
   r_lcl_mem_we                  <=  0;
+  r_1sec_stb_100mhz             <=  0;
 
   if (rst) begin
     o_wbs_dat                   <=  32'h0;
@@ -424,6 +470,7 @@ always @ (posedge clk) begin
     r_enable_pcie               <=  0;
 
     r_lcl_mem_din               <=  0;
+    r_host_clock_count          <=  0;
 
   end
 
@@ -480,12 +527,22 @@ always @ (posedge clk) begin
               o_wbs_dat[`STS_BITS_PCIE_BUS_NUM]       <=  cfg_bus_number;
               o_wbs_dat[`STS_BITS_PCIE_DEV_NUM]       <=  cfg_device_number;
               o_wbs_dat[`STS_BITS_PCIE_FUNC_NUM]      <=  cfg_function_number;
+              o_wbs_dat[`STS_BIT_GTP_PLL_LOCK_DETECT] <=  gtp_pll_lock_detect;
+              o_wbs_dat[`STS_BIT_PLL_LOCK_DETECT]     <=  pll_lock_detect;
+              o_wbs_dat[`STS_BIT_GTP_RESET_DONE]      <=  gtp_reset_done;
+              o_wbs_dat[`STS_BIT_RX_ELEC_IDLE]        <=  rx_elec_idle;
             end
             NUM_BLOCK_READ: begin
               o_wbs_dat <= w_num_reads;
             end
             LOCAL_BUFFER_SIZE: begin
               o_wbs_dat <= CONTROL_BUFFER_SIZE;
+            end
+            PCIE_CLOCK_CNT: begin
+              o_wbs_dat <=  r_clock_1_sec;
+            end
+            TEST_CLOCK: begin
+              o_wbs_dat <=  r_clock_count;
             end
             //add as many ADDR_X you need here
             default: begin
@@ -496,6 +553,13 @@ always @ (posedge clk) begin
           endcase
           if (w_lcl_mem_valid) begin
             o_wbs_ack <= 1;
+          end
+          if (r_host_clock_count < `CLOCK_RATE) begin
+            r_host_clock_count                        <= r_host_clock_count + 1;
+          end
+          else begin
+            r_host_clock_count                        <= 0;
+            r_1sec_stb_100mhz                         <= 1; 
           end
         end
       end

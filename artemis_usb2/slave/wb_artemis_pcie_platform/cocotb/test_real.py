@@ -80,7 +80,7 @@ class Test (unittest.TestCase):
         self.driver.enable(True)
         self.s.Info("Is PCIE Reset: %s" % self.driver.is_pcie_reset())
         self.s.Info("Is Linkup: %s" % self.driver.is_linkup())
-        self.s.Info("Link State: 0x%08X" % self.driver.get_link_state_string())
+        self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())
         self.s.Info("Get Device Number: 0x%08X" % self.driver.get_dev_num())
         self.s.Info("Get Function Number: 0x%08X" % self.driver.get_func_num())

@@ -15,7 +15,8 @@ from nysa.common.status import Status
 
 from nysa.host.platform_scanner import PlatformScanner
 
-DRIVER = SDHostDriver
+from dut_driver import ArtemisPCIEDriver
+DRIVER = ArtemisPCIEDriver
 
 
 class Test (unittest.TestCase):

@@ -111,8 +111,8 @@ module wb_artemis_pcie_platform #(
   output              o_pcie_phy_tx_p,
   output              o_pcie_phy_tx_n,
 
-  input               i_sata_phy_rx_rxp,
-  input               i_sata_phy_rx_rxn
+  input               i_pcie_phy_rx_p,
+  input               i_pcie_phy_rx_n
 );
 
 //Local Parameters

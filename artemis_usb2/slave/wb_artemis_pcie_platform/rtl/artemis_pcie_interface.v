@@ -226,7 +226,7 @@ wire                        cfg_trn_pending;
 
 
 //submodules
-cross_clock_strobe trn_pnd(
+cross_clock_strobe trn_pnd (
   .rst              (rst                ),
   .in_clk           (clk                ),
   .in_stb           (cfg_trn_pending_stb),
@@ -236,15 +236,7 @@ cross_clock_strobe trn_pnd(
 );
 
 
-`ifdef SIMULATION
-
-sim_pcie_axi_bridge #(
-  .USR_CLK_DIVIDE                     (4                      )
-)pcie_interface(
-`else
-pcie_axi_bridge pcie_interface(
-
-`endif
+pcie_axi_bridge pcie_interface (
 
   // PCI Express Fabric Interface
   .pci_exp_txp                       (pci_exp_txp             ),

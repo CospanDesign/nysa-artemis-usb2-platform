@@ -74,25 +74,44 @@ class Test (unittest.TestCase):
         self.s.Info("Instantiated a SDIO Device Device: %s" % sdio_urn)
 
     def test_device(self):
+
+        TX_DIFF_CTRL = 0x07
+        RX_EQUALIZER = 0x3
+
         self.s.Info("Attempting to set voltage range")
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.s.Info("Enable PCIE")
         #self.driver.enable(False)
+        #self.driver.enable(False)
+        self.driver.set_tx_diff_swing(TX_DIFF_CTRL)
+        self.driver.set_rx_equalizer(RX_EQUALIZER)
+        self.s.Important("Tx Diff Swing: %d" % self.driver.get_tx_diff_swing())
+        self.s.Important("RX Equalizer: %d" % self.driver.get_rx_equalizer())
+        time.sleep(0.5)
         self.driver.enable(True)
         time.sleep(0.5)
-        self.s.Info("Is PCIE Reset: %s" % self.driver.is_pcie_reset())
-        self.s.Info("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())
-        self.s.Info("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
-        self.s.Info("Is GTP RX Electrical Idle: %s" % self.driver.is_gtp_rx_elec_idle())
-        self.s.Info("Is PLL Locked: %s" % self.driver.is_pll_locked())
-        self.s.Info("Is Linkup: %s" % self.driver.is_linkup())
+
+        self.s.Verbose("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())
+        self.s.Verbose("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
+        self.s.Verbose("Is GTP RX Electrical Idle: %s" % self.driver.is_gtp_rx_elec_idle())
+        self.s.Verbose("Is PLL Locked: %s" % self.driver.is_pll_locked())
+
+        if self.driver.is_pcie_reset():
+            self.s.Error("PCIE_A1 Core is in reset!")
+
+        if self.driver.is_linkup():
+            self.s.Important("PCIE Linked up!")
+        else:
+            self.s.Error("PCIE Core is not linked up!")
+
+        self.s.Important("LTSSM State: %s" % self.driver.get_ltssm_state())
+
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())
         self.s.Info("Get Device Number: 0x%08X" % self.driver.get_dev_num())
         self.s.Info("Get Function Number: 0x%08X" % self.driver.get_func_num())
         self.s.Info("Clock: %d" % self.driver.get_pcie_clock_count())
         self.s.Info("Debug Clock Data: %d" % self.driver.get_debug_pcie_clock_count())
-
 
 if __name__ == "__main__":
     unittest.main()

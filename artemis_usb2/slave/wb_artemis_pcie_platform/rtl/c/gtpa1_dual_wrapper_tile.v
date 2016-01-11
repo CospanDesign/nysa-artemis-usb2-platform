@@ -165,9 +165,10 @@ module GTPA1_DUAL_WRAPPER_TILE #(
     input           TXDETECTRX0_IN,
     input           TXDETECTRX1_IN,
     input           TXELECIDLE0_IN,
-    input           TXELECIDLE1_IN
+    input           TXELECIDLE1_IN,
 
-
+    input [1:0]     rx_equalizer_ctrl,
+    input [3:0]     tx_diff_ctrl
 );
 
 
@@ -648,7 +649,7 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .RXELECIDLE0                    (RXELECIDLE0_OUT),
         .RXELECIDLE1                    (RXELECIDLE1_OUT),
         .RXEQMIX0                       (2'b11),
-        .RXEQMIX1                       (2'b11),
+        .RXEQMIX1                       (rx_equalizer_ctrl),
         .RXN0                           (RXN0_IN),
         .RXN1                           (RXN1_IN),
         .RXP0                           (RXP0_IN),
@@ -731,7 +732,7 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .TXBUFDIFFCTRL0                 (3'b101),
         .TXBUFDIFFCTRL1                 (3'b101),
         .TXDIFFCTRL0                    (4'b1001),
-        .TXDIFFCTRL1                    (4'b1001),
+        .TXDIFFCTRL1                    (tx_diff_ctrl),
         .TXINHIBIT0                     (tied_to_ground_i),
         .TXINHIBIT1                     (tied_to_ground_i),
         .TXN0                           (TXN0_OUT),
@@ -747,7 +748,7 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .TXPRBSFORCEERR1                (tied_to_ground_i),
         //------------------ Transmit Ports - TX Polarity Control ------------------
         .TXPOLARITY0                    (tied_to_ground_i),
-        .TXPOLARITY1                    (tied_to_ground_i),
+        .TXPOLARITY1                    (tied_to_vcc_i),
         //--------------- Transmit Ports - TX Ports for PCI Express ----------------
         .TXDETECTRX0                    (TXDETECTRX0_IN),
         .TXDETECTRX1                    (TXDETECTRX1_IN),

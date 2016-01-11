@@ -136,8 +136,11 @@ module artemis_pcie_interface #(
   input       [1:0]         i_data_out_wr_activate,
   output      [23:0]        o_data_out_wr_size,
   input                     i_data_out_wr_stb,
-  input       [31:0]        i_data_out_wr_data
+  input       [31:0]        i_data_out_wr_data,
 
+  input       [1:0]         rx_equalizer_ctrl,
+  input       [3:0]         tx_diff_ctrl,
+  output      [4:0]         cfg_ltssm_state
 );
 
 //local parameters
@@ -342,7 +345,12 @@ pcie_axi_bridge pcie_interface (
   .pll_lock_detect                   (pll_lock_detect         ),
   .gtp_pll_lock_detect               (gtp_pll_lock_detect     ),
   .gtp_reset_done                    (gtp_reset_done          ),
-  .rx_elec_idle                      (rx_elec_idle            )
+  .rx_elec_idle                      (rx_elec_idle            ),
+
+  .rx_equalizer_ctrl                 (rx_equalizer_ctrl       ),
+  .tx_diff_ctrl                      (tx_diff_ctrl            ),
+  .cfg_ltssm_state                   (cfg_ltssm_state         )
+
 );
 
 adapter_axi_stream_2_ppfifo cntrl_a2p (

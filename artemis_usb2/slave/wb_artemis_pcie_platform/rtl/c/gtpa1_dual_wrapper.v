@@ -167,8 +167,10 @@ module GTPA1_DUAL_WRAPPER #(
     input           TILE0_TXDETECTRX0_IN,
     input           TILE0_TXDETECTRX1_IN,
     input           TILE0_TXELECIDLE0_IN,
-    input           TILE0_TXELECIDLE1_IN
+    input           TILE0_TXELECIDLE1_IN,
 
+    input [1:0]     rx_equalizer_ctrl,
+    input [3:0]     tx_diff_ctrl
 
 );
 
@@ -345,7 +347,10 @@ endgenerate //End generate for WRAPPER_SIMULATION
         .TXDETECTRX0_IN                 (TILE0_TXDETECTRX0_IN),
         .TXDETECTRX1_IN                 (TILE0_TXDETECTRX1_IN),
         .TXELECIDLE0_IN                 (TILE0_TXELECIDLE0_IN),
-        .TXELECIDLE1_IN                 (TILE0_TXELECIDLE1_IN)
+        .TXELECIDLE1_IN                 (TILE0_TXELECIDLE1_IN),
+
+        .rx_equalizer_ctrl              (rx_equalizer_ctrl),
+        .tx_diff_ctrl                   (tx_diff_ctrl)
 
     );
 

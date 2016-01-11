@@ -112,23 +112,28 @@ module wb_artemis_pcie_platform #(
   input               i_clk_100mhz_gtp_p,
   input               i_clk_100mhz_gtp_n,
 
-
   output              o_pcie_phy_tx_p,
   output              o_pcie_phy_tx_n,
 
   input               i_pcie_phy_rx_p,
-  input               i_pcie_phy_rx_n
+  input               i_pcie_phy_rx_n,
+  
+  input               i_pcie_reset_n,
+  output              o_pcie_wake_n
 );
 
 //Local Parameters
 localparam    CONTROL_BUFFER_SIZE = 2 ** CONTROL_FIFO_DEPTH;
 
-localparam    CONTROL             = 00;
-localparam    STATUS              = 01;
-localparam    NUM_BLOCK_READ      = 02;
-localparam    LOCAL_BUFFER_SIZE   = 03;
-localparam    PCIE_CLOCK_CNT      = 04;
-localparam    TEST_CLOCK          = 05;
+localparam    CONTROL             = 0;
+localparam    STATUS              = 1;
+localparam    NUM_BLOCK_READ      = 2;
+localparam    LOCAL_BUFFER_SIZE   = 3;
+localparam    PCIE_CLOCK_CNT      = 4;
+localparam    TEST_CLOCK          = 5;
+localparam    TX_DIFF_CTRL        = 6;
+localparam    RX_EQUALIZER_CTRL   = 7;
+localparam    LTSSM_STATE         = 8;
 
 //Local Registers/Wires
 
@@ -249,6 +254,10 @@ wire  [23:0]                      w_data_out_wr_size;
 wire                              w_data_out_wr_stb;
 wire  [31:0]                      w_data_out_wr_data;
 
+reg   [1:0]                       r_rx_equalizer_ctrl;
+reg   [3:0]                       r_tx_diff_ctrl;
+wire  [4:0]                       cfg_ltssm_state;
+
 
 //Submodules
 artemis_pcie_interface #(
@@ -257,7 +266,7 @@ artemis_pcie_interface #(
   .SERIAL_NUMBER                  (64'h000000000000C594   )
 )api (
   .clk                            (clk                    ),
-  .rst                            (rst || !r_enable_pcie  ),
+  .rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
 
   .gtp_clk_p                      (i_clk_100mhz_gtp_p     ),
   .gtp_clk_n                      (i_clk_100mhz_gtp_n     ),
@@ -354,7 +363,12 @@ artemis_pcie_interface #(
   .i_data_out_wr_activate         (w_data_out_wr_activate ),
   .o_data_out_wr_size             (w_data_out_wr_size     ),
   .i_data_out_wr_stb              (w_data_out_wr_stb      ),
-  .i_data_out_wr_data             (w_data_out_wr_data     )
+  .i_data_out_wr_data             (w_data_out_wr_data     ),
+
+  .rx_equalizer_ctrl              (r_rx_equalizer_ctrl    ),
+  .tx_diff_ctrl                   (r_tx_diff_ctrl         ),
+  .cfg_ltssm_state                (cfg_ltssm_state        )
+
 
 );
 
@@ -433,6 +447,8 @@ assign  w_data_out_wr_activate  = 0;
 assign  w_data_out_wr_stb       = 0;
 assign  w_data_out_wr_data      = 0;
 
+assign  o_pcie_wake_n           = 0;
+
 
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
@@ -453,6 +469,8 @@ always @ (posedge pcie_clk) begin
     end
   end
 end
+
+
 always @ (posedge clk) begin
 
   //Deassert Strobes
@@ -467,13 +485,14 @@ always @ (posedge clk) begin
     o_wbs_ack                   <=  0;
     o_wbs_int                   <=  0;
     r_ppfifo_2_mem_en           <=  0;
-    r_enable_pcie               <=  0;
+    r_enable_pcie               <=  1;
 
     r_lcl_mem_din               <=  0;
     r_host_clock_count          <=  0;
 
+    r_rx_equalizer_ctrl         <=  2'b11;
+    r_tx_diff_ctrl              <=  4'b1001;
   end
-
   else begin
     //when the master acks our ack, then put our ack down
     if (o_wbs_ack && ~i_wbs_stb)begin
@@ -488,19 +507,18 @@ always @ (posedge clk) begin
           case (i_wbs_adr)
             CONTROL: begin
               $display("ADDR: %h user wrote %h", i_wbs_adr, i_wbs_dat);
+              r_enable_pcie       <=  i_wbs_dat[`CTRL_BIT_ENABLE];
               r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              r_enable_pcie       <=  i_wbs_dat[`CTRL_BIT_ENABLE];
 
             end
-            STATUS: begin
-              $display("ADDR: %h user wrote %h", i_wbs_adr, i_wbs_dat);
+            TX_DIFF_CTRL: begin
+              r_tx_diff_ctrl      <=  i_wbs_dat[3:0];
             end
-            NUM_BLOCK_READ: begin
-              $display("ADDR: %h user wrote %h", i_wbs_adr, i_wbs_dat);
+            RX_EQUALIZER_CTRL: begin
+              r_rx_equalizer_ctrl <=  i_wbs_dat[1:0];
             end
-            //add as many ADDR_X you need here
             default: begin
               if (w_lcl_mem_en) begin
                 r_lcl_mem_we                          <=  1;
@@ -542,9 +560,20 @@ always @ (posedge clk) begin
               o_wbs_dat <=  r_clock_1_sec;
             end
             TEST_CLOCK: begin
-              o_wbs_dat <=  r_clock_count;
+              o_wbs_dat       <=  r_clock_count;
             end
-            //add as many ADDR_X you need here
+            TX_DIFF_CTRL: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat[3:0]  <=  r_tx_diff_ctrl;
+            end
+            RX_EQUALIZER_CTRL: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat[1:0]  <=  r_rx_equalizer_ctrl;
+            end
+            LTSSM_STATE: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat[4:0]  <=  cfg_ltssm_state;
+            end
             default: begin
               if (w_lcl_mem_en) begin
                 o_wbs_dat                             <=  w_lcl_mem_dout;
@@ -554,16 +583,17 @@ always @ (posedge clk) begin
           if (w_lcl_mem_valid) begin
             o_wbs_ack <= 1;
           end
-          if (r_host_clock_count < `CLOCK_RATE) begin
-            r_host_clock_count                        <= r_host_clock_count + 1;
-          end
-          else begin
-            r_host_clock_count                        <= 0;
-            r_1sec_stb_100mhz                         <= 1; 
-          end
         end
       end
     end
+    if (r_host_clock_count < `CLOCK_RATE) begin
+      r_host_clock_count                        <= r_host_clock_count + 1;
+    end
+    else begin
+      r_host_clock_count                        <= 0;
+      r_1sec_stb_100mhz                         <= 1; 
+    end
+
   end
 end
 

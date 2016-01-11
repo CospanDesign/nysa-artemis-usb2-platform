@@ -18,6 +18,11 @@
         "Binary":"Yes"
        }
     },
+    "par":{
+      "flags":{
+        "-mt":"on"
+      }
+    },
     "xst":{
       "flags":{
         "-sd":"{cores}",

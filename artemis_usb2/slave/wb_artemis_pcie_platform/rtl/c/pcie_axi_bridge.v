@@ -239,7 +239,11 @@ module pcie_axi_bridge #(
   output            pll_lock_detect,
   output            gtp_pll_lock_detect,
   output            gtp_reset_done,
-  output            rx_elec_idle
+  output            rx_elec_idle,
+
+  input   [1:0]     rx_equalizer_ctrl,
+  input   [3:0]     tx_diff_ctrl,
+  output  [4:0]     cfg_ltssm_state
 );
 
 
@@ -333,7 +337,6 @@ assign w_cfg_rev_id         = CFG_REV_ID;
 assign w_cfg_subsys_ven_id  = CFG_SUBSYS_VEN_ID;
 assign w_cfg_subsys_id      = CFG_SUBSYS_ID;
 
-wire  [4:0]   cfg_ltssm_state;
 wire  [1:0]   cfg_link_control_aspm_control;
 wire          cfg_link_control_rcb;
 wire          cfg_link_control_common_clock;
@@ -635,7 +638,12 @@ GTPA1_DUAL_WRAPPER #(
   .TILE0_TXDETECTRX0_IN         (1'b0                                          ),
   .TILE0_TXDETECTRX1_IN         (tx_rcvr_det                                   ),
   .TILE0_TXELECIDLE0_IN         (1'b0                                          ),
-  .TILE0_TXELECIDLE1_IN         (gt_tx_elec_idle                               )
+  .TILE0_TXELECIDLE1_IN         (gt_tx_elec_idle                               ),
+
+  .rx_equalizer_ctrl            (rx_equalizer_ctrl                             ),
+  .tx_diff_ctrl                 (tx_diff_ctrl                                  )
+
+
 );
 
 // Generate the reset for the PLL

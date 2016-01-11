@@ -27,13 +27,15 @@ except SyntaxError:
     pass
 
 #Register Constants
-CONTROL                         =   00
-STATUS                          =   01
-NUM_BLOCK_READ                  =   02
-LOCAL_BUFFER_SIZE               =   03
-PCIE_CLOCK_CNT                  =   04
-TEST_CLOCK                      =   05
-
+CONTROL                         =   0
+STATUS                          =   1
+NUM_BLOCK_READ                  =   2
+LOCAL_BUFFER_SIZE               =   3
+PCIE_CLOCK_CNT                  =   4
+TEST_CLOCK                      =   5
+TX_DIFF_CTRL                    =   6
+RX_EQUALIZER_CTRL               =   7
+LTSSM_STATE                     =   8
 
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
@@ -213,4 +215,51 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_debug_pcie_clock_count(self):
         return self.read_register(TEST_CLOCK)
+
+    def set_tx_diff_swing(self, diff_ctrl):
+        self.write_register(TX_DIFF_CTRL, diff_ctrl)
+
+    def get_tx_diff_swing(self):
+        return self.read_register(TX_DIFF_CTRL)
+
+    def set_rx_equalizer(self, rx_equalizer):
+        self.write_register(RX_EQUALIZER_CTRL, rx_equalizer)
+
+    def get_rx_equalizer(self):
+        return self.read_register(RX_EQUALIZER_CTRL)
+
+    def get_ltssm_state(self):
+        state = self.read_register(LTSSM_STATE)
+        if state == 0b00000: return "Detect.Quiet"
+        if state == 0b00001: return "Detect.Active"
+        if state == 0b00010: return "Polling.Active"
+        if state == 0b00011: return "Polling.Config"
+        if state == 0b00100: return "Polling Compliance"
+        if state == 0b00101: return "Configuration.Linkwidth.Start"
+        if state == 0b00110: return "Configuration.Linkwidth.Start"
+        if state == 0b00111: return "Configuration.Linkwidth.Accept"
+        if state == 0b01000: return "Configuration.Linkwidth.Accept"
+        if state == 0b01001: return "Configuration.Lanenum.Wait"
+        if state == 0b01010: return "Configuration.Lanenum.Accept"
+        if state == 0b01011: return "Configuration.Complete"
+        if state == 0b01100: return "Configuration.Idle"
+        if state == 0b01101: return "L0"
+        if state == 0b01110: return "L1.Entry"
+        if state == 0b01111: return "L1.Entry"
+        if state == 0b10000: return "L1.Entry"
+        if state == 0b10001: return "L1.Idle"
+        if state == 0b10010: return "L1.Exit-to-recovery"
+        if state == 0b10011: return "Recovery.RcvrLock"
+        if state == 0b10100: return "Recovery.RcvrCfg"
+        if state == 0b10101: return "Recovery.Idle"
+        if state == 0b10110: return "Hot Reset"
+        if state == 0b10111: return "Disabled"
+        if state == 0b11000: return "Disabled"
+        if state == 0b11001: return "Disabled"
+        if state == 0b11010: return "Disabled"
+        if state == 0b11011: return "Detect.Quiet"
+        else:
+            return "Unknown State: 0x%02X" % state
+
+
 

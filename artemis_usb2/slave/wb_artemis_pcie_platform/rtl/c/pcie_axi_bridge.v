@@ -81,7 +81,8 @@ module pcie_axi_bridge #(
   parameter         TL_TFC_DISABLE                    = "FALSE",
   parameter         TL_TX_CHECKS_DISABLE              = "FALSE",
   parameter         USR_CFG                           = "FALSE",
-  parameter         USR_EXT_CFG                       = "TRUE",
+  //parameter         USR_EXT_CFG                       = "TRUE",
+  parameter         USR_EXT_CFG                       = "FALSE",
   parameter   [2:0] DEV_CAP_MAX_PAYLOAD_SUPPORTED     = 3'd2,
   parameter  [23:0] CLASS_CODE                        = 24'h050000,
   parameter  [31:0] CARDBUS_CIS_POINTER               = 32'h00000000,
@@ -243,7 +244,35 @@ module pcie_axi_bridge #(
 
   input   [1:0]     rx_equalizer_ctrl,
   input   [3:0]     tx_diff_ctrl,
-  output  [4:0]     cfg_ltssm_state
+  output  [4:0]     cfg_ltssm_state,
+
+  output            dbg_reg_detected_correctable,
+  output            dbg_reg_detected_fatal,
+  output            dbg_reg_detected_non_fatal,
+  output            dbg_reg_detected_unsupported,
+
+
+  output            dbg_bad_dllp_status,
+  output            dbg_bad_tlp_lcrc,
+  output            dbg_bad_tlp_seq_num,
+  output            dbg_bad_tlp_status,
+  output            dbg_dl_protocol_status,
+  output            dbg_fc_protocol_err_status,
+  output            dbg_mlfrmd_length,
+  output            dbg_mlfrmd_mps,
+  output            dbg_mlfrmd_tcvc,
+  output            dbg_mlfrmd_tlp_status,
+  output            dbg_mlfrmd_unrec_type,
+  output            dbg_poistlpstatus,
+  output            dbg_rcvr_overflow_status,
+  output            dbg_rply_rollover_status,
+  output            dbg_rply_timeout_status,
+  output            dbg_ur_no_bar_hit,
+  output            dbg_ur_pois_cfg_wr,
+  output            dbg_ur_status,
+  output            dbg_ur_unsup_msg
+
+
 );
 
 
@@ -341,11 +370,13 @@ wire  [1:0]   cfg_link_control_aspm_control;
 wire          cfg_link_control_rcb;
 wire          cfg_link_control_common_clock;
 wire          cfg_link_control_extended_sync;
+
 wire          cfg_command_interrupt_disable;
 wire          cfg_command_serr_en;
 wire          cfg_command_bus_master_enable;
 wire          cfg_command_mem_enable;
 wire          cfg_command_io_enable;
+
 wire          cfg_dev_status_ur_detected;
 wire          cfg_dev_status_fatal_err_detected;
 wire          cfg_dev_status_nonfatal_err_detected;
@@ -367,30 +398,6 @@ wire [11:0]   mim_tx_waddr, mim_tx_raddr, mim_rx_waddr, mim_rx_raddr;
 wire [35:0]   mim_tx_wdata, mim_tx_rdata;
 wire [34:0]   mim_rx_wdata, mim_rx_rdata;
 wire          mim_tx_wen, mim_tx_ren, mim_rx_wen, mim_rx_ren;
-
-wire          dbg_bad_dllp_status;
-wire          dbg_bad_tlp_lcrc;
-wire          dbg_bad_tlp_seq_num;
-wire          dbg_bad_tlp_status;
-wire          dbg_dl_protocol_status;
-wire          dbg_fc_protocol_err_status;
-wire          dbg_mlfrmd_length;
-wire          dbg_mlfrmd_mps;
-wire          dbg_mlfrmd_tcvc;
-wire          dbg_mlfrmd_tlp_status;
-wire          dbg_mlfrmd_unrec_type;
-wire          dbg_poistlpstatus;
-wire          dbg_rcvr_overflow_status;
-wire          dbg_reg_detected_correctable;
-wire          dbg_reg_detected_fatal;
-wire          dbg_reg_detected_non_fatal;
-wire          dbg_reg_detected_unsupported;
-wire          dbg_rply_rollover_status;
-wire          dbg_rply_timeout_status;
-wire          dbg_ur_no_bar_hit;
-wire          dbg_ur_pois_cfg_wr;
-wire          dbg_ur_status;
-wire          dbg_ur_unsup_msg;
 
 wire [1:0]    pipe_gt_power_down_a;
 wire [1:0]    pipe_gt_power_down_b;
@@ -836,7 +843,8 @@ PCIE_A1 #(
   .VC0_TOTAL_CREDITS_PD               (VC0_TOTAL_CREDITS_PD                     ),
   .VC0_TOTAL_CREDITS_PH               (VC0_TOTAL_CREDITS_PH                     ),
   .VC0_TX_LASTPACKET                  (VC0_TX_LASTPACKET                        )
-) PCIE_A1 (                                                                     
+) PCIE_A1 (
+
   .CFGBUSNUMBER                       (cfg_bus_number                           ),
   .CFGCOMMANDBUSMASTERENABLE          (cfg_command_bus_master_enable            ),
   .CFGCOMMANDINTERRUPTDISABLE         (cfg_command_interrupt_disable            ),
@@ -896,7 +904,9 @@ PCIE_A1 #(
   .CFGTRNPENDINGN                     (cfg_trn_pending_n                        ),
   .CFGTURNOFFOKN                      (cfg_turnoff_ok_n                         ),
   .CFGVENID                           (w_cfg_ven_id                             ),
+
   .CLOCKLOCKED                        (clock_locked                             ),
+
   .DBGBADDLLPSTATUS                   (dbg_bad_dllp_status                      ),
   .DBGBADTLPLCRC                      (dbg_bad_tlp_lcrc                         ),
   .DBGBADTLPSEQNUM                    (dbg_bad_tlp_seq_num                      ),
@@ -921,6 +931,7 @@ PCIE_A1 #(
   .DBGURSTATUS                        (dbg_ur_status                            ),
   .DBGURUNSUPMSG                      (dbg_ur_unsup_msg                         ),
   .MGTCLK                             (mgt_clk                                  ),
+
   .MIMRXRADDR                         (mim_rx_raddr                             ),
   .MIMRXRDATA                         (mim_rx_rdata                             ),
   .MIMRXREN                           (mim_rx_ren                               ),
@@ -933,6 +944,7 @@ PCIE_A1 #(
   .MIMTXWADDR                         (mim_tx_waddr                             ),
   .MIMTXWDATA                         (mim_tx_wdata                             ),
   .MIMTXWEN                           (mim_tx_wen                               ),
+
   .PIPEGTPOWERDOWNA                   (pipe_gt_power_down_a                     ),
   .PIPEGTPOWERDOWNB                   (pipe_gt_power_down_b                     ),
   .PIPEGTRESETDONEA                   (pipe_gt_reset_done_a                     ),
@@ -963,8 +975,9 @@ PCIE_A1 #(
   .PIPETXDATAB                        (pipe_tx_data_b                           ),
   .PIPETXRCVRDETA                     (pipe_tx_rcvr_det_a                       ),
   .PIPETXRCVRDETB                     (pipe_tx_rcvr_det_b                       ),
+
   .RECEIVEDHOTRESET                   (received_hot_reset                       ),
-  .SYSRESETN                          (sys_reset_n                              ),
+
   .TRNFCCPLD                          (fc_cpld                                  ),
   .TRNFCCPLH                          (fc_cplh                                  ),
   .TRNFCNPD                           (fc_npd                                   ),
@@ -994,11 +1007,13 @@ PCIE_A1 #(
   .TRNTSRCDSCN                        (!trn_tsrc_dsc                            ),
   .TRNTSRCRDYN                        (!trn_tsrc_rdy                            ),
   .TRNTSTRN                           (!trn_tstr                                ),
+
+  .SYSRESETN                          (sys_reset_n                              ),
   .USERCLK                            (user_clk_out                             ),
   .USERRSTN                           (user_reset_out_w                         )
 );
 
-IBUFGDS (
+IBUFGDS sys_clk_in(
   .I                                  (sys_clk_p                                ),
   .IB                                 (sys_clk_n                                ),
 
@@ -1010,64 +1025,32 @@ IBUFGDS (
 // the parameter GTP_SEL is 0, connect to PIPEA, when it is a 1, connect to
 // PIPEB.
 //***************************************************************************
-generate if (!GTP_SEL) begin : PIPE_A_SEL
 
-  // Signals from GTPA1_DUAL to PCIE_A1
-  assign   pipe_rx_charisk_a         = rx_char_is_k;
-  assign   pipe_rx_data_a            = rx_data;
-  assign   pipe_rx_enter_elec_idle_a = rx_elec_idle;
-  assign   pipe_rx_status_a          = rx_status;
-  assign   pipe_phy_status_a         = phystatus;
-  assign   pipe_gt_reset_done_a      = gtp_reset_done;
+// Signals from GTPA1_DUAL to PCIE_A1
+assign   pipe_rx_charisk_b         = rx_char_is_k;
+assign   pipe_rx_data_b            = rx_data;
+assign   pipe_rx_enter_elec_idle_b = rx_elec_idle;
+assign   pipe_rx_status_b          = rx_status;
+assign   pipe_phy_status_b         = phystatus;
+assign   pipe_gt_reset_done_b      = gtp_reset_done;
 
-  // Unused PCIE_A1 inputs
-  assign   pipe_rx_charisk_b         = 2'b0;
-  assign   pipe_rx_data_b            = 16'h0;
-  assign   pipe_rx_enter_elec_idle_b = 1'b0;
-  assign   pipe_rx_status_b          = 3'b0;
-  assign   pipe_phy_status_b         = 1'b0;
-  assign   pipe_gt_reset_done_b      = 1'b0;
+// Unused PCIE_A1 inputs
+assign   pipe_rx_charisk_a         = 2'b0;
+assign   pipe_rx_data_a            = 16'h0;
+assign   pipe_rx_enter_elec_idle_a = 1'b0;
+assign   pipe_rx_status_a          = 3'b0;
+assign   pipe_phy_status_a         = 1'b0;
+assign   pipe_gt_reset_done_a      = 1'b0;
 
-  //Signals from PCIE_A1 to GTPA1_DUAL
-  assign   rx_polarity               = pipe_rx_polarity_a;
-  assign   tx_char_disp_mode         = pipe_tx_char_disp_mode_a;
-  assign   tx_char_is_k              = pipe_tx_char_is_k_a;
-  assign   tx_rcvr_det               = pipe_tx_rcvr_det_a;
-  assign   tx_data                   = pipe_tx_data_a;
-  assign   gt_tx_elec_idle           = pipe_gt_tx_elec_idle_a;
-  assign   gt_power_down             = pipe_gt_power_down_a;
-  assign   rxreset                   = pipe_rxreset_a;
-
-end else begin : PIPE_B_SEL
-
-  // Signals from GTPA1_DUAL to PCIE_A1
-  assign   pipe_rx_charisk_b         = rx_char_is_k;
-  assign   pipe_rx_data_b            = rx_data;
-  assign   pipe_rx_enter_elec_idle_b = rx_elec_idle;
-  assign   pipe_rx_status_b          = rx_status;
-  assign   pipe_phy_status_b         = phystatus;
-  assign   pipe_gt_reset_done_b      = gtp_reset_done;
-
-  // Unused PCIE_A1 inputs
-  assign   pipe_rx_charisk_a         = 2'b0;
-  assign   pipe_rx_data_a            = 16'h0;
-  assign   pipe_rx_enter_elec_idle_a = 1'b0;
-  assign   pipe_rx_status_a          = 3'b0;
-  assign   pipe_phy_status_a         = 1'b0;
-  assign   pipe_gt_reset_done_a      = 1'b0;
-
-  //Signals from PCIE_A1 to GTPA1_DUAL
-  assign   rx_polarity               = pipe_rx_polarity_b;
-  assign   tx_char_disp_mode         = pipe_tx_char_disp_mode_b;
-  assign   tx_char_is_k              = pipe_tx_char_is_k_b;
-  assign   tx_rcvr_det               = pipe_tx_rcvr_det_b;
-  assign   tx_data                   = pipe_tx_data_b;
-  assign   gt_tx_elec_idle           = pipe_gt_tx_elec_idle_b;
-  assign   gt_power_down             = pipe_gt_power_down_b;
-  assign   rxreset                   = pipe_rxreset_b;
-
-end
-endgenerate
+//Signals from PCIE_A1 to GTPA1_DUAL
+assign   rx_polarity               = pipe_rx_polarity_b;
+assign   tx_char_disp_mode         = pipe_tx_char_disp_mode_b;
+assign   tx_char_is_k              = pipe_tx_char_is_k_b;
+assign   tx_rcvr_det               = pipe_tx_rcvr_det_b;
+assign   tx_data                   = pipe_tx_data_b;
+assign   gt_tx_elec_idle           = pipe_gt_tx_elec_idle_b;
+assign   gt_power_down             = pipe_gt_power_down_b;
+assign   rxreset                   = pipe_rxreset_b;
 
 
 

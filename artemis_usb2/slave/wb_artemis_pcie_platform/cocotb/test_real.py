@@ -12,6 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
                              os.pardir))
 
 from nysa.common.status import Status
+from nysa.host.driver.utils import *
 
 from nysa.host.platform_scanner import PlatformScanner
 
@@ -81,10 +82,10 @@ class Test (unittest.TestCase):
 
 
         self.s.Info("Attempting to set voltage range")
-        self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.s.Info("Enable PCIE")
-        #self.driver.enable(False)
-        #self.driver.enable(False)
+        self.driver.enable(False)
+        self.driver.enable_pcie_read_block(True)
+        self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.driver.set_tx_diff_swing(TX_DIFF_CTRL)
         self.driver.set_rx_equalizer(RX_EQUALIZER)
         self.s.Important("Tx Diff Swing: %d" % self.driver.get_tx_diff_swing())
@@ -92,6 +93,7 @@ class Test (unittest.TestCase):
         time.sleep(0.5)
         self.driver.enable(True)
         time.sleep(0.5)
+        self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
 
         self.s.Verbose("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())
         self.s.Verbose("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
@@ -108,12 +110,44 @@ class Test (unittest.TestCase):
 
         self.s.Important("LTSSM State: %s" % self.driver.get_ltssm_state())
 
+        if self.driver.is_correctable_error():
+            self.s.Error("Correctable Error Detected")
+
+        if self.driver.is_fatal_error():
+            self.s.Error("Fatal Error Detected")
+
+        if self.driver.is_non_fatal_error():
+            self.s.Error("Non Fatal Error Detected")
+
+        if self.driver.is_unsupported_error():
+            self.s.Error("Unsupported Error Detected")
+
+
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())
         self.s.Info("Get Device Number: 0x%08X" % self.driver.get_dev_num())
         self.s.Info("Get Function Number: 0x%08X" % self.driver.get_func_num())
         self.s.Info("Clock: %d" % self.driver.get_pcie_clock_count())
         self.s.Info("Debug Clock Data: %d" % self.driver.get_debug_pcie_clock_count())
+
+        self.s.Info("Hot Reset: %s" % self.driver.is_hot_reset())
+        self.s.Info("Config Turnoff Request: %s" % self.driver.is_turnoff_request())
+
+        self.s.Info("Config Command:    0x%04X" % self.driver.get_cfg_command())
+        self.s.Info("Config Status:     0x%04X" % self.driver.get_cfg_status())
+        self.s.Info("Config DCommand:   0x%04X" % self.driver.get_cfg_dcommand())
+        self.s.Info("Config DStatus:    0x%04X" % self.driver.get_cfg_dstatus())
+        self.s.Info("Config LCommand:   0x%04X" % self.driver.get_cfg_lcommand())
+        self.s.Info("Config LStatus:    0x%04X" % self.driver.get_cfg_lstatus())
+
+        self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
+
+        print "Buffer:"
+        print "%s" % list_to_hex_string(self.driver.read_local_buffer())
+
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

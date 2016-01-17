@@ -37,6 +37,16 @@ TX_DIFF_CTRL                    =   6
 RX_EQUALIZER_CTRL               =   7
 LTSSM_STATE                     =   8
 TX_PRE_EMPH                     =   9
+DBG_DATA                        =   9
+CONFIG_COMMAND                  =   10
+CONFIG_STATUS                   =   11
+CONFIG_DCOMMAND                 =   12
+CONFIG_DSTATUS                  =   13
+CONFIG_LCOMMAND                 =   14
+CONFIG_LSTATUS                  =   15
+DBG_FLAGS                       =   16
+
+
 
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
@@ -59,6 +69,13 @@ STS_BIT_GTP_PLL_LOCK_DETECT     =   25
 STS_BIT_PLL_LOCK_DETECT         =   26
 STS_BIT_GTP_RESET_DONE          =   27
 STS_BIT_RX_ELEC_IDLE            =   28
+STS_BIT_CFG_TO_TURNOFF          =   29
+
+
+DBG_CORRECTABLE                 =   0
+DBG_FATAL                       =   1
+DBG_NON_FATAL                   =   2
+DBG_UNSUPPORTED                 =   3
 
 LOCAL_BUFFER_OFFSET             =   0x100
 
@@ -171,6 +188,9 @@ class ArtemisPCIEDriver(driver.Driver):
     def is_local_mem_idle(self):
         return self.is_register_bit_set(STATUS, STS_BIT_LOCAL_MEM_IDLE)
 
+    def is_turnoff_request(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_CFG_TO_TURNOFF)
+
     def get_local_buffer_size(self):
         return self.read_register(LOCAL_BUFFER_SIZE)
 
@@ -268,5 +288,35 @@ class ArtemisPCIEDriver(driver.Driver):
         else:
             return "Unknown State: 0x%02X" % state
 
+    def is_correctable_error(self):
+        return self.is_register_bit_set(DBG_DATA, DBG_CORRECTABLE)
 
+    def is_fatal_error(self):
+        return self.is_register_bit_set(DBG_DATA, DBG_FATAL)
 
+    def is_non_fatal_error(self):
+        return self.is_register_bit_set(DBG_DATA, DBG_NON_FATAL)
+
+    def is_unsupported_error(self):
+        return self.is_register_bit_set(DBG_DATA, DBG_UNSUPPORTED)
+
+    def get_cfg_command(self):
+        return self.read_register(CONFIG_COMMAND)
+
+    def get_cfg_status(self):
+        return self.read_register(CONFIG_STATUS)
+
+    def get_cfg_dcommand(self):
+        return self.read_register(CONFIG_DCOMMAND)
+
+    def get_cfg_dstatus(self):
+        return self.read_register(CONFIG_DSTATUS)
+
+    def get_cfg_lcommand(self):
+        return self.read_register(CONFIG_LCOMMAND)
+
+    def get_cfg_lstatus(self):
+        return self.read_register(CONFIG_LSTATUS)
+
+    def get_debug_flags(self):
+        return self.read_register(DBG_FLAGS)

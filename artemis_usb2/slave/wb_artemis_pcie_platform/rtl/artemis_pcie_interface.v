@@ -141,7 +141,32 @@ module artemis_pcie_interface #(
   input       [1:0]         rx_equalizer_ctrl,
   input       [3:0]         tx_diff_ctrl,
   input       [2:0]         tx_pre_emphasis,
-  output      [4:0]         cfg_ltssm_state
+  output      [4:0]         cfg_ltssm_state,
+
+  output                    dbg_reg_detected_correctable,
+  output                    dbg_reg_detected_fatal,
+  output                    dbg_reg_detected_non_fatal,
+  output                    dbg_reg_detected_unsupported,
+
+  output                    dbg_bad_dllp_status,
+  output                    dbg_bad_tlp_lcrc,
+  output                    dbg_bad_tlp_seq_num,
+  output                    dbg_bad_tlp_status,
+  output                    dbg_dl_protocol_status,
+  output                    dbg_fc_protocol_err_status,
+  output                    dbg_mlfrmd_length,
+  output                    dbg_mlfrmd_mps,
+  output                    dbg_mlfrmd_tcvc,
+  output                    dbg_mlfrmd_tlp_status,
+  output                    dbg_mlfrmd_unrec_type,
+  output                    dbg_poistlpstatus,
+  output                    dbg_rcvr_overflow_status,
+  output                    dbg_rply_rollover_status,
+  output                    dbg_rply_timeout_status,
+  output                    dbg_ur_no_bar_hit,
+  output                    dbg_ur_pois_cfg_wr,
+  output                    dbg_ur_status,
+  output                    dbg_ur_unsup_msg
 );
 
 //local parameters
@@ -230,10 +255,10 @@ wire                        s_axis_tx_tlast;
 wire                        s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
-
-
+assign                      s_axis_tx_tuser = 0;
 
 //submodules
+/*
 cross_clock_strobe trn_pnd (
   .rst              (rst                ),
   .in_clk           (clk                ),
@@ -242,6 +267,17 @@ cross_clock_strobe trn_pnd (
   .out_clk          (clk_62p5           ),
   .out_stb          (cfg_trn_pending    )
 );
+*/
+assign  cfg_trn_pending =  0;
+
+
+wire  tx_cfg_gnt;
+wire  rx_np_ok;
+
+/*** ALLOW THE Normal PRIORITIZATION! ***/
+assign  tx_cfg_gnt      =   1'b1;
+//READY TO ACCEPT NON POSTED THIMAGIGGERS
+assign  rx_np_ok        =   1'b1;
 
 
 pcie_axi_bridge pcie_interface (
@@ -267,9 +303,10 @@ pcie_axi_bridge pcie_interface (
 //TODO
   output  reg [5:0]   tx_buf_av,
   output  reg         tx_err_drop,
-  input               tx_cfg_gnt,
   output  reg         tx_cfg_req,
 */
+  .tx_cfg_gnt                        (tx_cfg_gnt              ),
+
 
   // Rx
   .m_axis_rx_tdata                   (m_axis_rx_tdata         ),
@@ -279,6 +316,7 @@ pcie_axi_bridge pcie_interface (
   .m_axis_rx_tready                  (m_axis_rx_tready        ),
 //  output  reg [21:0]  m_axis_rx_tuser,
 //  input               rx_np_ok,
+  .rx_np_ok                          (rx_np_ok                ),
 
   // Flow Control
   .fc_sel                            (fc_sel                  ),
@@ -351,7 +389,35 @@ pcie_axi_bridge pcie_interface (
   .rx_equalizer_ctrl                 (rx_equalizer_ctrl       ),
   .tx_diff_ctrl                      (tx_diff_ctrl            ),
   .tx_pre_emphasis                   (tx_pre_emphasis         ),
-  .cfg_ltssm_state                   (cfg_ltssm_state         )
+  .cfg_ltssm_state                   (cfg_ltssm_state         ),
+
+  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
+  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
+  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal   ),
+  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported ),
+
+
+
+  .dbg_bad_dllp_status               (dbg_bad_dllp_status        ),
+  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc           ),
+  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num        ),
+  .dbg_bad_tlp_status                (dbg_bad_tlp_status         ),
+  .dbg_dl_protocol_status            (dbg_dl_protocol_status     ),
+  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status ),
+  .dbg_mlfrmd_length                 (dbg_mlfrmd_length          ),
+  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps             ),
+  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc            ),
+  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status      ),
+  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type      ),
+  .dbg_poistlpstatus                 (dbg_poistlpstatus          ),
+  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status   ),
+  .dbg_rply_rollover_status          (dbg_rply_rollover_status   ),
+  .dbg_rply_timeout_status           (dbg_rply_timeout_status    ),
+  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit          ),
+  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr         ),
+  .dbg_ur_status                     (dbg_ur_status              ),
+  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg           )
+
 
 );
 
@@ -571,8 +637,8 @@ assign  c_in_axi_valid    = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? m_
 assign  d_in_axi_valid    = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? m_axis_rx_tvalid: 32'h00000000;
 
 
-//assign  c_out_axi_data     = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? s_axis_tx_tready: 32'h00000000;
-//assign  d_out_axi_data     = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? s_axis_tx_tready: 32'h00000000;
+assign  c_out_axi_ready   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? s_axis_tx_tready: 32'h00000000;
+assign  d_out_axi_ready   = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? s_axis_tx_tready: 32'h00000000;
 
 
 assign  s_axis_tx_tdata   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_out_axi_data  : d_out_axi_data;

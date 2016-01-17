@@ -36,6 +36,7 @@ TEST_CLOCK                      =   5
 TX_DIFF_CTRL                    =   6
 RX_EQUALIZER_CTRL               =   7
 LTSSM_STATE                     =   8
+TX_PRE_EMPH                     =   9
 
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
@@ -221,6 +222,12 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_tx_diff_swing(self):
         return self.read_register(TX_DIFF_CTRL)
+
+    def set_tx_pre_emph(self, value):
+        self.write_register(TX_PRE_EMPH, value)
+
+    def get_tx_pre_emph(self):
+        return self.read_register(TX_PRE_EMPH)
 
     def set_rx_equalizer(self, rx_equalizer):
         self.write_register(RX_EQUALIZER_CTRL, rx_equalizer)

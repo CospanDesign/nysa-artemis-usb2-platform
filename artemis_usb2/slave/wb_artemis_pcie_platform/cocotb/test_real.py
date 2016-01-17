@@ -75,8 +75,10 @@ class Test (unittest.TestCase):
 
     def test_device(self):
 
-        TX_DIFF_CTRL = 0x07
+        TX_DIFF_CTRL = 0x0F
+        TX_PRE_EMPTH = 0x00
         RX_EQUALIZER = 0x3
+
 
         self.s.Info("Attempting to set voltage range")
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())

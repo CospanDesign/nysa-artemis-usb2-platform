@@ -134,6 +134,7 @@ localparam    TEST_CLOCK          = 5;
 localparam    TX_DIFF_CTRL        = 6;
 localparam    RX_EQUALIZER_CTRL   = 7;
 localparam    LTSSM_STATE         = 8;
+localparam    TX_PRE_EMPH         = 9;
 
 //Local Registers/Wires
 
@@ -256,6 +257,7 @@ wire  [31:0]                      w_data_out_wr_data;
 
 reg   [1:0]                       r_rx_equalizer_ctrl;
 reg   [3:0]                       r_tx_diff_ctrl;
+reg   [2:0]                       r_tx_pre_emphasis;
 wire  [4:0]                       cfg_ltssm_state;
 
 
@@ -367,6 +369,7 @@ artemis_pcie_interface #(
 
   .rx_equalizer_ctrl              (r_rx_equalizer_ctrl    ),
   .tx_diff_ctrl                   (r_tx_diff_ctrl         ),
+  .tx_pre_emphasis                (r_tx_pre_emphasis      ),
   .cfg_ltssm_state                (cfg_ltssm_state        )
 
 
@@ -492,6 +495,7 @@ always @ (posedge clk) begin
 
     r_rx_equalizer_ctrl         <=  2'b11;
     r_tx_diff_ctrl              <=  4'b1001;
+    r_tx_pre_emphasis           <=  3'b00;
   end
   else begin
     //when the master acks our ack, then put our ack down
@@ -515,6 +519,9 @@ always @ (posedge clk) begin
             end
             TX_DIFF_CTRL: begin
               r_tx_diff_ctrl      <=  i_wbs_dat[3:0];
+            end
+            TX_DIFF_CTRL: begin
+              r_tx_pre_emphasis   <=  i_wbs_dat[2:0];
             end
             RX_EQUALIZER_CTRL: begin
               r_rx_equalizer_ctrl <=  i_wbs_dat[1:0];
@@ -565,6 +572,10 @@ always @ (posedge clk) begin
             TX_DIFF_CTRL: begin
               o_wbs_dat       <=  0;
               o_wbs_dat[3:0]  <=  r_tx_diff_ctrl;
+            end
+            TX_PRE_EMPH: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat[3:0]  <=  r_tx_pre_emphasis;
             end
             RX_EQUALIZER_CTRL: begin
               o_wbs_dat       <=  0;

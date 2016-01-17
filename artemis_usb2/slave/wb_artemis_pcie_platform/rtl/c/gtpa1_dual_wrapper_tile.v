@@ -168,7 +168,8 @@ module GTPA1_DUAL_WRAPPER_TILE #(
     input           TXELECIDLE1_IN,
 
     input [1:0]     rx_equalizer_ctrl,
-    input [3:0]     tx_diff_ctrl
+    input [3:0]     tx_diff_ctrl,
+    input [2:0]     tx_pre_emphasis
 );
 
 
@@ -740,7 +741,7 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .TXP0                           (TXP0_OUT),
         .TXP1                           (TXP1_OUT),
         .TXPREEMPHASIS0                 (3'b000),
-        .TXPREEMPHASIS1                 (3'b000),
+        .TXPREEMPHASIS1                 (tx_pre_emphasis),
         //------------------- Transmit Ports - TX PRBS Generator -------------------
         .TXENPRBSTST0                   (tied_to_ground_vec_i[2:0]),
         .TXENPRBSTST1                   (tied_to_ground_vec_i[2:0]),

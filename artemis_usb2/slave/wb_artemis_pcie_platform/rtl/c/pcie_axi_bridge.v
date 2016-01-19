@@ -273,8 +273,6 @@ module pcie_axi_bridge #(
   output            dbg_ur_status,
   output            dbg_ur_unsup_msg
 
-
->>>>>>> 9d5b1e75aef235ef89747f7a05f2c038c1d8578f
 );
 
 

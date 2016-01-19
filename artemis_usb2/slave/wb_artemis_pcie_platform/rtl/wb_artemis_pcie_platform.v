@@ -145,7 +145,11 @@ module wb_artemis_pcie_platform #(
   input               i_pcie_phy_rx_n,
 
   input               i_pcie_reset_n,
-  output              o_pcie_wake_n
+  output              o_pcie_wake_n,
+
+  output              o_62p5_clk,
+  output      [31:0]  o_debug_data
+
 );
 
 //Local Parameters
@@ -170,8 +174,6 @@ localparam    CONFIG_LCOMMAND     = 14;
 localparam    CONFIG_LSTATUS      = 15;
 localparam    DBG_FLAGS           = 16;
 
-
->>>>>>> 9d5b1e75aef235ef89747f7a05f2c038c1d8578f
 
 //Local Registers/Wires
 
@@ -465,7 +467,7 @@ artemis_pcie_interface #(
   .rx_equalizer_ctrl              (r_rx_equalizer_ctrl    ),
   .tx_diff_ctrl                   (r_tx_diff_ctrl         ),
   .tx_pre_emphasis                (r_tx_pre_emphasis      ),
-  .cfg_ltssm_state                (cfg_ltssm_state        )
+  .cfg_ltssm_state                (cfg_ltssm_state        ),
 
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
   .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
@@ -579,6 +581,35 @@ assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
+assign  o_62p5_clk              = pcie_clk;
+
+assign  o_debug_data            = { dbg_reg_detected_correctable,
+                                    dbg_reg_detected_fatal,
+                                    dbg_reg_detected_non_fatal,
+                                    dbg_reg_detected_unsupported,
+                                    dbg_bad_dllp_status,
+                                    dbg_bad_tlp_lcrc,
+                                    dbg_bad_tlp_seq_num,
+                                    dbg_bad_tlp_status,
+                                    dbg_dl_protocol_status,
+                                    dbg_fc_protocol_err_status,
+                                    dbg_mlfrmd_length,
+                                    dbg_mlfrmd_mps,
+                                    dbg_mlfrmd_tcvc,
+                                    dbg_mlfrmd_tlp_status,
+                                    dbg_mlfrmd_unrec_type,
+                                    dbg_poistlpstatus,
+                                    dbg_rcvr_overflow_status,
+                                    dbg_rply_rollover_status,
+                                    dbg_rply_timeout_status,
+                                    dbg_ur_no_bar_hit,
+                                    dbg_ur_pois_cfg_wr,
+                                    dbg_ur_status,
+                                    dbg_ur_unsup_msg,
+                                    pll_lock_detect,
+                                    pcie_reset,
+                                    user_link_up,
+                                    cfg_ltssm_state};
 //Synchronous Logic
 
 always @ (posedge pcie_clk) begin

@@ -574,7 +574,7 @@ assign  w_data_out_wr_activate  = 0;
 assign  w_data_out_wr_stb       = 0;
 assign  w_data_out_wr_data      = 0;
 
-assign  o_pcie_wake_n           = 1;
+assign  o_pcie_wake_n           = !i_pcie_reset_n;
 
 
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
@@ -608,7 +608,7 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
                                     dbg_ur_unsup_msg,
                                     pll_lock_detect,
                                     pcie_reset,
-                                    user_link_up,
+                                    user_lnk_up,
                                     cfg_ltssm_state};
 //Synchronous Logic
 

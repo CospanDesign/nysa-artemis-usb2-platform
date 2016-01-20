@@ -26,7 +26,7 @@ TIMESPEC "TS_tn_mgt_clk" = PERIOD "tn_mgt_clk" 8.0;
 NET "pcie/api/pcie_interface/mgt_clk_2x" TNM_NET = "tn_mgt_clk_2x";
 TIMESPEC "TS_mgt_clk_2x" = PERIOD "tn_mgt_clk_2x" 16.0;
 
-NET "pcie/api/pcie_interface/user_clk_out" TNM_NET = "tn_user_clk_out";
+NET "pcie/api/clk_62p5" TNM_NET = "tn_user_clk_out";
 TIMESPEC "TS_user_clk_out" = PERIOD "tn_user_clk_out" 16.0;
 
 #NET "pcie/api/pcie_interface/pcie_sys_clk" TNM_NET = "tn_pcie_sys_clk";

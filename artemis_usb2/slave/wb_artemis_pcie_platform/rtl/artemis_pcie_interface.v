@@ -179,7 +179,7 @@ localparam      DATA_FUNCTION_ID      = 1'b1;
 //registes/wires
 
 
-wire                        clk_62p5;
+(* KEEP = "TRUE" *) wire                        clk_62p5;
 
 
 //Control Signals

@@ -68,6 +68,8 @@ SOFTWARE.
 `define CTRL_BIT_SEND_CONTROL_BLOCK 1
 `define CTRL_BIT_CANCEL_SEND_BLOCK  2
 `define CTRL_BIT_ENABLE_LOCAL_READ  3
+`define CTRL_BIT_ENABLE_EXT_RESET   4
+`define CTRL_BIT_MANUAL_USER_RESET  5
 
 `define STS_BIT_PCIE_RESET          0
 `define STS_BIT_LINKUP              1
@@ -180,6 +182,8 @@ localparam    DBG_FLAGS           = 16;
 wire      [31:0]        status;
 
 reg                     r_enable_pcie;
+reg                     r_enable_ext_reset;
+reg                     r_manual_pcie_reset;
 reg       [31:0]        r_clock_1_sec;
 reg       [31:0]        r_clock_count;
 reg       [31:0]        r_host_clock_count;
@@ -188,6 +192,7 @@ wire                    w_1sec_stb_65mhz;
 
 // Transaction (TRN) Interface
 wire                    user_lnk_up;
+wire                    ext_pcie_reset;
 
   // Flow Control
 wire      [2:0]         fc_sel;
@@ -365,7 +370,7 @@ artemis_pcie_interface #(
   .SERIAL_NUMBER                  (64'h000000000000C594   )
 )api (
   .clk                            (clk                    ),
-  .rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
+  .rst                            (rst || !r_enable_pcie  || ext_pcie_reset ),
 
   .gtp_clk_p                      (i_clk_100mhz_gtp_p     ),
   .gtp_clk_n                      (i_clk_100mhz_gtp_n     ),
@@ -574,13 +579,14 @@ assign  w_data_out_wr_activate  = 0;
 assign  w_data_out_wr_stb       = 0;
 assign  w_data_out_wr_data      = 0;
 
-assign  o_pcie_wake_n           = !i_pcie_reset_n;
+assign  o_pcie_wake_n           = 1;
 
 
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
+assign  ext_pcie_reset          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
 assign  o_62p5_clk              = pcie_clk;
 
 assign  o_debug_data            = { dbg_reg_detected_correctable,
@@ -613,7 +619,7 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
 //Synchronous Logic
 
 always @ (posedge pcie_clk) begin
-  if (!i_pcie_reset_n) begin
+  if (ext_pcie_reset) begin
     r_clock_1_sec   <=  0;
     r_clock_count   <=  0;
 
@@ -645,9 +651,6 @@ always @ (posedge pcie_clk) begin
     r_dbg_ur_status              <= 0;
     r_dbg_ur_unsup_msg           <= 0;
 
-
-
-
   end
   else begin
     r_clock_count   <=  r_clock_count + 1;
@@ -668,15 +671,6 @@ always @ (posedge pcie_clk) begin
     if (dbg_reg_detected_unsupported) begin
       dbg_unsupported <= 1;
     end
-
-    if (!i_pcie_reset_n) begin
-      dbg_correctable <= 0;
-      dbg_fatal       <= 0;
-      dbg_non_fatal   <= 0;
-      dbg_unsupported <= 0;
-    end
-
-
 
     //Power Controller
     if (cfg_to_turnoff && !trn_pending) begin
@@ -759,12 +753,6 @@ always @ (posedge pcie_clk) begin
       r_dbg_ur_unsup_msg           <= 1;
 
     end
-
-
-
-
-
-
   end
 end
 
@@ -784,6 +772,8 @@ always @ (posedge clk) begin
     o_wbs_int                   <=  0;
     r_ppfifo_2_mem_en           <=  1;
     r_enable_pcie               <=  1;
+    r_enable_ext_reset          <=  1;
+    r_manual_pcie_reset         <=  0;
 
     r_lcl_mem_din               <=  0;
     r_host_clock_count          <=  0;
@@ -810,6 +800,8 @@ always @ (posedge clk) begin
               r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
+              r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
+              r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
 
             end
             TX_DIFF_CTRL: begin
@@ -837,6 +829,8 @@ always @ (posedge clk) begin
               o_wbs_dat                               <=  0;
               o_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ]  <=  r_ppfifo_2_mem_en;
               o_wbs_dat[`CTRL_BIT_ENABLE]             <=  r_enable_pcie;
+              o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
+              o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
             end
             STATUS: begin
               o_wbs_dat                               <=  0;

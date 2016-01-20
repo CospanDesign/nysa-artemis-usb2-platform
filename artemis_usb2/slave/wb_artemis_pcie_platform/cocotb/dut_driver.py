@@ -52,6 +52,8 @@ CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
 CTRL_BIT_CANCEL_SEND_BLOCK      =   2
 CTRL_BIT_ENABLE_LOCAL_READ      =   3
+CTRL_BIT_ENABLE_EXT_RESET       =   4
+CTRL_BIT_MANUAL_USER_RESET      =   5
 
 STS_BIT_PCIE_RESET              =   0
 STS_BIT_LINKUP                  =   1
@@ -320,3 +322,15 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_debug_flags(self):
         return self.read_register(DBG_FLAGS)
+
+    def enable_external_reset(self, enable):
+        self.enable_register_bit(CONTROL, CTRL_BIT_ENABLE_EXT_RESET, enable)
+
+    def is_external_reset_enabled(self):
+        return self.is_register_bit_set(CONTORL, CTRL_BIT_ENABLE_EXT_RESET)
+
+    def enable_manual_reset(self, enable):
+        self.enable_register_bit(CONTROL, CTRL_BIT_MANUAL_USER_RESET, enable)
+
+    def is_manual_reset_set(self):
+        return self.enable_register_bit(CONTROL, CTRL_BIT_MANUAL_USER_RESET)

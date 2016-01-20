@@ -84,6 +84,7 @@ SOFTWARE.
 `define STS_BIT_GTP_RESET_DONE      27
 `define STS_BIT_RX_ELEC_IDLE        28
 `define STS_BIT_CFG_TO_TURNOFF      29
+`define STS_BIT_PCIE_EXT_RESET      30
 
 `define DBG_CORRECTABLE             0
 `define DBG_FATAL                   1
@@ -182,8 +183,8 @@ localparam    DBG_FLAGS           = 16;
 wire      [31:0]        status;
 
 reg                     r_enable_pcie;
-reg                     r_enable_ext_reset;
-reg                     r_manual_pcie_reset;
+//reg                     r_enable_ext_reset;
+//reg                     r_manual_pcie_reset;
 reg       [31:0]        r_clock_1_sec;
 reg       [31:0]        r_clock_count;
 reg       [31:0]        r_host_clock_count;
@@ -586,7 +587,8 @@ assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
-assign  ext_pcie_reset          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
+//assign  ext_pcie_reset          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
+assign  ext_pcie_reset          = i_pcie_reset_n;
 assign  o_62p5_clk              = pcie_clk;
 
 assign  o_debug_data            = { dbg_reg_detected_correctable,
@@ -772,8 +774,8 @@ always @ (posedge clk) begin
     o_wbs_int                   <=  0;
     r_ppfifo_2_mem_en           <=  1;
     r_enable_pcie               <=  1;
-    r_enable_ext_reset          <=  1;
-    r_manual_pcie_reset         <=  0;
+    //r_enable_ext_reset          <=  1;
+    //r_manual_pcie_reset         <=  0;
 
     r_lcl_mem_din               <=  0;
     r_host_clock_count          <=  0;
@@ -800,8 +802,8 @@ always @ (posedge clk) begin
               r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
-              r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
+              //r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
+              //r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
 
             end
             TX_DIFF_CTRL: begin
@@ -829,8 +831,8 @@ always @ (posedge clk) begin
               o_wbs_dat                               <=  0;
               o_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ]  <=  r_ppfifo_2_mem_en;
               o_wbs_dat[`CTRL_BIT_ENABLE]             <=  r_enable_pcie;
-              o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
-              o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
+              //o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
+              //o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
             end
             STATUS: begin
               o_wbs_dat                               <=  0;
@@ -846,6 +848,7 @@ always @ (posedge clk) begin
               o_wbs_dat[`STS_BIT_GTP_RESET_DONE]      <=  gtp_reset_done;
               o_wbs_dat[`STS_BIT_RX_ELEC_IDLE]        <=  rx_elec_idle;
               o_wbs_dat[`STS_BIT_CFG_TO_TURNOFF]      <=  cfg_to_turnoff;
+              o_wbs_dat[`STS_BIT_PCIE_EXT_RESET]      <=  !i_pcie_reset_n;
             end
             NUM_BLOCK_READ: begin
               o_wbs_dat <= w_num_reads;

@@ -76,7 +76,7 @@ class Test (unittest.TestCase):
 
     def test_device(self):
 
-        TX_DIFF_CTRL = 0x0F
+        TX_DIFF_CTRL = 0x09
         TX_PRE_EMPTH = 0x00
         RX_EQUALIZER = 0x3
 
@@ -85,6 +85,11 @@ class Test (unittest.TestCase):
         self.s.Info("Enable PCIE")
         self.driver.enable(False)
         self.driver.enable_pcie_read_block(True)
+        self.driver.enable_external_reset(True)
+        #self.driver.enable_manual_reset(True)
+        #self.driver.enable_manual_reset(False)
+
+        self.s.Info("Is external reset enabled: %s" % str(self.driver.is_external_reset_enabled()))
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.driver.set_tx_diff_swing(TX_DIFF_CTRL)
         self.driver.set_rx_equalizer(RX_EQUALIZER)
@@ -99,6 +104,7 @@ class Test (unittest.TestCase):
         self.s.Verbose("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
         self.s.Verbose("Is GTP RX Electrical Idle: %s" % self.driver.is_gtp_rx_elec_idle())
         self.s.Verbose("Is PLL Locked: %s" % self.driver.is_pll_locked())
+        self.s.Verbose("Is Host Holding Reset: %s" % self.driver.is_host_set_reset())
 
         if self.driver.is_pcie_reset():
             self.s.Error("PCIE_A1 Core is in reset!")
@@ -140,14 +146,11 @@ class Test (unittest.TestCase):
         self.s.Info("Config LCommand:   0x%04X" % self.driver.get_cfg_lcommand())
         self.s.Info("Config LStatus:    0x%04X" % self.driver.get_cfg_lstatus())
 
-        self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
+        #self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
+        self.driver.read_debug_flags()
 
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
-
-
-
-
 
 if __name__ == "__main__":
     unittest.main()

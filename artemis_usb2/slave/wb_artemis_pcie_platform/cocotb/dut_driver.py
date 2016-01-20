@@ -72,12 +72,35 @@ STS_BIT_PLL_LOCK_DETECT         =   26
 STS_BIT_GTP_RESET_DONE          =   27
 STS_BIT_RX_ELEC_IDLE            =   28
 STS_BIT_CFG_TO_TURNOFF          =   29
+STS_BIT_PCIE_EXT_RESET          =   30
 
 
 DBG_CORRECTABLE                 =   0
 DBG_FATAL                       =   1
 DBG_NON_FATAL                   =   2
 DBG_UNSUPPORTED                 =   3
+
+DBG_BAD_DLLP_STATUS             =   0
+DBG_BAD_TLP_LCRC                =   1
+DBG_BAD_TLP_SEQ_NUM             =   2
+DBG_BAD_TLP_STATUS              =   3
+DBG_DL_PROTOCOL_STATUS          =   4
+DBG_FC_PROTOCOL_ERR_STATUS      =   5
+DBG_MLFMD_LENGTH                =   6
+DBG_MLFMD_MPS                   =   7
+DBG_MLFMD_TCVC                  =   8
+DBG_MLFMD_TLP_STATUS            =   9
+DBG_MLFMD_UNREC_TYPE            =   10
+DBG_POISTLPSTATUS               =   11
+DBG_RCVR_OVERFLOW_STATUS        =   12
+DBG_RPLY_ROLLOVER_STATUS        =   13
+DBG_RPLY_TIMEOUT_STATUS         =   14
+DBG_UR_NO_BAR_HIT               =   15
+DBG_UR_POIS_CFG_WR              =   16
+DBG_UR_STATUS                   =   17
+DBG_UR_UNSUP_MSG                =   18
+
+
 
 LOCAL_BUFFER_OFFSET             =   0x100
 
@@ -192,6 +215,9 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def is_turnoff_request(self):
         return self.is_register_bit_set(STATUS, STS_BIT_CFG_TO_TURNOFF)
+
+    def is_host_set_reset(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_PCIE_EXT_RESET)
 
     def get_local_buffer_size(self):
         return self.read_register(LOCAL_BUFFER_SIZE)
@@ -320,6 +346,49 @@ class ArtemisPCIEDriver(driver.Driver):
     def get_cfg_lstatus(self):
         return self.read_register(CONFIG_LSTATUS)
 
+    def read_debug_flags(self):
+        flags = self.get_debug_flags()
+        print "Debug Flags:"
+        if (flags & (1 << DBG_BAD_DLLP_STATUS)) > 0:
+            print "\tBad DLLP CRC Error"
+        if (flags & (1 << DBG_BAD_TLP_LCRC)) > 0:
+            print "\tLCP with an LCRC Error detected"
+        if (flags & (1 << DBG_BAD_TLP_SEQ_NUM)) > 0:
+            print "\tTLP with an invalid sequence number"
+        if (flags & (1 << DBG_BAD_TLP_STATUS)) > 0:
+            print "\tTLP with an error detected"
+        if (flags & (1 << DBG_DL_PROTOCOL_STATUS)) > 0:
+            print "\tOut of Range ACK or NACK is received"
+        if (flags & (1 << DBG_FC_PROTOCOL_ERR_STATUS)) > 0:
+            print "\tProtocol error with the received flow control update"
+        if (flags & (1 << DBG_MLFMD_LENGTH)) > 0:
+            print "\tTLP Length did not match what was in the TLP header"
+        if (flags & (1 << DBG_MLFMD_MPS)) > 0:
+            print "\tTLP Length had a length that did not match the negotiated MPS"
+        if (flags & (1 << DBG_MLFMD_TCVC)) > 0:
+            print "\tInvalid TC or VC value"
+        if (flags & (1 << DBG_MLFMD_TLP_STATUS)) > 0:
+            print "\tMalformed TLP is received"
+        if (flags & (1 << DBG_MLFMD_UNREC_TYPE)) > 0:
+            print "\tTLP had invalid/unrecognized field"
+        if (flags & (1 << DBG_POISTLPSTATUS)) > 0:
+            print "\tTLP was received with the EP (poisoned status bit set)"
+        if (flags & (1 << DBG_RCVR_OVERFLOW_STATUS)) > 0:
+            print "\tTLP violates the advertise credits"
+        if (flags & (1 << DBG_RPLY_ROLLOVER_STATUS)) > 0:
+            print "\tRollover counter expires"
+        if (flags & (1 << DBG_RPLY_TIMEOUT_STATUS)) > 0:
+            print "\tReplay time-out conter expires"
+        if (flags & (1 << DBG_UR_NO_BAR_HIT)) > 0:
+            print "\tReceived read/write did not match a configured BAR"
+        if (flags & (1 << DBG_UR_POIS_CFG_WR)) > 0:
+            print "\tCFGWR TLP with the error/poisoned bit (EP) =  was received"
+        if (flags & (1 << DBG_UR_STATUS)) > 0:
+            print "\tUnsupported request is recieved"
+        if (flags & (1 << DBG_UR_UNSUP_MSG)) > 0:
+            print "\tMSG or MSGD TLP with unsupported type was received"
+
+
     def get_debug_flags(self):
         return self.read_register(DBG_FLAGS)
 
@@ -327,7 +396,7 @@ class ArtemisPCIEDriver(driver.Driver):
         self.enable_register_bit(CONTROL, CTRL_BIT_ENABLE_EXT_RESET, enable)
 
     def is_external_reset_enabled(self):
-        return self.is_register_bit_set(CONTORL, CTRL_BIT_ENABLE_EXT_RESET)
+        return self.is_register_bit_set(CONTROL, CTRL_BIT_ENABLE_EXT_RESET)
 
     def enable_manual_reset(self, enable):
         self.enable_register_bit(CONTROL, CTRL_BIT_MANUAL_USER_RESET, enable)

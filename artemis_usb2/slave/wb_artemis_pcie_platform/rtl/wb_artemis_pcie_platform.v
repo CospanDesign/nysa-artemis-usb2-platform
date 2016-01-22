@@ -193,7 +193,6 @@ wire                    w_1sec_stb_65mhz;
 
 // Transaction (TRN) Interface
 wire                    user_lnk_up;
-wire                    ext_pcie_reset;
 
   // Flow Control
 wire      [2:0]         fc_sel;
@@ -371,7 +370,7 @@ artemis_pcie_interface #(
   .SERIAL_NUMBER                  (64'h000000000000C594   )
 )api (
   .clk                            (clk                    ),
-  .rst                            (rst || !r_enable_pcie  || ext_pcie_reset ),
+  .rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
 
   .gtp_clk_p                      (i_clk_100mhz_gtp_p     ),
   .gtp_clk_n                      (i_clk_100mhz_gtp_n     ),
@@ -587,8 +586,8 @@ assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
-//assign  ext_pcie_reset          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
-assign  ext_pcie_reset          = i_pcie_reset_n;
+//assign  !i_pcie_reset_n          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
+//assign  !i_pcie_reset_n          = i_pcie_reset_n;
 assign  o_62p5_clk              = pcie_clk;
 
 assign  o_debug_data            = { dbg_reg_detected_correctable,
@@ -621,7 +620,7 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
 //Synchronous Logic
 
 always @ (posedge pcie_clk) begin
-  if (ext_pcie_reset) begin
+  if (!i_pcie_reset_n) begin
     r_clock_1_sec   <=  0;
     r_clock_count   <=  0;
 

@@ -36,7 +36,6 @@ TEST_CLOCK                      =   5
 TX_DIFF_CTRL                    =   6
 RX_EQUALIZER_CTRL               =   7
 LTSSM_STATE                     =   8
-TX_PRE_EMPH                     =   9
 DBG_DATA                        =   9
 CONFIG_COMMAND                  =   10
 CONFIG_STATUS                   =   11
@@ -45,6 +44,7 @@ CONFIG_DSTATUS                  =   13
 CONFIG_LCOMMAND                 =   14
 CONFIG_LSTATUS                  =   15
 DBG_FLAGS                       =   16
+TX_PRE_EMPH                     =   17
 
 
 

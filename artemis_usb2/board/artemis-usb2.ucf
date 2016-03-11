@@ -14,7 +14,7 @@ OFFSET = OUT 12 ns AFTER "FTDI_CLK" RISING;
 
 #PCIE
 NET i_pcie_reset_n  LOC=R9  | IOSTANDARD = LVTTL;
-NET o_pcie_wake_n   LOC=Y4  | IOSTANDARD = LVTTL;
+NET io_pcie_wake_n  LOC=Y4  | IOSTANDARD = LVTTL;
 
 #FTDI
 NET OE_N          LOC = Y10   | IOSTANDARD = LVTTL ;

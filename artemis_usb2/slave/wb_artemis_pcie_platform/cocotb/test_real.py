@@ -76,8 +76,8 @@ class Test (unittest.TestCase):
 
     def test_device(self):
 
-        TX_DIFF_CTRL = 0x09
-        TX_PRE_EMPTH = 0x00
+        TX_DIFF_CTRL = 0x07
+        TX_PRE_EMPH = 0x00
         RX_EQUALIZER = 0x3
 
 
@@ -85,6 +85,7 @@ class Test (unittest.TestCase):
         self.s.Info("Enable PCIE")
         self.driver.enable(False)
         self.driver.enable_pcie_read_block(True)
+
         self.driver.enable_external_reset(True)
         #self.driver.enable_manual_reset(True)
         #self.driver.enable_manual_reset(False)
@@ -92,12 +93,15 @@ class Test (unittest.TestCase):
         self.s.Info("Is external reset enabled: %s" % str(self.driver.is_external_reset_enabled()))
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.driver.set_tx_diff_swing(TX_DIFF_CTRL)
+        self.driver.set_tx_pre_emph(TX_PRE_EMPH)
         self.driver.set_rx_equalizer(RX_EQUALIZER)
         self.s.Important("Tx Diff Swing: %d" % self.driver.get_tx_diff_swing())
+        self.s.Important("TX Pre Emphasis: %d" % self.driver.get_tx_pre_emph())
         self.s.Important("RX Equalizer: %d" % self.driver.get_rx_equalizer())
-        time.sleep(0.5)
+        time.sleep(0.2)
         self.driver.enable(True)
-        time.sleep(0.5)
+        time.sleep(0.2)
+
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
 
         self.s.Verbose("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())

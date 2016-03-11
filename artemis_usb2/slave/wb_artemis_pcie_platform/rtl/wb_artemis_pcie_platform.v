@@ -148,7 +148,7 @@ module wb_artemis_pcie_platform #(
   input               i_pcie_phy_rx_n,
 
   input               i_pcie_reset_n,
-  output              o_pcie_wake_n,
+  inout               io_pcie_wake_n,
 
   output              o_62p5_clk,
   output      [31:0]  o_debug_data
@@ -167,7 +167,6 @@ localparam    TEST_CLOCK          = 5;
 localparam    TX_DIFF_CTRL        = 6;
 localparam    RX_EQUALIZER_CTRL   = 7;
 localparam    LTSSM_STATE         = 8;
-localparam    TX_PRE_EMPH         = 9;
 localparam    DBG_DATA            = 9;
 localparam    CONFIG_COMMAND      = 10;
 localparam    CONFIG_STATUS       = 11;
@@ -176,6 +175,7 @@ localparam    CONFIG_DSTATUS      = 13;
 localparam    CONFIG_LCOMMAND     = 14;
 localparam    CONFIG_LSTATUS      = 15;
 localparam    DBG_FLAGS           = 16;
+localparam    TX_PRE_EMPH         = 17;
 
 
 //Local Registers/Wires
@@ -183,8 +183,9 @@ localparam    DBG_FLAGS           = 16;
 wire      [31:0]        status;
 
 reg                     r_enable_pcie;
-//reg                     r_enable_ext_reset;
-//reg                     r_manual_pcie_reset;
+reg                     r_enable_ext_reset;
+reg                     r_manual_pcie_reset;
+wire                    w_ext_reset;
 reg       [31:0]        r_clock_1_sec;
 reg       [31:0]        r_clock_count;
 reg       [31:0]        r_host_clock_count;
@@ -370,7 +371,8 @@ artemis_pcie_interface #(
   .SERIAL_NUMBER                  (64'h000000000000C594   )
 )api (
   .clk                            (clk                    ),
-  .rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
+  //.rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
+  .rst                            (rst || !r_enable_pcie  || w_ext_reset ),
 
   .gtp_clk_p                      (i_clk_100mhz_gtp_p     ),
   .gtp_clk_n                      (i_clk_100mhz_gtp_n     ),
@@ -579,15 +581,14 @@ assign  w_data_out_wr_activate  = 0;
 assign  w_data_out_wr_stb       = 0;
 assign  w_data_out_wr_data      = 0;
 
-assign  o_pcie_wake_n           = 1;
+assign  io_pcie_wake_n          = 1'hZ;
 
 
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
-//assign  !i_pcie_reset_n          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
-//assign  !i_pcie_reset_n          = i_pcie_reset_n;
+assign  w_ext_reset             = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
 assign  o_62p5_clk              = pcie_clk;
 
 assign  o_debug_data            = { dbg_reg_detected_correctable,
@@ -620,7 +621,7 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
 //Synchronous Logic
 
 always @ (posedge pcie_clk) begin
-  if (!i_pcie_reset_n) begin
+  if (w_ext_reset) begin
     r_clock_1_sec   <=  0;
     r_clock_count   <=  0;
 
@@ -773,8 +774,8 @@ always @ (posedge clk) begin
     o_wbs_int                   <=  0;
     r_ppfifo_2_mem_en           <=  1;
     r_enable_pcie               <=  1;
-    //r_enable_ext_reset          <=  1;
-    //r_manual_pcie_reset         <=  0;
+    r_enable_ext_reset          <=  1;
+    r_manual_pcie_reset         <=  0;
 
     r_lcl_mem_din               <=  0;
     r_host_clock_count          <=  0;
@@ -801,14 +802,14 @@ always @ (posedge clk) begin
               r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              //r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
-              //r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
+              r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
+              r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
 
             end
             TX_DIFF_CTRL: begin
               r_tx_diff_ctrl      <=  i_wbs_dat[3:0];
             end
-            TX_DIFF_CTRL: begin
+            TX_PRE_EMPH: begin
               r_tx_pre_emphasis   <=  i_wbs_dat[2:0];
             end
             RX_EQUALIZER_CTRL: begin
@@ -830,8 +831,8 @@ always @ (posedge clk) begin
               o_wbs_dat                               <=  0;
               o_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ]  <=  r_ppfifo_2_mem_en;
               o_wbs_dat[`CTRL_BIT_ENABLE]             <=  r_enable_pcie;
-              //o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
-              //o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
+              o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
+              o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
             end
             STATUS: begin
               o_wbs_dat                               <=  0;
@@ -867,7 +868,7 @@ always @ (posedge clk) begin
             end
             TX_PRE_EMPH: begin
               o_wbs_dat       <=  0;
-              o_wbs_dat[3:0]  <=  r_tx_pre_emphasis;
+              o_wbs_dat[2:0]  <=  r_tx_pre_emphasis;
             end
             RX_EQUALIZER_CTRL: begin
               o_wbs_dat       <=  0;

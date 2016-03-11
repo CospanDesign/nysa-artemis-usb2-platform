@@ -18,6 +18,10 @@
         "Binary":"Yes"
        }
     },
+    "map":{
+      "flags":{
+      }
+    },
     "par":{
       "flags":{
         "-mt":"on"

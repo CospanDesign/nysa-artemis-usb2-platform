@@ -77,7 +77,7 @@ class Test (unittest.TestCase):
     def test_device(self):
 
         TX_DIFF_CTRL = 0x09
-        TX_PRE_EMPTH = 0x00
+        TX_PRE_EMPH = 0x00
         RX_EQUALIZER = 0x3
 
 
@@ -92,6 +92,7 @@ class Test (unittest.TestCase):
         self.s.Info("Is external reset enabled: %s" % str(self.driver.is_external_reset_enabled()))
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
         self.driver.set_tx_diff_swing(TX_DIFF_CTRL)
+        self.driver.set_tx_pre_emph(TX_PRE_EMPH)
         self.driver.set_rx_equalizer(RX_EQUALIZER)
         self.s.Important("Tx Diff Swing: %d" % self.driver.get_tx_diff_swing())
         self.s.Important("RX Equalizer: %d" % self.driver.get_rx_equalizer())

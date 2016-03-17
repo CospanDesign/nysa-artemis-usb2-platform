@@ -155,13 +155,13 @@ module pcie_axi_bridge #(
 
   // Tx
   output            s_axis_tx_tready,
-  input  [31:0]     s_axis_tx_tdata,
-  input  [3:0]      s_axis_tx_tkeep,
-  input  [3:0]      s_axis_tx_tuser,
+  input   [31:0]    s_axis_tx_tdata,
+  input   [3:0]     s_axis_tx_tkeep,
+  input   [3:0]     s_axis_tx_tuser,
   input             s_axis_tx_tlast,
   input             s_axis_tx_tvalid,
 
-  output     [5:0]  tx_buf_av,
+  output  [5:0]     tx_buf_av,
   output            tx_err_drop,
   input             tx_cfg_gnt,
   output            tx_cfg_req,
@@ -252,7 +252,6 @@ module pcie_axi_bridge #(
   output            dbg_reg_detected_non_fatal,
   output            dbg_reg_detected_unsupported,
 
-
   output            dbg_bad_dllp_status,
   output            dbg_bad_tlp_lcrc,
   output            dbg_bad_tlp_seq_num,
@@ -272,9 +271,7 @@ module pcie_axi_bridge #(
   output            dbg_ur_pois_cfg_wr,
   output            dbg_ur_status,
   output            dbg_ur_unsup_msg
-
 );
-
 
 //Local Parameters
 localparam CLKFBOUT_MULT  = (REF_CLK_FREQ == 0) ? 5 : 4;
@@ -312,8 +309,6 @@ wire          cfg_err_cpl_rdy_n;
 wire          user_reset_out_w;
 wire          user_lnk_up_w;
 
-
-
 assign        cfg_rd_wr_done          = !cfg_rd_wr_done_n ;
 wire          cfg_rd_en_n             = !cfg_rd_en ;
 wire          cfg_trn_pending_n       = !cfg_trn_pending ;
@@ -337,7 +332,6 @@ assign        user_reset_out          = !user_reset_out_w;
 wire          sys_reset_n             = !sys_reset;
 assign        user_lnk_up             = !user_lnk_up_w;
 
-
 // Wires for the PLL
 wire          mgt_clk;
 wire          mgt_clk_2x;
@@ -360,11 +354,11 @@ wire   [7:0]  w_cfg_rev_id;
 wire  [15:0]  w_cfg_subsys_ven_id;
 wire  [15:0]  w_cfg_subsys_id;
 
-assign w_cfg_ven_id         = CFG_VEN_ID;
-assign w_cfg_dev_id         = CFG_DEV_ID;
-assign w_cfg_rev_id         = CFG_REV_ID;
-assign w_cfg_subsys_ven_id  = CFG_SUBSYS_VEN_ID;
-assign w_cfg_subsys_id      = CFG_SUBSYS_ID;
+assign        w_cfg_ven_id         = CFG_VEN_ID;
+assign        w_cfg_dev_id         = CFG_DEV_ID;
+assign        w_cfg_rev_id         = CFG_REV_ID;
+assign        w_cfg_subsys_ven_id  = CFG_SUBSYS_VEN_ID;
+assign        w_cfg_subsys_id      = CFG_SUBSYS_ID;
 
 wire  [1:0]   cfg_link_control_aspm_control;
 wire          cfg_link_control_rcb;
@@ -694,17 +688,17 @@ axi_basic_top #(
 .m_axis_rx_tlast          (m_axis_rx_tlast  ),  // output
 .m_axis_rx_tuser          (m_axis_rx_tuser  ),  // output
 
-  // User Misc.
-  //-----------
+// User Misc.
+//-----------
 .user_turnoff_ok          (cfg_turnoff_ok   ),  //  input
 .user_tcfg_gnt            (tx_cfg_gnt       ),  //  input
 
-  //---------------------------------------------//
-  // PCIe Block I/O                              //
-  //---------------------------------------------//
+//---------------------------------------------//
+// PCIe Block I/O                              //
+//---------------------------------------------//
 
-  // TRN TX
-  //-----------
+// TRN TX
+//-----------
 .trn_td                   (trn_td),             //  output
 .trn_tsof                 (trn_tsof),           //  output
 .trn_teof                 (trn_teof),           //  output
@@ -717,8 +711,8 @@ axi_basic_top #(
 .trn_tbuf_av              (tx_buf_av),          //  input
 .trn_tecrc_gen            (),                   //  output
 
-  // TRN RX
-  //-----------
+// TRN RX
+//-----------
 .trn_rd                   (trn_rd),             //  input
 .trn_rsof                 (!trn_rsof_n),        //  input
 .trn_reof                 (!trn_reof_n),        //  input
@@ -744,8 +738,8 @@ axi_basic_top #(
 //-----------
 .cfg_pm_send_pme_to       (1'b0),               //  input  NOT USED FOR EP
 .cfg_pmcsr_powerstate     (2'b00),              //  input
-.trn_rdllp_data           (32'h0),              //    input
-.trn_rdllp_src_rdy        (1'b0),               //    input
+.trn_rdllp_data           (32'h0),              //  input
+.trn_rdllp_src_rdy        (1'b0),               //  input
 
 // Power Mgmt for S6/V6
 //-----------

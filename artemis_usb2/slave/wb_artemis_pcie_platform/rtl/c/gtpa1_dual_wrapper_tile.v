@@ -251,23 +251,20 @@ module GTPA1_DUAL_WRAPPER_TILE #(
     GTPA1_DUAL #
     (
         //_______________________ Simulation-Only Attributes __________________
+        .SIM_TX_ELEC_IDLE_LEVEL                 ("Z"),
+        .SIM_RECEIVER_DETECT_PASS               ("TRUE"),
+        .SIM_VERSION                            ("2.0"),
+        .SIM_REFCLK0_SOURCE                     (3'b000),
+        .SIM_REFCLK1_SOURCE                     (3'b000),
+        .SIM_GTPRESET_SPEEDUP                   (TILE_SIM_GTPRESET_SPEEDUP),
+        .CLK25_DIVIDER_0                        (TILE_CLK25_DIVIDER_0),
+        .CLK25_DIVIDER_1                        (TILE_CLK25_DIVIDER_1),
+        .PLL_DIVSEL_FB_0                        (TILE_PLL_DIVSEL_FB_0),
+        .PLL_DIVSEL_FB_1                        (TILE_PLL_DIVSEL_FB_1),
+        .PLL_DIVSEL_REF_0                       (TILE_PLL_DIVSEL_REF_0),
+        .PLL_DIVSEL_REF_1                       (TILE_PLL_DIVSEL_REF_1),
 
-
-        .SIM_TX_ELEC_IDLE_LEVEL         ("Z"),
-        .SIM_RECEIVER_DETECT_PASS       ("TRUE"),
-        .SIM_VERSION                    ("2.0"),
-        .SIM_REFCLK0_SOURCE             (3'b000),
-        .SIM_REFCLK1_SOURCE             (3'b000),
-        .SIM_GTPRESET_SPEEDUP           (TILE_SIM_GTPRESET_SPEEDUP),
-        .CLK25_DIVIDER_0                (TILE_CLK25_DIVIDER_0),
-        .CLK25_DIVIDER_1                (TILE_CLK25_DIVIDER_1),
-        .PLL_DIVSEL_FB_0                (TILE_PLL_DIVSEL_FB_0),
-        .PLL_DIVSEL_FB_1                (TILE_PLL_DIVSEL_FB_1),
-        .PLL_DIVSEL_REF_0               (TILE_PLL_DIVSEL_REF_0),
-        .PLL_DIVSEL_REF_1               (TILE_PLL_DIVSEL_REF_1),
-
-
-       //PLL Attributes
+        //PLL Attributes
         .CLKINDC_B_0                            ("TRUE"),
         .CLKRCV_TRST_0                          ("TRUE"),
         .OOB_CLK_DIVIDER_0                      (4),
@@ -279,7 +276,7 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .PLL_TXDIVSEL_OUT_0                     (1),
         .PLLLKDET_CFG_0                         (3'b111),
 
-       //
+        //
         .CLKINDC_B_1                            ("TRUE"),
         .CLKRCV_TRST_1                          ("TRUE"),
         .OOB_CLK_DIVIDER_1                      (4),
@@ -513,9 +510,6 @@ module GTPA1_DUAL_WRAPPER_TILE #(
      )
      gtpa1_dual_i
      (
-
-
-
         //---------------------- Loopback and Powerdown Ports ----------------------
         .LOOPBACK0                      (tied_to_ground_vec_i[2:0]),
         .LOOPBACK1                      (tied_to_ground_vec_i[2:0]),
@@ -749,7 +743,8 @@ module GTPA1_DUAL_WRAPPER_TILE #(
         .TXPRBSFORCEERR1                (tied_to_ground_i),
         //------------------ Transmit Ports - TX Polarity Control ------------------
         .TXPOLARITY0                    (tied_to_ground_i),
-        .TXPOLARITY1                    (tied_to_vcc_i),
+        //.TXPOLARITY1                    (tied_to_vcc_i),
+        .TXPOLARITY1                    (tied_to_ground_i),
         //--------------- Transmit Ports - TX Ports for PCI Express ----------------
         .TXDETECTRX0                    (TXDETECTRX0_IN),
         .TXDETECTRX1                    (TXDETECTRX1_IN),

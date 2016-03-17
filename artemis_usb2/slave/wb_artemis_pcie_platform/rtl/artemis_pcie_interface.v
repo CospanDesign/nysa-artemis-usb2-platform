@@ -508,7 +508,7 @@ adapter_ppfifo_2_axi_stream control_p2a (
   .i_ppfifo_data    (c_out_rd_data    ),
   .o_ppfifo_stb     (c_out_rd_stb     ),
 
-  //AXI Stream Output
+  //AXI Stream Output (clock read from i_ppfifo_clk)
   .o_axi_clk        (                 ),
   .i_axi_ready      (c_out_axi_ready  ),
   .o_axi_data       (c_out_axi_data   ),
@@ -530,6 +530,7 @@ adapter_axi_stream_2_ppfifo data_a2p (
   .i_axi_last       (d_in_axi_last    ),
   .i_axi_valid      (d_in_axi_valid   ),
 
+  //AXI Stream Output (clock read from i_ppfifo_clk)
   //Ping Pong FIFO Write Controller
   .o_ppfifo_clk     (                 ),
   .i_ppfifo_rdy     (d_in_wr_ready    ),

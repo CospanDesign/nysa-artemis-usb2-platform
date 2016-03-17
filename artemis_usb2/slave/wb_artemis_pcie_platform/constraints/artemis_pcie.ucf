@@ -39,7 +39,6 @@ TIMESPEC "TS_user_clk_out" = PERIOD "tn_user_clk_out" 16.0;
 NET i_gtp1_clk_p    LOC=C11 | IOB = FALSE;
 NET i_gtp1_clk_n    LOC=D11 | IOB = FALSE;
 
-
 ######################### mgt clock module constraints ########################
 
 #NET i_sata_phy_rx_p LOC=D7 | IOB = FALSE;

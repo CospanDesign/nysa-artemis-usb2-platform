@@ -180,81 +180,80 @@ localparam    DBG_FLAGS           = 16;
 
 //Local Registers/Wires
 
-wire      [31:0]        status;
+wire      [31:0]                 status;
 
-reg                     r_enable_pcie;
-//reg                     r_enable_ext_reset;
-//reg                     r_manual_pcie_reset;
-reg       [31:0]        r_clock_1_sec;
-reg       [31:0]        r_clock_count;
-reg       [31:0]        r_host_clock_count;
-reg                     r_1sec_stb_100mhz;
-wire                    w_1sec_stb_65mhz;
+reg                              r_enable_pcie;
+//reg                              r_enable_ext_reset;
+//reg                              r_manual_pcie_reset;
+reg       [31:0]                 r_clock_1_sec;
+reg       [31:0]                 r_clock_count;
+reg       [31:0]                 r_host_clock_count;
+reg                              r_1sec_stb_100mhz;
+wire                             w_1sec_stb_65mhz;
 
 // Transaction (TRN) Interface
-wire                    user_lnk_up;
+wire                             user_lnk_up;
 
   // Flow Control
-wire      [2:0]         fc_sel;
-wire      [7:0]         fc_nph;
-wire      [11:0]        fc_npd;
-wire      [7:0]         fc_ph;
-wire      [11:0]        fc_pd;
-wire      [7:0]         fc_cplh;
-wire      [11:0]        fc_cpld;
+wire      [2:0]                  fc_sel;
+wire      [7:0]                  fc_nph;
+wire      [11:0]                 fc_npd;
+wire      [7:0]                  fc_ph;
+wire      [11:0]                 fc_pd;
+wire      [7:0]                  fc_cplh;
+wire      [11:0]                 fc_cpld;
 
 
 // Host (CFG) Interface
-wire      [31:0]        cfg_do;
-wire                    cfg_rd_wr_done;
-wire      [9:0]         cfg_dwaddr;
-wire                    cfg_rd_en;
+wire      [31:0]                 cfg_do;
+wire                             cfg_rd_wr_done;
+wire      [9:0]                  cfg_dwaddr;
+wire                             cfg_rd_en;
 
 // Configuration: Error
-wire                    cfg_err_ur;
-wire                    cfg_err_cor;
-wire                    cfg_err_ecrc;
-wire                    cfg_err_cpl_timeout;
-wire                    cfg_err_cpl_abort;
-wire                    cfg_err_posted;
-wire                    cfg_err_locked;
-wire      [47:0]        cfg_err_tlp_cpl_header;
-wire                    cfg_err_cpl_rdy;
+wire                             cfg_err_ur;
+wire                             cfg_err_cor;
+wire                             cfg_err_ecrc;
+wire                             cfg_err_cpl_timeout;
+wire                             cfg_err_cpl_abort;
+wire                             cfg_err_posted;
+wire                             cfg_err_locked;
+wire      [47:0]                 cfg_err_tlp_cpl_header;
+wire                             cfg_err_cpl_rdy;
 
 // Conifguration: Interrupt
-wire                    cfg_interrupt;
-wire                    cfg_interrupt_rdy;
-wire                    cfg_interrupt_assert;
-wire      [7:0]         cfg_interrupt_do;
-wire      [7:0]         cfg_interrupt_di;
-wire      [2:0]         cfg_interrupt_mmenable;
-wire                    cfg_interrupt_msienable;
+wire                             cfg_interrupt;
+wire                             cfg_interrupt_rdy;
+wire                             cfg_interrupt_assert;
+wire      [7:0]                  cfg_interrupt_do;
+wire      [7:0]                  cfg_interrupt_di;
+wire      [2:0]                  cfg_interrupt_mmenable;
+wire                             cfg_interrupt_msienable;
 
 // Configuration: Power Management
-reg                     cfg_turnoff_ok;
-reg                     trn_pending;
-wire                    cfg_to_turnoff;
-wire                    cfg_pm_wake;
+reg                              cfg_turnoff_ok = 0;
+reg                              trn_pending = 0;
+wire                             cfg_to_turnoff;
+wire                             cfg_pm_wake;
 
 // Configuration: System/Status
-wire      [2:0]         cfg_pcie_link_state;
-reg                     r_cfg_trn_pending;
-wire      [7:0]         cfg_bus_number;
-wire      [4:0]         cfg_device_number;
-wire      [2:0]         cfg_function_number;
+wire      [2:0]                  cfg_pcie_link_state;
+reg                              r_cfg_trn_pending;
+wire      [7:0]                  cfg_bus_number;
+wire      [4:0]                  cfg_device_number;
+wire      [2:0]                  cfg_function_number;
 
-wire      [15:0]        cfg_status;
-wire      [15:0]        cfg_command;
-wire      [15:0]        cfg_dstatus;
-wire      [15:0]        cfg_dcommand;
-wire      [15:0]        cfg_lstatus;
-wire      [15:0]        cfg_lcommand;
+wire      [15:0]                 cfg_status;
+wire      [15:0]                 cfg_command;
+wire      [15:0]                 cfg_dstatus;
+wire      [15:0]                 cfg_dcommand;
+wire      [15:0]                 cfg_lstatus;
+wire      [15:0]                 cfg_lcommand;
 
 // System Interface
 wire                              pcie_reset;
 wire                              pcie_clk;
 wire                              received_hot_reset;
-
 
 reg                               r_ppfifo_2_mem_en;
 reg                               r_mem_2_ppfifo_stb;
@@ -300,9 +299,9 @@ wire  [23:0]                      w_data_out_wr_size;
 wire                              w_data_out_wr_stb;
 wire  [31:0]                      w_data_out_wr_data;
 
-reg   [1:0]                       r_rx_equalizer_ctrl;
-reg   [3:0]                       r_tx_diff_ctrl;
-reg   [2:0]                       r_tx_pre_emphasis;
+reg   [1:0]                       r_rx_equalizer_ctrl = 2'b11;
+reg   [3:0]                       r_tx_diff_ctrl      = 4'h9;
+reg   [2:0]                       r_tx_pre_emphasis   = 3'b00;
 wire  [4:0]                       cfg_ltssm_state;
 
 wire                              dbg_reg_detected_correctable;
@@ -365,114 +364,114 @@ reg                               r_dbg_ur_unsup_msg;
 
 //Submodules
 artemis_pcie_interface #(
-  .CONTROL_FIFO_DEPTH             (CONTROL_FIFO_DEPTH     ),
-  .DATA_FIFO_DEPTH                (DATA_FIFO_DEPTH        ),
-  .SERIAL_NUMBER                  (64'h000000000000C594   )
-)api (
-  .clk                            (clk                    ),
-  .rst                            (rst || !r_enable_pcie  || !i_pcie_reset_n ),
-
-  .gtp_clk_p                      (i_clk_100mhz_gtp_p     ),
-  .gtp_clk_n                      (i_clk_100mhz_gtp_n     ),
-  .pci_exp_txp                    (o_pcie_phy_tx_p        ),
-  .pci_exp_txn                    (o_pcie_phy_tx_n        ),
-  .pci_exp_rxp                    (i_pcie_phy_rx_p        ),
-  .pci_exp_rxn                    (i_pcie_phy_rx_n        ),
-
-  // Transaction (TRN) Interface
-  .user_lnk_up                    (user_lnk_up            ),
-  .pcie_clk                       (pcie_clk               ),
-
-  // Flow Control
-  .fc_sel                         (fc_sel                 ),
-  .fc_nph                         (fc_nph                 ),
-  .fc_npd                         (fc_npd                 ),
-  .fc_ph                          (fc_ph                  ),
-  .fc_pd                          (fc_pd                  ),
-  .fc_cplh                        (fc_cplh                ),
-  .fc_cpld                        (fc_cpld                ),
-
-  // Host (CFG) Interface
-  .cfg_do                         (cfg_do                 ),
-  .cfg_rd_wr_done                 (cfg_rd_wr_done         ),
-  .cfg_dwaddr                     (cfg_dwaddr             ),
-  .cfg_rd_en                      (cfg_rd_en              ),
-
-  // Configuration: Error
-  .cfg_err_ur                     (cfg_err_ur             ),
-  .cfg_err_cor                    (cfg_err_cor            ),
-  .cfg_err_ecrc                   (cfg_err_ecrc           ),
-  .cfg_err_cpl_timeout            (cfg_err_cpl_timeout    ),
-  .cfg_err_cpl_abort              (cfg_err_cpl_abort      ),
-  .cfg_err_posted                 (cfg_err_posted         ),
-  .cfg_err_locked                 (cfg_err_locked         ),
-  .cfg_err_tlp_cpl_header         (cfg_err_tlp_cpl_header ),
-  .cfg_err_cpl_rdy                (cfg_err_cpl_rdy        ),
-
-  // Conifguration: Interrupt
-  .cfg_interrupt                  (cfg_interrupt          ),
-  .cfg_interrupt_rdy              (cfg_interrupt_rdy      ),
-  .cfg_interrupt_assert           (cfg_interrupt_assert   ),
-  .cfg_interrupt_do               (cfg_interrupt_do       ),
-  .cfg_interrupt_di               (cfg_interrupt_di       ),
-  .cfg_interrupt_mmenable         (cfg_interrupt_mmenable ),
-  .cfg_interrupt_msienable        (cfg_interrupt_msienable),
+  .CONTROL_FIFO_DEPTH                (CONTROL_FIFO_DEPTH           ),
+  .DATA_FIFO_DEPTH                   (DATA_FIFO_DEPTH              ),
+  .SERIAL_NUMBER                     (64'h000000000000C594         )
+)api (                                                             
+  .clk                               (clk                          ),
+  .rst                               (rst || !r_enable_pcie || !i_pcie_reset_n ),
+                                                                   
+  .gtp_clk_p                         (i_clk_100mhz_gtp_p           ),
+  .gtp_clk_n                         (i_clk_100mhz_gtp_n           ),
+  .pci_exp_txp                       (o_pcie_phy_tx_p              ),
+  .pci_exp_txn                       (o_pcie_phy_tx_n              ),
+  .pci_exp_rxp                       (i_pcie_phy_rx_p              ),
+  .pci_exp_rxn                       (i_pcie_phy_rx_n              ),
+                                                                   
+  // Transaction (TRN) Interface                                   
+  .user_lnk_up                       (user_lnk_up                  ),
+  .pcie_clk                          (pcie_clk                     ),
+                                                                   
+  // Flow Control                                                  
+  .fc_sel                            (fc_sel                       ),
+  .fc_nph                            (fc_nph                       ),
+  .fc_npd                            (fc_npd                       ),
+  .fc_ph                             (fc_ph                        ),
+  .fc_pd                             (fc_pd                        ),
+  .fc_cplh                           (fc_cplh                      ),
+  .fc_cpld                           (fc_cpld                      ),
+                                                                   
+  // Host (CFG) Interface                                          
+  .cfg_do                            (cfg_do                       ),
+  .cfg_rd_wr_done                    (cfg_rd_wr_done               ),
+  .cfg_dwaddr                        (cfg_dwaddr                   ),
+  .cfg_rd_en                         (cfg_rd_en                    ),
+                                                                   
+  // Configuration: Error                                          
+  .cfg_err_ur                        (cfg_err_ur                   ),
+  .cfg_err_cor                       (cfg_err_cor                  ),
+  .cfg_err_ecrc                      (cfg_err_ecrc                 ),
+  .cfg_err_cpl_timeout               (cfg_err_cpl_timeout          ),
+  .cfg_err_cpl_abort                 (cfg_err_cpl_abort            ),
+  .cfg_err_posted                    (cfg_err_posted               ),
+  .cfg_err_locked                    (cfg_err_locked               ),
+  .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
+  .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
+                                                                   
+  // Conifguration: Interrupt                                      
+  .cfg_interrupt                     (cfg_interrupt                ),
+  .cfg_interrupt_rdy                 (cfg_interrupt_rdy            ),
+  .cfg_interrupt_assert              (cfg_interrupt_assert         ),
+  .cfg_interrupt_do                  (cfg_interrupt_do             ),
+  .cfg_interrupt_di                  (cfg_interrupt_di             ),
+  .cfg_interrupt_mmenable            (cfg_interrupt_mmenable       ),
+  .cfg_interrupt_msienable           (cfg_interrupt_msienable      ),
 
   // Configuration: Power Management
-  .cfg_turnoff_ok                 (cfg_turnoff_ok         ),
-  .cfg_to_turnoff                 (cfg_to_turnoff         ),
-  .cfg_pm_wake                    (cfg_pm_wake            ),
+  .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
+  .cfg_to_turnoff                    (cfg_to_turnoff               ),
+  .cfg_pm_wake                       (cfg_pm_wake                  ),
 
   // Configuration: System/Status
-  .cfg_pcie_link_state            (cfg_pcie_link_state    ),
-  .cfg_trn_pending_stb            (r_cfg_trn_pending      ),
-  .cfg_bus_number                 (cfg_bus_number         ),
-  .cfg_device_number              (cfg_device_number      ),
-  .cfg_function_number            (cfg_function_number    ),
-
-  .cfg_status                     (cfg_status             ),
-  .cfg_command                    (cfg_command            ),
-  .cfg_dstatus                    (cfg_dstatus            ),
-  .cfg_dcommand                   (cfg_dcommand           ),
-  .cfg_lstatus                    (cfg_lstatus            ),
-  .cfg_lcommand                   (cfg_lcommand           ),
-
-  // System Interface
-  .pcie_reset                     (pcie_reset             ),
-  .received_hot_reset             (received_hot_reset     ),
-  .gtp_pll_lock_detect            (gtp_pll_lock_detect    ),
-  .gtp_reset_done                 (gtp_reset_done         ),
-  .pll_lock_detect                (pll_lock_detect        ),
-  .rx_elec_idle                   (rx_elec_idle           ),
-
-  .i_cmd_in_rd_stb                (w_cmd_in_rd_stb        ),
-  .o_cmd_in_rd_ready              (w_cmd_in_rd_ready      ),
-  .i_cmd_in_rd_activate           (w_cmd_in_rd_activate   ),
-  .o_cmd_in_rd_count              (w_cmd_in_rd_size       ),
-  .o_cmd_in_rd_data               (w_cmd_in_rd_data       ),
-
-  .o_cmd_out_wr_ready             (w_cmd_out_wr_ready     ),
-  .i_cmd_out_wr_activate          (w_cmd_out_wr_activate  ),
-  .o_cmd_out_wr_size              (w_cmd_out_wr_size      ),
-  .i_cmd_out_wr_stb               (w_cmd_out_wr_stb       ),
-  .i_cmd_out_wr_data              (w_cmd_out_wr_data      ),
-
-  .i_data_in_rd_stb               (w_data_in_rd_stb       ),
-  .o_data_in_rd_ready             (w_data_in_rd_ready     ),
-  .i_data_in_rd_activate          (w_data_in_rd_activate  ),
-  .o_data_in_rd_count             (w_data_in_rd_size     ),
-  .o_data_in_rd_data              (w_data_in_rd_data      ),
-
-  .o_data_out_wr_ready            (w_data_out_wr_ready    ),
-  .i_data_out_wr_activate         (w_data_out_wr_activate ),
-  .o_data_out_wr_size             (w_data_out_wr_size     ),
-  .i_data_out_wr_stb              (w_data_out_wr_stb      ),
-  .i_data_out_wr_data             (w_data_out_wr_data     ),
-
-  .rx_equalizer_ctrl              (r_rx_equalizer_ctrl    ),
-  .tx_diff_ctrl                   (r_tx_diff_ctrl         ),
-  .tx_pre_emphasis                (r_tx_pre_emphasis      ),
-  .cfg_ltssm_state                (cfg_ltssm_state        ),
+  .cfg_pcie_link_state               (cfg_pcie_link_state          ),
+  .cfg_trn_pending_stb               (r_cfg_trn_pending            ),
+  .cfg_bus_number                    (cfg_bus_number               ),
+  .cfg_device_number                 (cfg_device_number            ),
+  .cfg_function_number               (cfg_function_number          ),
+                                                                   
+  .cfg_status                        (cfg_status                   ),
+  .cfg_command                       (cfg_command                  ),
+  .cfg_dstatus                       (cfg_dstatus                  ),
+  .cfg_dcommand                      (cfg_dcommand                 ),
+  .cfg_lstatus                       (cfg_lstatus                  ),
+  .cfg_lcommand                      (cfg_lcommand                 ),
+                                                                   
+  // System Interface                                              
+  .pcie_reset                        (pcie_reset                   ),
+  .received_hot_reset                (received_hot_reset           ),
+  .gtp_pll_lock_detect               (gtp_pll_lock_detect          ),
+  .gtp_reset_done                    (gtp_reset_done               ),
+  .pll_lock_detect                   (pll_lock_detect              ),
+  .rx_elec_idle                      (rx_elec_idle                 ),
+                                                                   
+  .i_cmd_in_rd_stb                   (w_cmd_in_rd_stb              ),
+  .o_cmd_in_rd_ready                 (w_cmd_in_rd_ready            ),
+  .i_cmd_in_rd_activate              (w_cmd_in_rd_activate         ),
+  .o_cmd_in_rd_count                 (w_cmd_in_rd_size             ),
+  .o_cmd_in_rd_data                  (w_cmd_in_rd_data             ),
+                                                                   
+  .o_cmd_out_wr_ready                (w_cmd_out_wr_ready           ),
+  .i_cmd_out_wr_activate             (w_cmd_out_wr_activate        ),
+  .o_cmd_out_wr_size                 (w_cmd_out_wr_size            ),
+  .i_cmd_out_wr_stb                  (w_cmd_out_wr_stb             ),
+  .i_cmd_out_wr_data                 (w_cmd_out_wr_data            ),
+                                                                   
+  .i_data_in_rd_stb                  (w_data_in_rd_stb             ),
+  .o_data_in_rd_ready                (w_data_in_rd_ready           ),
+  .i_data_in_rd_activate             (w_data_in_rd_activate        ),
+  .o_data_in_rd_count                (w_data_in_rd_size            ),
+  .o_data_in_rd_data                 (w_data_in_rd_data            ),
+                                                                   
+  .o_data_out_wr_ready               (w_data_out_wr_ready          ),
+  .i_data_out_wr_activate            (w_data_out_wr_activate       ),
+  .o_data_out_wr_size                (w_data_out_wr_size           ),
+  .i_data_out_wr_stb                 (w_data_out_wr_stb            ),
+  .i_data_out_wr_data                (w_data_out_wr_data           ),
+                                                                   
+  .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
+  .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
+  .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
+  .cfg_ltssm_state                   (cfg_ltssm_state              ),
 
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
   .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
@@ -621,16 +620,16 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
 
 always @ (posedge pcie_clk) begin
   if (!i_pcie_reset_n) begin
-    r_clock_1_sec   <=  0;
-    r_clock_count   <=  0;
-
-    dbg_correctable <= 0;
-    dbg_fatal       <= 0;
-    dbg_non_fatal   <= 0;
-    dbg_unsupported <= 0;
-
-    cfg_turnoff_ok  <= 0;
-    trn_pending     <= 0;
+    r_clock_1_sec                <=  0;
+    r_clock_count                <=  0;
+                                 
+    dbg_correctable              <= 0;
+    dbg_fatal                    <= 0;
+    dbg_non_fatal                <= 0;
+    dbg_unsupported              <= 0;
+                                 
+    cfg_turnoff_ok               <= 0;
+    trn_pending                  <= 0;
 
     r_dbg_bad_dllp_status        <= 0;
     r_dbg_bad_tlp_lcrc           <= 0;
@@ -765,6 +764,8 @@ always @ (posedge clk) begin
   r_cancel_write_stb            <=  0;
   r_lcl_mem_we                  <=  0;
   r_1sec_stb_100mhz             <=  0;
+  
+  //THis might need to be moved into the 62.5MHz clock
   r_cfg_trn_pending             <=  0;
 
   if (rst) begin

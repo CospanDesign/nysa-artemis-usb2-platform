@@ -76,17 +76,20 @@ class Test (unittest.TestCase):
 
     def test_device(self):
 
-        TX_DIFF_CTRL = 0x09
+        TX_DIFF_CTRL = 0x07
         TX_PRE_EMPH = 0x00
-        RX_EQUALIZER = 0x1
+        RX_EQUALIZER = 0x3
 
 
         self.s.Info("Attempting to set voltage range")
         self.s.Info("Enable PCIE")
 
+        '''
         self.driver.enable(False)
         self.driver.enable_pcie_read_block(True)
         self.driver.enable_external_reset(True)
+
+
 
         #self.driver.enable_manual_reset(True)
         #self.driver.enable_manual_reset(False)
@@ -102,6 +105,7 @@ class Test (unittest.TestCase):
         self.driver.enable(True)
         time.sleep(0.5)
         self.s.Info("Driver Control: 0x%08X" % self.driver.get_control())
+        '''
 
         self.s.Verbose("Is GTP PLL Locked: %s" % self.driver.is_gtp_pll_locked())
         self.s.Verbose("Is GTP Reset Done: %s" % self.driver.is_gtp_reset_done())
@@ -130,6 +134,7 @@ class Test (unittest.TestCase):
 
         if self.driver.is_unsupported_error():
             self.s.Error("Unsupported Error Detected")
+
 
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())

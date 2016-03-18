@@ -153,11 +153,14 @@ class Test (unittest.TestCase):
         self.s.Info("Config LCommand:   0x%04X" % self.driver.get_cfg_lcommand())
         self.s.Info("Config LStatus:    0x%04X" % self.driver.get_cfg_lstatus())
 
+
+        self.s.Verbose("BAR Select: 0x%02X" % self.driver.get_bar_select())
         #self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
         self.driver.read_debug_flags()
 
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
+        self.driver.reset_debug_flags()
 
 if __name__ == "__main__":
     unittest.main()

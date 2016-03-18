@@ -45,8 +45,7 @@ CONFIG_DSTATUS                  =   13
 CONFIG_LCOMMAND                 =   14
 CONFIG_LSTATUS                  =   15
 DBG_FLAGS                       =   16
-
-
+BAR_SELECT                      =   17
 
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
@@ -54,6 +53,7 @@ CTRL_BIT_CANCEL_SEND_BLOCK      =   2
 CTRL_BIT_ENABLE_LOCAL_READ      =   3
 CTRL_BIT_ENABLE_EXT_RESET       =   4
 CTRL_BIT_MANUAL_USER_RESET      =   5
+CTRL_BIT_RESET_DBG_REGS         =   6
 
 STS_BIT_PCIE_RESET              =   0
 STS_BIT_LINKUP                  =   1
@@ -388,9 +388,11 @@ class ArtemisPCIEDriver(driver.Driver):
         if (flags & (1 << DBG_UR_UNSUP_MSG)) > 0:
             print "\tMSG or MSGD TLP with unsupported type was received"
 
-
     def get_debug_flags(self):
         return self.read_register(DBG_FLAGS)
+
+    def reset_debug_flags(self):
+        self.set_register_bit(CONTROL, CTRL_BIT_RESET_DBG_REGS);
 
     def enable_external_reset(self, enable):
         self.enable_register_bit(CONTROL, CTRL_BIT_ENABLE_EXT_RESET, enable)
@@ -403,3 +405,6 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def is_manual_reset_set(self):
         return self.enable_register_bit(CONTROL, CTRL_BIT_MANUAL_USER_RESET)
+
+    def get_bar_select(self):
+        return self.read_register(BAR_SELECT);

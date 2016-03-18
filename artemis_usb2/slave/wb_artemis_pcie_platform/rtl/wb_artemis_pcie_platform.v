@@ -70,6 +70,7 @@ SOFTWARE.
 `define CTRL_BIT_ENABLE_LOCAL_READ  3
 `define CTRL_BIT_ENABLE_EXT_RESET   4
 `define CTRL_BIT_MANUAL_USER_RESET  5
+`define CTRL_BIT_RESET_DBG_REGS     6
 
 `define STS_BIT_PCIE_RESET          0
 `define STS_BIT_LINKUP              1
@@ -176,6 +177,7 @@ localparam    CONFIG_DSTATUS      = 13;
 localparam    CONFIG_LCOMMAND     = 14;
 localparam    CONFIG_LSTATUS      = 15;
 localparam    DBG_FLAGS           = 16;
+localparam    BAR_SELECT          = 17;
 
 
 //Local Registers/Wires
@@ -357,32 +359,31 @@ reg                               r_dbg_ur_pois_cfg_wr;
 reg                               r_dbg_ur_status;
 reg                               r_dbg_ur_unsup_msg;
 
-
-
-
-
+reg                               r_reset_dbg_regs;
+wire [6:0]                        w_bar_select;
+reg  [6:0]                        r_unrecognized_bar;
 
 //Submodules
 artemis_pcie_interface #(
   .CONTROL_FIFO_DEPTH                (CONTROL_FIFO_DEPTH           ),
   .DATA_FIFO_DEPTH                   (DATA_FIFO_DEPTH              ),
   .SERIAL_NUMBER                     (64'h000000000000C594         )
-)api (                                                             
+)api (
   .clk                               (clk                          ),
   .rst                               (rst || !r_enable_pcie || !i_pcie_reset_n ),
-                                                                   
+
   .gtp_clk_p                         (i_clk_100mhz_gtp_p           ),
   .gtp_clk_n                         (i_clk_100mhz_gtp_n           ),
   .pci_exp_txp                       (o_pcie_phy_tx_p              ),
   .pci_exp_txn                       (o_pcie_phy_tx_n              ),
   .pci_exp_rxp                       (i_pcie_phy_rx_p              ),
   .pci_exp_rxn                       (i_pcie_phy_rx_n              ),
-                                                                   
-  // Transaction (TRN) Interface                                   
+
+  // Transaction (TRN) Interface
   .user_lnk_up                       (user_lnk_up                  ),
   .pcie_clk                          (pcie_clk                     ),
-                                                                   
-  // Flow Control                                                  
+
+  // Flow Control
   .fc_sel                            (fc_sel                       ),
   .fc_nph                            (fc_nph                       ),
   .fc_npd                            (fc_npd                       ),
@@ -390,14 +391,14 @@ artemis_pcie_interface #(
   .fc_pd                             (fc_pd                        ),
   .fc_cplh                           (fc_cplh                      ),
   .fc_cpld                           (fc_cpld                      ),
-                                                                   
-  // Host (CFG) Interface                                          
+
+  // Host (CFG) Interface
   .cfg_do                            (cfg_do                       ),
   .cfg_rd_wr_done                    (cfg_rd_wr_done               ),
   .cfg_dwaddr                        (cfg_dwaddr                   ),
   .cfg_rd_en                         (cfg_rd_en                    ),
-                                                                   
-  // Configuration: Error                                          
+
+  // Configuration: Error
   .cfg_err_ur                        (cfg_err_ur                   ),
   .cfg_err_cor                       (cfg_err_cor                  ),
   .cfg_err_ecrc                      (cfg_err_ecrc                 ),
@@ -407,8 +408,8 @@ artemis_pcie_interface #(
   .cfg_err_locked                    (cfg_err_locked               ),
   .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
-                                                                   
-  // Conifguration: Interrupt                                      
+
+  // Conifguration: Interrupt
   .cfg_interrupt                     (cfg_interrupt                ),
   .cfg_interrupt_rdy                 (cfg_interrupt_rdy            ),
   .cfg_interrupt_assert              (cfg_interrupt_assert         ),
@@ -428,50 +429,55 @@ artemis_pcie_interface #(
   .cfg_bus_number                    (cfg_bus_number               ),
   .cfg_device_number                 (cfg_device_number            ),
   .cfg_function_number               (cfg_function_number          ),
-                                                                   
+
   .cfg_status                        (cfg_status                   ),
   .cfg_command                       (cfg_command                  ),
   .cfg_dstatus                       (cfg_dstatus                  ),
   .cfg_dcommand                      (cfg_dcommand                 ),
   .cfg_lstatus                       (cfg_lstatus                  ),
   .cfg_lcommand                      (cfg_lcommand                 ),
-                                                                   
-  // System Interface                                              
+
+  // System Interface
   .pcie_reset                        (pcie_reset                   ),
   .received_hot_reset                (received_hot_reset           ),
   .gtp_pll_lock_detect               (gtp_pll_lock_detect          ),
   .gtp_reset_done                    (gtp_reset_done               ),
   .pll_lock_detect                   (pll_lock_detect              ),
   .rx_elec_idle                      (rx_elec_idle                 ),
-                                                                   
+
   .i_cmd_in_rd_stb                   (w_cmd_in_rd_stb              ),
   .o_cmd_in_rd_ready                 (w_cmd_in_rd_ready            ),
   .i_cmd_in_rd_activate              (w_cmd_in_rd_activate         ),
   .o_cmd_in_rd_count                 (w_cmd_in_rd_size             ),
   .o_cmd_in_rd_data                  (w_cmd_in_rd_data             ),
-                                                                   
+
   .o_cmd_out_wr_ready                (w_cmd_out_wr_ready           ),
   .i_cmd_out_wr_activate             (w_cmd_out_wr_activate        ),
   .o_cmd_out_wr_size                 (w_cmd_out_wr_size            ),
   .i_cmd_out_wr_stb                  (w_cmd_out_wr_stb             ),
   .i_cmd_out_wr_data                 (w_cmd_out_wr_data            ),
-                                                                   
+
   .i_data_in_rd_stb                  (w_data_in_rd_stb             ),
   .o_data_in_rd_ready                (w_data_in_rd_ready           ),
   .i_data_in_rd_activate             (w_data_in_rd_activate        ),
   .o_data_in_rd_count                (w_data_in_rd_size            ),
   .o_data_in_rd_data                 (w_data_in_rd_data            ),
-                                                                   
+
   .o_data_out_wr_ready               (w_data_out_wr_ready          ),
   .i_data_out_wr_activate            (w_data_out_wr_activate       ),
   .o_data_out_wr_size                (w_data_out_wr_size           ),
   .i_data_out_wr_stb                 (w_data_out_wr_stb            ),
   .i_data_out_wr_data                (w_data_out_wr_data           ),
-                                                                   
+
   .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
   .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
   .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
   .cfg_ltssm_state                   (cfg_ltssm_state              ),
+
+
+
+  //Debug Info
+  .o_bar_select                      (w_bar_select                 ),
 
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
   .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
@@ -545,6 +551,15 @@ cross_clock_strobe clk_stb(
 
   .out_clk                            (pcie_clk               ),
   .out_stb                            (w_1sec_stb_65mhz       )
+);
+
+cross_clock_strobe clear_stb(
+  .rst                                (rst                    ),
+  .in_clk                             (clk                    ),
+  .in_stb                             (r_reset_dbg_regs       ),
+
+  .out_clk                            (pcie_clk               ),
+  .out_stb                            (w_reset_strobes        )
 );
 
 
@@ -622,12 +637,12 @@ always @ (posedge pcie_clk) begin
   if (!i_pcie_reset_n) begin
     r_clock_1_sec                <=  0;
     r_clock_count                <=  0;
-                                 
+
     dbg_correctable              <= 0;
     dbg_fatal                    <= 0;
     dbg_non_fatal                <= 0;
     dbg_unsupported              <= 0;
-                                 
+
     cfg_turnoff_ok               <= 0;
     trn_pending                  <= 0;
 
@@ -650,6 +665,7 @@ always @ (posedge pcie_clk) begin
     r_dbg_ur_pois_cfg_wr         <= 0;
     r_dbg_ur_status              <= 0;
     r_dbg_ur_unsup_msg           <= 0;
+    r_unrecognized_bar           <= 0;
 
   end
   else begin
@@ -739,6 +755,7 @@ always @ (posedge pcie_clk) begin
     end
     if (dbg_ur_no_bar_hit) begin
       r_dbg_ur_no_bar_hit          <= 1;
+      r_unrecognized_bar           <= w_bar_select;
 
     end
     if (dbg_ur_pois_cfg_wr) begin
@@ -753,6 +770,33 @@ always @ (posedge pcie_clk) begin
       r_dbg_ur_unsup_msg           <= 1;
 
     end
+
+    if (w_reset_strobes) begin
+      r_dbg_ur_unsup_msg           <= 0;
+      r_dbg_ur_status              <= 0;
+      r_dbg_ur_pois_cfg_wr         <= 0;
+      r_dbg_ur_no_bar_hit          <= 0;
+      r_dbg_rply_timeout_status    <= 0;
+      r_dbg_rply_rollover_status   <= 0;
+      r_dbg_rcvr_overflow_status   <= 0;
+      r_dbg_poistlpstatus          <= 0;
+      r_dbg_mlfrmd_unrec_type      <= 0;
+      r_dbg_mlfrmd_tlp_status      <= 0;
+      r_dbg_mlfrmd_tcvc            <= 0;
+      r_dbg_mlfrmd_mps             <= 0;
+      r_dbg_mlfrmd_length          <= 0;
+      r_dbg_fc_protocol_err_status <= 0;
+      r_dbg_dl_protocol_status     <= 0;
+      r_dbg_bad_tlp_status         <= 0;
+      r_dbg_bad_tlp_seq_num        <= 0;
+      r_dbg_bad_tlp_lcrc           <= 0;
+      r_dbg_bad_dllp_status        <= 0;
+      dbg_unsupported              <= 0;
+      dbg_non_fatal                <= 0;
+      dbg_fatal                    <= 0;
+      dbg_correctable              <= 0;
+      r_unrecognized_bar           <= 0;
+    end
   end
 end
 
@@ -764,7 +808,8 @@ always @ (posedge clk) begin
   r_cancel_write_stb            <=  0;
   r_lcl_mem_we                  <=  0;
   r_1sec_stb_100mhz             <=  0;
-  
+  r_reset_dbg_regs              <=  0;
+
   //THis might need to be moved into the 62.5MHz clock
   r_cfg_trn_pending             <=  0;
 
@@ -802,6 +847,7 @@ always @ (posedge clk) begin
               r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
+              r_reset_dbg_regs    <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
               //r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
               //r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
 
@@ -931,9 +977,12 @@ always @ (posedge clk) begin
               o_wbs_dat[`DBG_UR_STATUS                ] <=  r_dbg_ur_status;
               o_wbs_dat[`DBG_UR_UNSUP_MSG             ] <=  r_dbg_ur_unsup_msg;
             end
+            BAR_SELECT: begin
+              o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};
+            end
             default: begin
               if (w_lcl_mem_en) begin
-                o_wbs_dat                             <=  w_lcl_mem_dout;
+                o_wbs_dat                       <=  w_lcl_mem_dout;
               end
             end
           endcase

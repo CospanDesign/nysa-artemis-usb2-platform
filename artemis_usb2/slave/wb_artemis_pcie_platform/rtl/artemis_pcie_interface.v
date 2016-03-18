@@ -143,6 +143,8 @@ module artemis_pcie_interface #(
   input       [2:0]         tx_pre_emphasis,
   output      [4:0]         cfg_ltssm_state,
 
+  output      [6:0]         o_bar_select,
+
   output                    dbg_reg_detected_correctable,
   output                    dbg_reg_detected_fatal,
   output                    dbg_reg_detected_non_fatal,
@@ -391,12 +393,11 @@ pcie_axi_bridge pcie_interface (
   .tx_pre_emphasis                   (tx_pre_emphasis         ),
   .cfg_ltssm_state                   (cfg_ltssm_state         ),
 
-  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
-  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
-  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal   ),
-  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported ),
-
-
+  .o_bar_select                      (o_bar_select                  ),
+  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable  ),
+  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal        ),
+  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal    ),
+  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported  ),
 
   .dbg_bad_dllp_status               (dbg_bad_dllp_status        ),
   .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc           ),
@@ -417,8 +418,6 @@ pcie_axi_bridge pcie_interface (
   .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr         ),
   .dbg_ur_status                     (dbg_ur_status              ),
   .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg           )
-
-
 );
 
 adapter_axi_stream_2_ppfifo cntrl_a2p (

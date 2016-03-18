@@ -69,12 +69,14 @@ module pcie_axi_bridge #(
   parameter   [6:0] VC0_TOTAL_CREDITS_CH              = 40,
   parameter  [10:0] VC0_TOTAL_CREDITS_CD              = 467,
   parameter         VC0_CPL_INFINITE                  = "TRUE",
-  parameter  [31:0] BAR0                              = 32'hFFFFFF80,
-  parameter  [31:0] BAR1                              = 32'h00000000,
-  parameter  [31:0] BAR2                              = 32'hF8000000,
+
+  parameter  [31:0] BAR0                              = 32'hFFFFFE00,
+  parameter  [31:0] BAR1                              = 32'hF8000000,
+  parameter  [31:0] BAR2                              = 32'h00000000,
   parameter  [31:0] BAR3                              = 32'h00000000,
   parameter  [31:0] BAR4                              = 32'h00000000,
   parameter  [31:0] BAR5                              = 32'h00000000,
+
   parameter  [21:0] EXPANSION_ROM                     = 22'h000000,
   parameter         DISABLE_BAR_FILTERING             = "FALSE",
   parameter         DISABLE_ID_CHECK                  = "FALSE",
@@ -112,6 +114,7 @@ module pcie_axi_bridge #(
   parameter         FAST_TRAIN                        = "FALSE",
   parameter         ENABLE_RX_TD_ECRC_TRIM            = "TRUE",
   parameter         DISABLE_SCRAMBLING                = "FALSE",
+
   parameter   [2:0] PM_CAP_VERSION                    = 3'd3,
   parameter         PM_CAP_PME_CLOCK                  = "FALSE",
   parameter         PM_CAP_DSI                        = "FALSE",
@@ -135,8 +138,11 @@ module pcie_axi_bridge #(
   parameter   [1:0] PM_DATA_SCALE6                    = 2'h0,
   parameter   [7:0] PM_DATA7                          = 8'h00,
   parameter   [1:0] PM_DATA_SCALE7                    = 2'h0,
+
   parameter  [11:0] PCIE_GENERIC                      = 12'b000011101111,
+
   parameter   [0:0] GTP_SEL                           = 1'b1,
+
   parameter  [15:0] CFG_VEN_ID                        = 16'h10EE,
   parameter  [15:0] CFG_DEV_ID                        = 16'h0007,
   parameter   [7:0] CFG_REV_ID                        = 8'h00,
@@ -247,6 +253,7 @@ module pcie_axi_bridge #(
   input   [2:0]     tx_pre_emphasis,
   output  [4:0]     cfg_ltssm_state,
 
+  output  [6:0]     o_bar_select,
   output            dbg_reg_detected_correctable,
   output            dbg_reg_detected_fatal,
   output            dbg_reg_detected_non_fatal,
@@ -764,8 +771,10 @@ PCIE_A1 #(
   .BAR3                               (BAR3                                     ),
   .BAR4                               (BAR4                                     ),
   .BAR5                               (BAR5                                     ),
+
   .CARDBUS_CIS_POINTER                (CARDBUS_CIS_POINTER                      ),
   .CLASS_CODE                         (CLASS_CODE                               ),
+
   .DEV_CAP_ENDPOINT_L0S_LATENCY       (DEV_CAP_ENDPOINT_L0S_LATENCY             ),
   .DEV_CAP_ENDPOINT_L1_LATENCY        (DEV_CAP_ENDPOINT_L1_LATENCY              ),
   .DEV_CAP_EXT_TAG_SUPPORTED          (DEV_CAP_EXT_TAG_SUPPORTED                ),
@@ -775,25 +784,32 @@ PCIE_A1 #(
   .DISABLE_BAR_FILTERING              (DISABLE_BAR_FILTERING                    ),
   .DISABLE_ID_CHECK                   (DISABLE_ID_CHECK                         ),
   .DISABLE_SCRAMBLING                 (DISABLE_SCRAMBLING                       ),
+
   .ENABLE_RX_TD_ECRC_TRIM             (ENABLE_RX_TD_ECRC_TRIM                   ),
   .EXPANSION_ROM                      (EXPANSION_ROM                            ),
   .FAST_TRAIN                         (FAST_TRAIN                               ),
+
   .GTP_SEL                            (GTP_SEL                                  ),
+
   .LINK_CAP_ASPM_SUPPORT              (LINK_CAP_ASPM_SUPPORT                    ),
   .LINK_CAP_L0S_EXIT_LATENCY          (LINK_CAP_L0S_EXIT_LATENCY                ),
   .LINK_CAP_L1_EXIT_LATENCY           (LINK_CAP_L1_EXIT_LATENCY                 ),
   .LINK_STATUS_SLOT_CLOCK_CONFIG      (LINK_STATUS_SLOT_CLOCK_CONFIG            ),
+
   .LL_ACK_TIMEOUT                     (LL_ACK_TIMEOUT                           ),
   .LL_ACK_TIMEOUT_EN                  (LL_ACK_TIMEOUT_EN                        ),
   .LL_REPLAY_TIMEOUT                  (LL_REPLAY_TIMEOUT                        ),
   .LL_REPLAY_TIMEOUT_EN               (LL_REPLAY_TIMEOUT_EN                     ),
+
   .MSI_CAP_MULTIMSG_EXTENSION         (MSI_CAP_MULTIMSG_EXTENSION               ),
   .MSI_CAP_MULTIMSGCAP                (MSI_CAP_MULTIMSGCAP                      ),
+
   .PCIE_CAP_CAPABILITY_VERSION        (PCIE_CAP_CAPABILITY_VERSION              ),
   .PCIE_CAP_DEVICE_PORT_TYPE          (PCIE_CAP_DEVICE_PORT_TYPE                ),
   .PCIE_CAP_INT_MSG_NUM               (PCIE_CAP_INT_MSG_NUM                     ),
   .PCIE_CAP_SLOT_IMPLEMENTED          (PCIE_CAP_SLOT_IMPLEMENTED                ),
   .PCIE_GENERIC                       (PCIE_GENERIC                             ),
+
   .PLM_AUTO_CONFIG                    (PLM_AUTO_CONFIG                          ),
   .PM_CAP_AUXCURRENT                  (PM_CAP_AUXCURRENT                        ),
   .PM_CAP_DSI                         (PM_CAP_DSI                               ),
@@ -818,9 +834,11 @@ PCIE_A1 #(
   .PM_DATA5                           (PM_DATA5                                 ),
   .PM_DATA6                           (PM_DATA6                                 ),
   .PM_DATA7                           (PM_DATA7                                 ),
+
   .SLOT_CAP_ATT_BUTTON_PRESENT        (SLOT_CAP_ATT_BUTTON_PRESENT              ),
   .SLOT_CAP_ATT_INDICATOR_PRESENT     (SLOT_CAP_ATT_INDICATOR_PRESENT           ),
   .SLOT_CAP_POWER_INDICATOR_PRESENT   (SLOT_CAP_POWER_INDICATOR_PRESENT         ),
+
   .TL_RX_RAM_RADDR_LATENCY            (TL_RX_RAM_RADDR_LATENCY                  ),
   .TL_RX_RAM_RDATA_LATENCY            (TL_RX_RAM_RDATA_LATENCY                  ),
   .TL_RX_RAM_WRITE_LATENCY            (TL_RX_RAM_WRITE_LATENCY                  ),
@@ -828,8 +846,10 @@ PCIE_A1 #(
   .TL_TX_CHECKS_DISABLE               (TL_TX_CHECKS_DISABLE                     ),
   .TL_TX_RAM_RADDR_LATENCY            (TL_TX_RAM_RADDR_LATENCY                  ),
   .TL_TX_RAM_RDATA_LATENCY            (TL_TX_RAM_RDATA_LATENCY                  ),
+
   .USR_CFG                            (USR_CFG                                  ),
   .USR_EXT_CFG                        (USR_EXT_CFG                              ),
+
   .VC0_CPL_INFINITE                   (VC0_CPL_INFINITE                         ),
   .VC0_RX_RAM_LIMIT                   (VC0_RX_RAM_LIMIT                         ),
   .VC0_TOTAL_CREDITS_CD               (VC0_TOTAL_CREDITS_CD                     ),
@@ -846,6 +866,7 @@ PCIE_A1 #(
   .CFGCOMMANDIOENABLE                 (cfg_command_io_enable                    ),
   .CFGCOMMANDMEMENABLE                (cfg_command_mem_enable                   ),
   .CFGCOMMANDSERREN                   (cfg_command_serr_en                      ),
+
   .CFGDEVCONTROLAUXPOWEREN            (cfg_dev_control_aux_power_en             ),
   .CFGDEVCONTROLCORRERRREPORTINGEN    (cfg_dev_control_corr_err_reporting_en    ),
   .CFGDEVCONTROLENABLERO              (cfg_dev_control_enable_ro                ),
@@ -1047,8 +1068,6 @@ assign   gt_tx_elec_idle           = pipe_gt_tx_elec_idle_b;
 assign   gt_power_down             = pipe_gt_power_down_b;
 assign   rxreset                   = pipe_rxreset_b;
 
-
-
 //***************************************************************************
 // Recreate wrapper outputs from the PCIE_A1 signals.
 //***************************************************************************
@@ -1094,6 +1113,7 @@ assign      cfg_lcommand  = {8'h0,
                             1'b0,
                             cfg_link_control_aspm_control};
 
+assign      o_bar_select  = ~trn_rbar_hit_n;
 
 
 endmodule

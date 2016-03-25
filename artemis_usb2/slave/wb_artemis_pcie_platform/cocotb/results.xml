@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites name="results">
   <testsuite name="all" package="all" tests="0">
-    <testcase classname="test_dut" name="test_local_buffer" time="0.7070407867431641" />
-    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.6569161415100098" />
+    <testcase classname="test_dut" name="test_config_read" time="0.6201949119567871" />
+    <testcase classname="test_dut" name="test_local_buffer" time="1.2759819030761719" />
+    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.4617788791656494" />
   </testsuite>
 </testsuites>

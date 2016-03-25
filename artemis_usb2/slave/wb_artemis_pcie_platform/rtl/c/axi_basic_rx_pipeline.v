@@ -171,15 +171,15 @@ assign rsrc_rdy_filtered = trn_rsrc_rdy &&
 //----------------------------------------------------------------------------//
 always @(posedge user_clk) begin
   if(user_rst) begin
-    trn_rd_prev        <= #TCQ {C_DATA_WIDTH{1'b0}};
-    trn_rsof_prev      <= #TCQ 1'b0;
-    trn_rrem_prev      <= #TCQ {REM_WIDTH{1'b0}};
-    trn_rsrc_rdy_prev  <= #TCQ 1'b0;
-    trn_rbar_hit_prev  <= #TCQ 7'h00;
-    trn_rerrfwd_prev   <= #TCQ 1'b0;
-    trn_recrc_err_prev <= #TCQ 1'b0;
-    trn_reof_prev      <= #TCQ 1'b0;
-    trn_rsrc_dsc_prev  <= #TCQ 1'b0;
+    trn_rd_prev          <= #TCQ {C_DATA_WIDTH{1'b0}};
+    trn_rsof_prev        <= #TCQ 1'b0;
+    trn_rrem_prev        <= #TCQ {REM_WIDTH{1'b0}};
+    trn_rsrc_rdy_prev    <= #TCQ 1'b0;
+    trn_rbar_hit_prev    <= #TCQ 7'h00;
+    trn_rerrfwd_prev     <= #TCQ 1'b0;
+    trn_recrc_err_prev   <= #TCQ 1'b0;
+    trn_reof_prev        <= #TCQ 1'b0;
+    trn_rsrc_dsc_prev    <= #TCQ 1'b0;
   end
   else begin
     // prev buffer works by checking trn_rdst_rdy. When trn_rdst_rdy is
@@ -238,7 +238,7 @@ endgenerate
 //                     data from the PCIe block
 always @(posedge user_clk) begin
   if(user_rst) begin
-    m_axis_rx_tdata <= #TCQ {C_DATA_WIDTH{1'b0}};
+    m_axis_rx_tdata     <= #TCQ {C_DATA_WIDTH{1'b0}};
   end
   else begin
     if(!data_hold) begin
@@ -279,10 +279,10 @@ end
 //----------------------------------------------------------------------------//
 always @(posedge user_clk) begin
   if(user_rst) begin
-    m_axis_rx_tvalid <= #TCQ 1'b0;
-    reg_tlast        <= #TCQ 1'b0;
-    reg_tkeep        <= #TCQ {STRB_WIDTH{1'b1}};
-    m_axis_rx_tuser  <= #TCQ 22'h0;
+    m_axis_rx_tvalid     <= #TCQ 1'b0;
+    reg_tlast            <= #TCQ 1'b0;
+    reg_tkeep            <= #TCQ {STRB_WIDTH{1'b1}};
+    m_axis_rx_tuser      <= #TCQ 22'h0;
   end
   else begin
     if(!data_hold) begin

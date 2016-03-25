@@ -1,4 +1,10 @@
 *.py[cod]
+.idea
+test/fake/temp
+tools/nysa
+wip
+
+docs/_build
 
 # VIM temporary files
 *~
@@ -14,6 +20,7 @@ temp.txt
 
 # C extensions
 *.so
+*.o
 
 # Packages
 *.egg

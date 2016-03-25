@@ -6,5 +6,5 @@
 //project_defines.v
 `define SIM
 
-`define CLOCK_RATE 50000000
+`define CLOCK_RATE 100
 `endif

@@ -440,10 +440,16 @@ class WorkerThread(threading.Thread):
                 #print "Interrupt finished"
 
         except TypeError as ex:
-            print "Type Error: %s" % str(ex)
-        except:
-            print "Error while reading interrupts: %s" % sys.exc_info()[0]
-            #print "Exception when reading interrupts"
+            print "Type Error while checking interrupts: %s" % str(ex)
+            '''
+            except ValueError as ex:
+                print "Value Error while checking interrupts: %s" % str(ex)
+            except AttributeError as ex:
+                print "Attribute Error while checking interrupts: %s" % str(ex)
+            except:
+                print "Error while reading interrupts: %s" % sys.exc_info()[0]
+                #print "Exception when reading interrupts"
+            '''
 
         finally:
             self.lock.release()
@@ -459,6 +465,7 @@ class WorkerThread(threading.Thread):
             for cb in self.interrupts_cb[i]:
                 try:
                     #print "callback %s" % str(cb)
+                    self.s.Debug( "Calling callback for: %d" % i)
                     cb()
                 except TypeError:
                     #If an error occured when calling a callback removed if from

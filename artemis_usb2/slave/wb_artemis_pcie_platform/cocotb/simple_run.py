@@ -83,6 +83,9 @@ class Test (unittest.TestCase):
 
         self.s.Info("Attempting to set voltage range")
         self.s.Info("Enable PCIE")
+        self.driver.enable(True)
+        self.driver.enable_pcie_read_block(True)
+        #self.driver.send_block_from_local_buffer()
 
         '''
         self.driver.enable(False)
@@ -137,27 +140,33 @@ class Test (unittest.TestCase):
 
 
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
-        self.s.Info("Get Bus Number: 0x%08X" % self.driver.get_bus_num())
-        self.s.Info("Get Device Number: 0x%08X" % self.driver.get_dev_num())
-        self.s.Info("Get Function Number: 0x%08X" % self.driver.get_func_num())
-        self.s.Info("Clock: %d" % self.driver.get_pcie_clock_count())
-        self.s.Info("Debug Clock Data: %d" % self.driver.get_debug_pcie_clock_count())
-
-        self.s.Info("Hot Reset: %s" % self.driver.is_hot_reset())
+        self.s.Info("Get Bus Number:         0x%08X" % self.driver.get_bus_num())
+        self.s.Info("Get Device Number:      0x%08X" % self.driver.get_dev_num())
+        self.s.Info("Get Function Number:    0x%08X" % self.driver.get_func_num())
+        print ""
+        self.s.Info("Clock:                  %d" % self.driver.get_pcie_clock_count())
+        self.s.Info("Debug Clock Data:       %d" % self.driver.get_debug_pcie_clock_count())
+        self.s.Info("Hot Reset:              %s" % self.driver.is_hot_reset())
         self.s.Info("Config Turnoff Request: %s" % self.driver.is_turnoff_request())
 
-        self.s.Info("Config Command:    0x%04X" % self.driver.get_cfg_command())
-        self.s.Info("Config Status:     0x%04X" % self.driver.get_cfg_status())
-        self.s.Info("Config DCommand:   0x%04X" % self.driver.get_cfg_dcommand())
-        self.s.Info("Config DStatus:    0x%04X" % self.driver.get_cfg_dstatus())
-        self.s.Info("Config LCommand:   0x%04X" % self.driver.get_cfg_lcommand())
-        self.s.Info("Config LStatus:    0x%04X" % self.driver.get_cfg_lstatus())
-
-
-        self.s.Verbose("BAR Select: 0x%02X" % self.driver.get_bar_select())
+        self.s.Info("Config Command:         0x%04X" % self.driver.get_cfg_command())
+        self.s.Info("Config Status:          0x%04X" % self.driver.get_cfg_status())
+        self.s.Info("Config DCommand:        0x%04X" % self.driver.get_cfg_dcommand())
+        self.s.Info("Config DStatus:         0x%04X" % self.driver.get_cfg_dstatus())
+        self.s.Info("Config LCommand:        0x%04X" % self.driver.get_cfg_lcommand())
+        self.s.Info("Config LStatus:         0x%04X" % self.driver.get_cfg_lstatus())
+        print ""
+        self.s.Verbose("Received AXI High:   %s" % self.driver.is_axi_receive_ready())
+        self.s.Verbose("BAR Select:          0x%02X" % self.driver.get_bar_select())
+        self.s.Verbose("Number of Reads:     %d" % self.driver.get_num_block_reads())
         #self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
         self.driver.read_debug_flags()
 
+        self.driver.get_config_data()
+        for i in range (6):
+            self.s.Info("Bus Address:           0x%08X" % self.driver.get_bar_address(i))
+
+            
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
         self.driver.reset_debug_flags()

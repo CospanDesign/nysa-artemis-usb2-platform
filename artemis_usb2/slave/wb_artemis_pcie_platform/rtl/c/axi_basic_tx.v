@@ -160,32 +160,32 @@ axi_basic_tx_pipeline #(
 
   // Incoming AXI RX
   //-----------
-  .s_axis_tx_tdata( s_axis_tx_tdata ),
-  .s_axis_tx_tready( s_axis_tx_tready ),
-  .s_axis_tx_tvalid( s_axis_tx_tvalid ),
-  .s_axis_tx_tkeep( s_axis_tx_tkeep ),
-  .s_axis_tx_tlast( s_axis_tx_tlast ),
-  .s_axis_tx_tuser( s_axis_tx_tuser ),
+  .s_axis_tx_tdata  (s_axis_tx_tdata  ),
+  .s_axis_tx_tready (s_axis_tx_tready ),
+  .s_axis_tx_tvalid (s_axis_tx_tvalid ),
+  .s_axis_tx_tkeep  (s_axis_tx_tkeep  ),
+  .s_axis_tx_tlast  (s_axis_tx_tlast  ),
+  .s_axis_tx_tuser  (s_axis_tx_tuser  ),
 
   // Outgoing TRN TX
   //-----------
-  .trn_td( trn_td ),
-  .trn_tsof( trn_tsof ),
-  .trn_teof( trn_teof ),
-  .trn_tsrc_rdy( trn_tsrc_rdy ),
-  .trn_tdst_rdy( trn_tdst_rdy ),
-  .trn_tsrc_dsc( trn_tsrc_dsc ),
-  .trn_trem( trn_trem ),
-  .trn_terrfwd( trn_terrfwd ),
-  .trn_tstr( trn_tstr ),
-  .trn_tecrc_gen( trn_tecrc_gen ),
-  .trn_lnk_up( trn_lnk_up ),
+  .trn_td           (trn_td           ),
+  .trn_tsof         (trn_tsof         ),
+  .trn_teof         (trn_teof         ),
+  .trn_tsrc_rdy     (trn_tsrc_rdy     ),
+  .trn_tdst_rdy     (trn_tdst_rdy     ),
+  .trn_tsrc_dsc     (trn_tsrc_dsc     ),
+  .trn_trem         (trn_trem         ),
+  .trn_terrfwd      (trn_terrfwd      ),
+  .trn_tstr         (trn_tstr         ),
+  .trn_tecrc_gen    (trn_tecrc_gen    ),
+  .trn_lnk_up       (trn_lnk_up       ),
 
   // System
   //-----------
-  .tready_thrtl( tready_thrtl ),
-  .user_clk( user_clk ),
-  .user_rst( user_rst )
+  .tready_thrtl     (tready_thrtl     ),
+  .user_clk         (user_clk         ),
+  .user_rst         (user_rst         )
 );
 
 
@@ -205,53 +205,52 @@ generate
 
       // Outgoing AXI TX
       //-----------
-      .s_axis_tx_tdata( s_axis_tx_tdata ),
-      .s_axis_tx_tvalid( s_axis_tx_tvalid ),
-      .s_axis_tx_tuser( s_axis_tx_tuser ),
-      .s_axis_tx_tlast( s_axis_tx_tlast ),
+      .s_axis_tx_tdata      (s_axis_tx_tdata      ),
+      .s_axis_tx_tvalid     (s_axis_tx_tvalid     ),
+      .s_axis_tx_tuser      (s_axis_tx_tuser      ),
+      .s_axis_tx_tlast      (s_axis_tx_tlast      ),
 
       // User Misc.
       //-----------
-      .user_turnoff_ok( user_turnoff_ok ),
-      .user_tcfg_gnt( user_tcfg_gnt ),
+      .user_turnoff_ok      (user_turnoff_ok      ),
+      .user_tcfg_gnt        (user_tcfg_gnt        ),
 
       // Incoming TRN RX
       //-----------
-      .trn_tbuf_av( trn_tbuf_av ),
-      .trn_tdst_rdy( trn_tdst_rdy ),
+      .trn_tbuf_av          (trn_tbuf_av          ),
+      .trn_tdst_rdy         (trn_tdst_rdy         ),
 
       // TRN Misc.
       //-----------
-      .trn_tcfg_req( trn_tcfg_req ),
-      .trn_tcfg_gnt( trn_tcfg_gnt ),
-      .trn_lnk_up( trn_lnk_up ),
+      .trn_tcfg_req         (trn_tcfg_req         ),
+      .trn_tcfg_gnt         (trn_tcfg_gnt         ),
+      .trn_lnk_up           (trn_lnk_up           ),
 
       // 7 Seriesq/Virtex6 PM
       //-----------
-      .cfg_pcie_link_state( cfg_pcie_link_state ),
+      .cfg_pcie_link_state  (cfg_pcie_link_state  ),
 
       // Virtex6 PM
       //-----------
-      .cfg_pm_send_pme_to( cfg_pm_send_pme_to ),
-      .cfg_pmcsr_powerstate( cfg_pmcsr_powerstate ),
-      .trn_rdllp_data( trn_rdllp_data ),
-      .trn_rdllp_src_rdy( trn_rdllp_src_rdy ),
+      .cfg_pm_send_pme_to   (cfg_pm_send_pme_to   ),
+      .cfg_pmcsr_powerstate (cfg_pmcsr_powerstate ),
+      .trn_rdllp_data       (trn_rdllp_data       ),
+      .trn_rdllp_src_rdy    (trn_rdllp_src_rdy    ),
 
       // Spartan6 PM
       //-----------
-      .cfg_to_turnoff( cfg_to_turnoff ),
-      .cfg_turnoff_ok( cfg_turnoff_ok ),
+      .cfg_to_turnoff       (cfg_to_turnoff       ),
+      .cfg_turnoff_ok       (cfg_turnoff_ok       ),
 
       // System
       //-----------
-      .tready_thrtl( tready_thrtl ),
-      .user_clk( user_clk ),
-      .user_rst( user_rst )
+      .tready_thrtl         (tready_thrtl         ),
+      .user_clk             (user_clk             ),
+      .user_rst             (user_rst             )
     );
   end
   else begin : thrtl_ctl_disabled
     assign tready_thrtl   = 1'b0;
-
     assign cfg_turnoff_ok = user_turnoff_ok;
     assign trn_tcfg_gnt   = user_tcfg_gnt;
   end

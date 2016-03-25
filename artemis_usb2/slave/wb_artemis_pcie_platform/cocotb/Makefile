@@ -8,7 +8,7 @@ PYTHONPATH := ./model:$(PYTHONPATH)
 export PYTHONPATH
 export PYTHONHOME=$(shell python -c "from distutils.sysconfig import get_config_var; print(get_config_var('prefix'))")
 
-EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(NYSA)/verilog/ -DSIMULATION
+EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION
 
 #Dependencies
 VERILOG_SOURCES = $(NYSA)/verilog/wishbone/master/wishbone_master.v
@@ -21,11 +21,12 @@ VERILOG_SOURCES += $(NYSA)/verilog/generic/cross_clock_enable.v
 VERILOG_SOURCES += $(NYSA)/verilog/generic/ppfifo.v
 
 VERILOG_SOURCES += ${TOPDIR}/sim/sim_pcie_axi_bridge.v
-VERILOG_SOURCES += ${TOPDIR}/rtl/adapter_dpb_ppfifo.v
-VERILOG_SOURCES += ${TOPDIR}/rtl/adapter_axi_stream_2_ppfifo.v
-VERILOG_SOURCES += ${TOPDIR}/rtl/adapter_ppfifo_2_axi_stream.v
-VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_interface.v
+VERILOG_SOURCES += ${NYSA}/verilog/generic/adapter_dpb_ppfifo.v
+VERILOG_SOURCES += ${NYSA}/verilog/generic/adapter_axi_stream_2_ppfifo.v
+VERILOG_SOURCES += ${NYSA}/verilog/generic/adapter_ppfifo_2_axi_stream.v
 
+VERILOG_SOURCES += ${TOPDIR}/rtl/config_parser.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_interface.v
 
 
 VERILOG_SOURCES += ${NYSA}/verilog/wishbone/slave/wb_bram/rtl/wb_bram.v

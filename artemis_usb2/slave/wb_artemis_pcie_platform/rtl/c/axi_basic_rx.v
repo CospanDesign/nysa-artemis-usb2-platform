@@ -139,39 +139,39 @@ axi_basic_rx_pipeline #(
 
   // Outgoing AXI TX
   //-----------
-  .m_axis_rx_tdata( m_axis_rx_tdata ),
-  .m_axis_rx_tvalid( m_axis_rx_tvalid ),
-  .m_axis_rx_tready( m_axis_rx_tready ),
-  .m_axis_rx_tkeep( m_axis_rx_tkeep ),
-  .m_axis_rx_tlast( m_axis_rx_tlast ),
-  .m_axis_rx_tuser( m_axis_rx_tuser ),
+  .m_axis_rx_tdata  (m_axis_rx_tdata  ),
+  .m_axis_rx_tvalid (m_axis_rx_tvalid ),
+  .m_axis_rx_tready (m_axis_rx_tready ),
+  .m_axis_rx_tkeep  (m_axis_rx_tkeep  ),
+  .m_axis_rx_tlast  (m_axis_rx_tlast  ),
+  .m_axis_rx_tuser  (m_axis_rx_tuser  ),
 
   // Incoming TRN RX
   //-----------
-  .trn_rd( trn_rd ),
-  .trn_rsof( trn_rsof ),
-  .trn_reof( trn_reof ),
-  .trn_rsrc_rdy( trn_rsrc_rdy ),
-  .trn_rdst_rdy( trn_rdst_rdy ),
-  .trn_rsrc_dsc( trn_rsrc_dsc ),
-  .trn_rrem( trn_rrem ),
-  .trn_rerrfwd( trn_rerrfwd ),
-  .trn_rbar_hit( trn_rbar_hit ),
-  .trn_recrc_err( trn_recrc_err ),
+  .trn_rd           (trn_rd           ),
+  .trn_rsof         (trn_rsof         ),
+  .trn_reof         (trn_reof         ),
+  .trn_rsrc_rdy     (trn_rsrc_rdy     ),
+  .trn_rdst_rdy     (trn_rdst_rdy     ),
+  .trn_rsrc_dsc     (trn_rsrc_dsc     ),
+  .trn_rrem         (trn_rrem         ),
+  .trn_rerrfwd      (trn_rerrfwd      ),
+  .trn_rbar_hit     (trn_rbar_hit     ),
+  .trn_recrc_err    (trn_recrc_err    ),
 
   // Null Inputs
   //-----------
-  .null_rx_tvalid( null_rx_tvalid ),
-  .null_rx_tlast( null_rx_tlast ),
-  .null_rx_tkeep( null_rx_tkeep ),
-  .null_rdst_rdy( null_rdst_rdy ),
-  .null_is_eof( null_is_eof ),
+  .null_rx_tvalid   (null_rx_tvalid   ),
+  .null_rx_tlast    (null_rx_tlast    ),
+  .null_rx_tkeep    (null_rx_tkeep    ),
+  .null_rdst_rdy    (null_rdst_rdy    ),
+  .null_is_eof      (null_is_eof      ),
 
   // System
   //-----------
-  .np_counter( np_counter ),
-  .user_clk( user_clk ),
-  .user_rst( user_rst )
+  .np_counter       (np_counter       ),
+  .user_clk         (user_clk         ),
+  .user_rst         (user_rst         )
 );
 
 
@@ -180,33 +180,32 @@ axi_basic_rx_pipeline #(
  //---------------------------------------------//
 
  axi_basic_rx_null_gen #(
-  .C_DATA_WIDTH( C_DATA_WIDTH ),
-  .TCQ( TCQ ),
-
-  .STRB_WIDTH( STRB_WIDTH )
+  .C_DATA_WIDTH     (C_DATA_WIDTH     ),
+  .TCQ              (TCQ              ),
+  .STRB_WIDTH       (STRB_WIDTH       )
 
  ) rx_null_gen_inst (
 
   // Inputs
   //-----------
-  .m_axis_rx_tdata( m_axis_rx_tdata ),
-  .m_axis_rx_tvalid( m_axis_rx_tvalid ),
-  .m_axis_rx_tready( m_axis_rx_tready ),
-  .m_axis_rx_tlast( m_axis_rx_tlast ),
-  .m_axis_rx_tuser( m_axis_rx_tuser ),
+  .m_axis_rx_tdata  (m_axis_rx_tdata  ),
+  .m_axis_rx_tvalid (m_axis_rx_tvalid ),
+  .m_axis_rx_tready (m_axis_rx_tready ),
+  .m_axis_rx_tlast  (m_axis_rx_tlast  ),
+  .m_axis_rx_tuser  (m_axis_rx_tuser  ),
 
   // Null Outputs
   //-----------
-  .null_rx_tvalid( null_rx_tvalid ),
-  .null_rx_tlast( null_rx_tlast ),
-  .null_rx_tkeep( null_rx_tkeep ),
-  .null_rdst_rdy( null_rdst_rdy ),
-  .null_is_eof( null_is_eof ),
+  .null_rx_tvalid   (null_rx_tvalid   ),
+  .null_rx_tlast    (null_rx_tlast    ),
+  .null_rx_tkeep    (null_rx_tkeep    ),
+  .null_rdst_rdy    (null_rdst_rdy    ),
+  .null_is_eof      (null_is_eof      ),
 
   // System
   //-----------
-  .user_clk( user_clk ),
-  .user_rst( user_rst )
+  .user_clk         (user_clk         ),
+  .user_rst         (user_rst         )
  );
 
 endmodule

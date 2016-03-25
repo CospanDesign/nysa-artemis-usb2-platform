@@ -27,6 +27,7 @@ SOFTWARE.
  *
  * Changes:
  */
+`include "project_defines.v"
 
 module artemis_pcie_interface #(
   parameter CONTROL_FIFO_DEPTH        = 7,
@@ -47,9 +48,11 @@ module artemis_pcie_interface #(
   input                     pci_exp_rxp,
   input                     pci_exp_rxn,
 
+  input                     read_bar_addr_stb,
+
   // Transaction (TRN) Interface
   output                    user_lnk_up,
-  output                    pcie_clk,
+  output                    clk_62p5,
 
 
   // Flow Control
@@ -62,10 +65,10 @@ module artemis_pcie_interface #(
   output      [11:0]        fc_cpld,
 
   // Host (CFG) Interface
-  output      [31:0]        cfg_do,
-  output                    cfg_rd_wr_done,
-  input       [9:0]         cfg_dwaddr,
-  input                     cfg_rd_en,
+  //output      [31:0]        cfg_do,
+  //output                    cfg_rd_wr_done,
+  //input       [9:0]         cfg_dwaddr,
+  //input                     cfg_rd_en,
 
   // Configuration: Error
   input                     cfg_err_ur,
@@ -138,12 +141,23 @@ module artemis_pcie_interface #(
   input                     i_data_out_wr_stb,
   input       [31:0]        i_data_out_wr_data,
 
+  output      [31:0]        o_bar_addr0,
+  output      [31:0]        o_bar_addr1,
+  output      [31:0]        o_bar_addr2,
+  output      [31:0]        o_bar_addr3,
+  output      [31:0]        o_bar_addr4,
+  output      [31:0]        o_bar_addr5,
+
+//  output      [6:0]         rx_bar_hit,
+  output                    rx_rcv_data_valid,
+
   input       [1:0]         rx_equalizer_ctrl,
   input       [3:0]         tx_diff_ctrl,
   input       [2:0]         tx_pre_emphasis,
   output      [4:0]         cfg_ltssm_state,
 
-  output      [6:0]         o_bar_select,
+  output      [6:0]         o_bar_hit,
+  output                    o_receive_axi_ready,
 
   output                    dbg_reg_detected_correctable,
   output                    dbg_reg_detected_fatal,
@@ -176,12 +190,13 @@ localparam      CONTROL_FIFO_SIZE     = (2 ** CONTROL_FIFO_DEPTH);
 localparam      DATA_FIFO_SIZE        = (2 ** DATA_FIFO_DEPTH);
 
 
-localparam      CONTROL_FUNCTION_ID   = 1'b0;
-localparam      DATA_FUNCTION_ID      = 1'b1;
+localparam      CONFIG_SELECT    = 2'b00;
+localparam      CONTROL_SELECT   = 2'b01;
+localparam      DATA_SELECT      = 2'b10;
 //registes/wires
 
 
-(* KEEP = "TRUE" *) wire                        clk_62p5;
+(* KEEP = "TRUE" *) wire    clk_62p5;
 
 
 //Control Signals
@@ -191,14 +206,11 @@ wire  [23:0]                c_in_wr_size;
 wire                        c_in_wr_stb;
 wire  [31:0]                c_in_wr_data;
 
-
 wire                        c_out_rd_stb;
 wire                        c_out_rd_ready;
 wire                        c_out_rd_activate;
 wire  [23:0]                c_out_rd_size;
 wire  [31:0]                c_out_rd_data;
-
-
 
 //Data
 wire  [1:0]                 d_in_wr_ready;
@@ -213,17 +225,14 @@ wire                        d_out_rd_activate;
 wire  [23:0]                d_out_rd_size;
 wire  [31:0]                d_out_rd_data;
 
-
-wire                        axi_clk;
-
 //Control Signals
 wire                        c_in_axi_ready;
-wire          [31:0]        c_in_axi_data;
-wire          [3:0]         c_in_axi_keep;
-wire                        c_in_axi_last;
-wire                        c_in_axi_valid;
+reg           [31:0]        c_in_axi_data;
+reg           [3:0]         c_in_axi_keep;
+reg                         c_in_axi_last;
+reg                         c_in_axi_valid;
 
-wire                        c_out_axi_ready;
+reg                         c_out_axi_ready;
 wire          [31:0]        c_out_axi_data;
 wire          [3:0]         c_out_axi_keep;
 wire                        c_out_axi_last;
@@ -232,12 +241,12 @@ wire                        c_out_axi_valid;
 
 //Data Signals
 wire                        d_in_axi_ready;
-wire          [31:0]        d_in_axi_data;
-wire          [3:0]         d_in_axi_keep;
-wire                        d_in_axi_last;
-wire                        d_in_axi_valid;
+reg           [31:0]        d_in_axi_data;
+reg           [3:0]         d_in_axi_keep;
+reg                         d_in_axi_last;
+reg                         d_in_axi_valid;
 
-wire                        d_out_axi_ready;
+reg                         d_out_axi_ready;
 wire          [31:0]        d_out_axi_data;
 wire          [3:0]         d_out_axi_keep;
 wire                        d_out_axi_last;
@@ -247,42 +256,57 @@ wire          [31:0]        m_axis_rx_tdata;
 wire          [3:0]         m_axis_rx_tkeep;
 wire                        m_axis_rx_tlast;
 wire                        m_axis_rx_tvalid;
-wire                        m_axis_rx_tready;
+reg                         m_axis_rx_tready;
+wire          [21:0]        m_axis_rx_tuser;
 
 wire                        s_axis_tx_tready;
-wire          [31:0]        s_axis_tx_tdata;
-wire          [3:0]         s_axis_tx_tkeep;
+reg           [31:0]        s_axis_tx_tdata;
+reg           [3:0]         s_axis_tx_tkeep;
 wire          [3:0]         s_axis_tx_tuser;
-wire                        s_axis_tx_tlast;
-wire                        s_axis_tx_tvalid;
+reg                         s_axis_tx_tlast;
+reg                         s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
-assign                      s_axis_tx_tuser = 0;
-
-//submodules
-/*
-cross_clock_strobe trn_pnd (
-  .rst              (rst                ),
-  .in_clk           (clk                ),
-  .in_stb           (cfg_trn_pending_stb),
-
-  .out_clk          (clk_62p5           ),
-  .out_stb          (cfg_trn_pending    )
-);
-*/
-assign  cfg_trn_pending =  0;
+//assign                      s_axis_tx_tuser = 0;
 
 
-wire  tx_cfg_gnt;
-wire  rx_np_ok;
+wire                        s_axis_tx_discont;
+wire                        s_axis_tx_stream;
+wire                        s_axis_tx_err_fwd;
+wire                        s_axis_tx_s6_not_used;
 
-/*** ALLOW THE Normal PRIORITIZATION! ***/
-assign  tx_cfg_gnt      =   1'b1;
-//READY TO ACCEPT NON POSTED THIMAGIGGERS
-assign  rx_np_ok        =   1'b1;
+wire          [31:0]        cfg_do;
+wire                        cfg_rd_wr_done;
+wire          [9:0]         cfg_dwaddr;
+wire                        cfg_rd_en;
+
+wire                        cfg_enable;
+
+wire                        tx_cfg_gnt;
+wire                        rx_np_ok;
+wire  [6:0]                 w_bar_hit;
 
 
-pcie_axi_bridge pcie_interface (
+
+assign  s_axis_tx_discont     = 0;
+assign  s_axis_tx_stream      = 0;
+assign  s_axis_tx_err_fwd     = 0;
+assign  s_axis_tx_s6_not_used = 0;
+
+assign  s_axis_tx_tuser       = {s_axis_tx_discont,
+                                 s_axis_tx_stream,
+                                 s_axis_tx_err_fwd,
+                                 s_axis_tx_s6_not_used};
+
+assign  o_bar_hit             = m_axis_rx_tuser[8:2];
+
+assign  cfg_trn_pending       =  1'b0;
+assign  tx_cfg_gnt            =  1'b1;
+assign  rx_np_ok              =  1'b1;
+
+pcie_axi_bridge pcie_interface
+//sim_pcie_axi_bridge pcie_interface
+(
 
   // PCI Express Fabric Interface
   .pci_exp_txp                       (pci_exp_txp             ),
@@ -307,7 +331,8 @@ pcie_axi_bridge pcie_interface (
   output  reg         tx_err_drop,
   output  reg         tx_cfg_req,
 */
-  .tx_cfg_gnt                        (tx_cfg_gnt              ),
+  .tx_cfg_gnt                        (tx_cfg_gnt               ),
+  .user_enable_comm                  (user_enable_comm         ),
 
 
   // Rx
@@ -316,6 +341,7 @@ pcie_axi_bridge pcie_interface (
   .m_axis_rx_tlast                   (m_axis_rx_tlast         ),
   .m_axis_rx_tvalid                  (m_axis_rx_tvalid        ),
   .m_axis_rx_tready                  (m_axis_rx_tready        ),
+  .m_axis_rx_tuser                   (m_axis_rx_tuser         ),
 //  output  reg [21:0]  m_axis_rx_tuser,
 //  input               rx_np_ok,
   .rx_np_ok                          (rx_np_ok                ),
@@ -360,6 +386,8 @@ pcie_axi_bridge pcie_interface (
   .cfg_to_turnoff                    (cfg_to_turnoff          ),
   .cfg_pm_wake                       (cfg_pm_wake             ),
 
+  //Core Controller
+
   // Configuration: System/Status
   .cfg_pcie_link_state               (cfg_pcie_link_state     ),
   .cfg_trn_pending                   (cfg_trn_pending         ),
@@ -393,7 +421,7 @@ pcie_axi_bridge pcie_interface (
   .tx_pre_emphasis                   (tx_pre_emphasis         ),
   .cfg_ltssm_state                   (cfg_ltssm_state         ),
 
-  .o_bar_select                      (o_bar_select                  ),
+  .o_bar_hit                         (w_bar_hit                     ),
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable  ),
   .dbg_reg_detected_fatal            (dbg_reg_detected_fatal        ),
   .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal    ),
@@ -420,43 +448,64 @@ pcie_axi_bridge pcie_interface (
   .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg           )
 );
 
+
+config_parser cfg (
+  .rst              (pcie_reset           ),
+  .clk              (clk_62p5             ),
+
+  .i_en             (cfg_enable           ),
+
+  .i_cfg_do         (cfg_do               ),
+  .i_cfg_rd_wr_done (cfg_rd_wr_done       ),
+  .o_cfg_dwaddr     (cfg_dwaddr           ),
+  .o_cfg_rd_en      (cfg_rd_en            ),
+
+
+  .o_bar_addr0      (o_bar_addr0          ),
+  .o_bar_addr1      (o_bar_addr1          ),
+  .o_bar_addr2      (o_bar_addr2          ),
+  .o_bar_addr3      (o_bar_addr3          ),
+  .o_bar_addr4      (o_bar_addr4          ),
+  .o_bar_addr5      (o_bar_addr5          )
+);
+
 adapter_axi_stream_2_ppfifo cntrl_a2p (
-  .rst              (pcie_reset       ),
+  .rst              (pcie_reset           ),
 
   //AXI Stream Input
-  .i_axi_clk        (axi_clk          ),
-  .o_axi_ready      (c_in_axi_ready   ),
-  .i_axi_data       (c_in_axi_data    ),
-  .i_axi_keep       (c_in_axi_keep    ),
-  .i_axi_last       (c_in_axi_last    ),
-  .i_axi_valid      (c_in_axi_valid   ),
+  .i_axi_clk        (clk_62p5             ),
+  .o_axi_ready      (c_in_axi_ready       ),
+  .i_axi_data       (c_in_axi_data        ),
+  .i_axi_keep       (c_in_axi_keep        ),
+  .i_axi_last       (c_in_axi_last        ),
+  .i_axi_valid      (c_in_axi_valid       ),
 
   //Ping Pong FIFO Write Controller
-  .o_ppfifo_clk     (axi_clk          ),
-  .i_ppfifo_rdy     (c_in_wr_ready    ),
-  .o_ppfifo_act     (c_in_wr_activate ),
-  .i_ppfifo_size    (c_in_wr_size     ),
-  .o_ppfifo_stb     (c_in_wr_stb      ),
-  .o_ppfifo_data    (c_in_wr_data     )
-
+  //.o_ppfifo_clk     (clk_62p5             ),
+  .o_ppfifo_clk     (                     ),
+  .i_ppfifo_rdy     (c_in_wr_ready        ),
+  .o_ppfifo_act     (c_in_wr_activate     ),
+  .i_ppfifo_size    (c_in_wr_size         ),
+  .o_ppfifo_stb     (c_in_wr_stb          ),
+  .o_ppfifo_data    (c_in_wr_data         )
 );
 
 ppfifo #(
-  .DATA_WIDTH       (32               ),
+  .DATA_WIDTH       (32                   ),
   .ADDRESS_WIDTH    (CONTROL_FIFO_DEPTH - 2)
 ) pcie_control_ingress (
 
   //Control Signals
-  .reset            (pcie_reset       ),
+  .reset            (pcie_reset           ),
 
   //Write Side
-  .write_clock      (axi_clk          ),
-  .write_ready      (c_in_wr_ready    ),
-  .write_activate   (c_in_wr_activate ),
-  .write_fifo_size  (c_in_wr_size     ),
-  .write_strobe     (c_in_wr_stb      ),
-  .write_data       (c_in_wr_data     ),
-  .starved          (                 ),
+  .write_clock      (clk_62p5             ),
+  .write_ready      (c_in_wr_ready        ),
+  .write_activate   (c_in_wr_activate     ),
+  .write_fifo_size  (c_in_wr_size         ),
+  .write_strobe     (c_in_wr_stb          ),
+  .write_data       (c_in_wr_data         ),
+  .starved          (                     ),
 
   //Read Size
   .read_clock       (clk                  ),
@@ -469,182 +518,216 @@ ppfifo #(
 );
 
 ppfifo #(
-  .DATA_WIDTH       (32               ),
+  .DATA_WIDTH       (32                   ),
   .ADDRESS_WIDTH    (CONTROL_FIFO_DEPTH - 2)
 ) pcie_control_egress (
 
   //Control Signals
-  .reset            (pcie_reset       ),
+  .reset            (pcie_reset           ),
 
   //Write Side
-  .write_clock      (clk              ),
+  .write_clock      (clk                  ),
   .write_ready      (o_cmd_out_wr_ready   ),
   .write_activate   (i_cmd_out_wr_activate),
   .write_fifo_size  (o_cmd_out_wr_size    ),
   .write_strobe     (i_cmd_out_wr_stb     ),
   .write_data       (i_cmd_out_wr_data    ),
-  .starved          (                 ),
+  .starved          (                     ),
 
   //Read Size
-  .read_clock       (axi_clk          ),
-  .read_strobe      (c_out_rd_stb     ),
-  .read_ready       (c_out_rd_ready   ),
-  .read_activate    (c_out_rd_activate),
-  .read_count       (c_out_rd_size    ),
-  .read_data        (c_out_rd_data    ),
-  .inactive         (                 )
+  .read_clock       (clk_62p5             ),
+  .read_strobe      (c_out_rd_stb         ),
+  .read_ready       (c_out_rd_ready       ),
+  .read_activate    (c_out_rd_activate    ),
+  .read_count       (c_out_rd_size        ),
+  .read_data        (c_out_rd_data        ),
+  .inactive         (                     )
 );
 
 
 adapter_ppfifo_2_axi_stream control_p2a (
-  .rst              (pcie_reset       ),
+  .rst              (pcie_reset           ),
 
   //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (axi_clk          ),
-  .i_ppfifo_rdy     (c_out_rd_ready   ),
-  .o_ppfifo_act     (c_out_rd_activate),
-  .i_ppfifo_size    (c_out_rd_size    ),
-  .i_ppfifo_data    (c_out_rd_data    ),
-  .o_ppfifo_stb     (c_out_rd_stb     ),
+  .i_ppfifo_clk     (clk_62p5             ),
+  .i_ppfifo_rdy     (c_out_rd_ready       ),
+  .o_ppfifo_act     (c_out_rd_activate    ),
+  .i_ppfifo_size    (c_out_rd_size        ),
+  .i_ppfifo_data    (c_out_rd_data        ),
+  .o_ppfifo_stb     (c_out_rd_stb         ),
 
   //AXI Stream Output (clock read from i_ppfifo_clk)
-  .o_axi_clk        (                 ),
-  .i_axi_ready      (c_out_axi_ready  ),
-  .o_axi_data       (c_out_axi_data   ),
-  .o_axi_keep       (c_out_axi_keep   ),
-  .o_axi_last       (c_out_axi_last   ),
-  .o_axi_valid      (c_out_axi_valid  )
+  .o_axi_clk        (                     ),
+  .i_axi_ready      (c_out_axi_ready      ),
+  .o_axi_data       (c_out_axi_data       ),
+  .o_axi_keep       (c_out_axi_keep       ),
+  .o_axi_last       (c_out_axi_last       ),
+  .o_axi_valid      (c_out_axi_valid      )
 
 );
 
 //Data FIFOs
 adapter_axi_stream_2_ppfifo data_a2p (
-  .rst              (pcie_reset       ),
+  .rst              (pcie_reset           ),
 
   //AXI Stream Input
-  .i_axi_clk        (axi_clk          ),
-  .o_axi_ready      (d_in_axi_ready   ),
-  .i_axi_data       (d_in_axi_data    ),
-  .i_axi_keep       (d_in_axi_keep    ),
-  .i_axi_last       (d_in_axi_last    ),
-  .i_axi_valid      (d_in_axi_valid   ),
+  .i_axi_clk        (clk_62p5             ),
+  .o_axi_ready      (d_in_axi_ready       ),
+  .i_axi_data       (d_in_axi_data        ),
+  .i_axi_keep       (d_in_axi_keep        ),
+  .i_axi_last       (d_in_axi_last        ),
+  .i_axi_valid      (d_in_axi_valid       ),
 
   //AXI Stream Output (clock read from i_ppfifo_clk)
   //Ping Pong FIFO Write Controller
-  .o_ppfifo_clk     (                 ),
-  .i_ppfifo_rdy     (d_in_wr_ready    ),
-  .o_ppfifo_act     (d_in_wr_activate ),
-  .i_ppfifo_size    (d_in_wr_size     ),
-  .o_ppfifo_stb     (d_in_wr_stb      ),
-  .o_ppfifo_data    (d_in_wr_data     )
+  .o_ppfifo_clk     (                     ),
+  .i_ppfifo_rdy     (d_in_wr_ready        ),
+  .o_ppfifo_act     (d_in_wr_activate     ),
+  .i_ppfifo_size    (d_in_wr_size         ),
+  .o_ppfifo_stb     (d_in_wr_stb          ),
+  .o_ppfifo_data    (d_in_wr_data         )
 );
 
 ppfifo #(
-  .DATA_WIDTH       (32               ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2 )
+  .DATA_WIDTH       (32                   ),
+  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2  )
 ) pcie_data_ingress (
 
   //Control Signals
-  .reset            (pcie_reset       ),
+  .reset            (pcie_reset           ),
 
   //Write Side
-  .write_clock      (axi_clk          ),
-  .write_ready      (d_in_wr_ready    ),
-  .write_activate   (d_in_wr_activate ),
-  .write_fifo_size  (d_in_wr_size     ),
-  .write_strobe     (d_in_wr_stb      ),
-  .write_data       (d_in_wr_data     ),
-  .starved          (),
+  .write_clock      (clk_62p5             ),
+  .write_ready      (d_in_wr_ready        ),
+  .write_activate   (d_in_wr_activate     ),
+  .write_fifo_size  (d_in_wr_size         ),
+  .write_strobe     (d_in_wr_stb          ),
+  .write_data       (d_in_wr_data         ),
+  .starved          (                     ),
 
   //Read Size
-  .read_clock       (clk              ),
-  .read_strobe      (i_data_in_rd_stb      ),
-  .read_ready       (o_data_in_rd_ready    ),
-  .read_activate    (i_data_in_rd_activate ),
-  .read_count       (o_data_in_rd_count    ),
-  .read_data        (o_data_in_rd_data     ),
-  .inactive         ()
+  .read_clock       (clk                  ),
+  .read_strobe      (i_data_in_rd_stb     ),
+  .read_ready       (o_data_in_rd_ready   ),
+  .read_activate    (i_data_in_rd_activate),
+  .read_count       (o_data_in_rd_count   ),
+  .read_data        (o_data_in_rd_data    ),
+  .inactive         (                     )
 );
 
 
 ppfifo #(
-  .DATA_WIDTH       (32               ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2 )
+  .DATA_WIDTH       (32                   ),
+  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2  )
 ) pcie_data_egress (
 
   //Control Signals
-  .reset            (pcie_reset       ),
+  .reset            (pcie_reset           ),
 
   //Write Side
-  .write_clock      (clk              ),
-  .write_ready      (o_data_out_wr_ready   ),
+  .write_clock      (clk                  ),
+  .write_ready      (o_data_out_wr_ready  ),
   .write_activate   (i_data_out_wr_activate),
-  .write_fifo_size  (o_data_out_wr_size    ),
-  .write_strobe     (i_data_out_wr_stb     ),
-  .write_data       (i_data_out_wr_data    ),
+  .write_fifo_size  (o_data_out_wr_size   ),
+  .write_strobe     (i_data_out_wr_stb    ),
+  .write_data       (i_data_out_wr_data   ),
   .starved          (),
 
   //Read Size
-  .read_clock       (axi_clk          ),
-  .read_strobe      (d_out_rd_stb     ),
-  .read_ready       (d_out_rd_ready   ),
-  .read_activate    (d_out_rd_activate),
-  .read_count       (d_out_rd_size    ),
-  .read_data        (d_out_rd_data    ),
-  .inactive         ()
+  .read_clock       (clk_62p5             ),
+  .read_strobe      (d_out_rd_stb         ),
+  .read_ready       (d_out_rd_ready       ),
+  .read_activate    (d_out_rd_activate    ),
+  .read_count       (d_out_rd_size        ),
+  .read_data        (d_out_rd_data        ),
+  .inactive         (                     )
 );
 
 adapter_ppfifo_2_axi_stream data_p2a (
-  .rst              (pcie_reset       ),
+  .rst              (pcie_reset           ),
 
   //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (axi_clk          ),
-  .i_ppfifo_rdy     (d_out_rd_ready   ),
-  .o_ppfifo_act     (d_out_rd_activate),
-  .i_ppfifo_size    (d_out_rd_size    ),
-  .i_ppfifo_data    (d_out_rd_data    ),
-  .o_ppfifo_stb     (d_out_rd_stb     ),
+  .i_ppfifo_clk     (clk_62p5             ),
+  .i_ppfifo_rdy     (d_out_rd_ready       ),
+  .o_ppfifo_act     (d_out_rd_activate    ),
+  .i_ppfifo_size    (d_out_rd_size        ),
+  .i_ppfifo_data    (d_out_rd_data        ),
+  .o_ppfifo_stb     (d_out_rd_stb         ),
 
   //AXI Stream Output
-  .o_axi_clk        (                 ),
-  .i_axi_ready      (d_out_axi_ready  ),
-  .o_axi_data       (d_out_axi_data   ),
-  .o_axi_keep       (d_out_axi_keep   ),
-  .o_axi_last       (d_out_axi_last   ),
-  .o_axi_valid      (d_out_axi_valid  )
+  .o_axi_clk        (                     ),
+  .i_axi_ready      (d_out_axi_ready      ),
+  .o_axi_data       (d_out_axi_data       ),
+  .o_axi_keep       (d_out_axi_keep       ),
+  .o_axi_last       (d_out_axi_last       ),
+  .o_axi_valid      (d_out_axi_valid      )
 );
 
 //asynchronous logic
 
-assign  axi_clk             = clk_62p5;
-assign  pcie_clk            = clk_62p5;
-
+assign  o_receive_axi_ready     = m_axis_rx_tready;
 
 //Map the PCIE to PPFIFO FIFO
 
-assign  m_axis_rx_tready  = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_in_axi_ready : d_in_axi_ready;
+always @ (*) begin
+  //If not select reset all to zeros
+  c_in_axi_valid          = 1'b0;
+  c_in_axi_data           = 32'h0;
+  c_in_axi_keep           = 3'b0;
+  c_in_axi_last           = 1'b0;
 
-assign  c_in_axi_data     = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? m_axis_rx_tdata: 32'h00000000;
-assign  d_in_axi_data     = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? m_axis_rx_tdata: 32'h00000000;
+  d_in_axi_valid          = 1'b0;
+  d_in_axi_data           = 32'h0;
+  d_in_axi_keep           = 3'b0;
+  d_in_axi_last           = 1'b0;
 
-assign  c_in_axi_keep     = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? m_axis_rx_tkeep: 32'h00000000;
-assign  d_in_axi_keep     = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? m_axis_rx_tkeep: 32'h00000000;
+  s_axis_tx_tvalid        = 1'b0;
+  s_axis_tx_tlast         = 1'b0;
+  s_axis_tx_tkeep         = 3'h0;
+  s_axis_tx_tdata         = 32'h0;
 
-assign  c_in_axi_last     = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? m_axis_rx_tlast: 32'h00000000;
-assign  d_in_axi_last     = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? m_axis_rx_tlast: 32'h00000000;
+  case (o_bar_hit)
+    CONTROL_SELECT: begin
+      //Ingress
+      m_axis_rx_tready    = c_in_axi_ready;
+      c_in_axi_valid      = m_axis_rx_tdata;
+      c_in_axi_data       = m_axis_rx_tdata;
+      c_in_axi_keep       = m_axis_rx_tkeep;
+      c_in_axi_last       = m_axis_rx_tlast;
 
-assign  c_in_axi_valid    = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? m_axis_rx_tvalid: 32'h00000000;
-assign  d_in_axi_valid    = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? m_axis_rx_tvalid: 32'h00000000;
+      //Egress
+      c_out_axi_ready     = s_axis_tx_tready;
+      s_axis_tx_tvalid    = c_out_axi_valid;
+      s_axis_tx_tlast     = c_out_axi_last;
+      s_axis_tx_tkeep     = c_out_axi_keep;
+      s_axis_tx_tdata     = c_out_axi_data;
+    end
+    DATA_SELECT: begin
+      //Ingress
+      m_axis_rx_tready    = d_in_axi_ready;
+      d_in_axi_valid      = m_axis_rx_tdata;
+      d_in_axi_data       = m_axis_rx_tdata;
+      d_in_axi_keep       = m_axis_rx_tkeep;
+      d_in_axi_last       = m_axis_rx_tlast;
 
-
-assign  c_out_axi_ready   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? s_axis_tx_tready: 32'h00000000;
-assign  d_out_axi_ready   = (cfg_function_number[0] == DATA_FUNCTION_ID)    ? s_axis_tx_tready: 32'h00000000;
-
-
-assign  s_axis_tx_tdata   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_out_axi_data  : d_out_axi_data;
-assign  s_axis_tx_tkeep   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_out_axi_keep  : d_out_axi_keep;
-assign  s_axis_tx_tlast   = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_out_axi_last  : d_out_axi_last;
-assign  s_axis_tx_tvalid  = (cfg_function_number[0] == CONTROL_FUNCTION_ID) ? c_out_axi_valid : d_out_axi_valid;
+      //Egress
+      d_out_axi_ready     = s_axis_tx_tready;
+      s_axis_tx_tvalid    = d_out_axi_valid;
+      s_axis_tx_tlast     = d_out_axi_last;
+      s_axis_tx_tkeep     = d_out_axi_keep;
+      s_axis_tx_tdata     = d_out_axi_data;
+    end
+    default: begin
+      m_axis_rx_tready    = 1'b0;
+      c_out_axi_ready     = 1'b0;
+      d_out_axi_ready     = 1'b0;
+    end
+  endcase
+end
 
 //synchronous logic
+
+//Strobe the cfg_enable whenever the pcie core relinquishes control
+assign  cfg_enable  =  read_bar_addr_stb;
+
 endmodule

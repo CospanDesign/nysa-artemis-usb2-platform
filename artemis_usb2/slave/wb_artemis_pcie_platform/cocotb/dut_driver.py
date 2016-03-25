@@ -37,15 +37,25 @@ TX_DIFF_CTRL                    =   6
 RX_EQUALIZER_CTRL               =   7
 LTSSM_STATE                     =   8
 TX_PRE_EMPH                     =   9
-DBG_DATA                        =   9
-CONFIG_COMMAND                  =   10
-CONFIG_STATUS                   =   11
-CONFIG_DCOMMAND                 =   12
-CONFIG_DSTATUS                  =   13
-CONFIG_LCOMMAND                 =   14
-CONFIG_LSTATUS                  =   15
-DBG_FLAGS                       =   16
-BAR_SELECT                      =   17
+DBG_DATA                        =   10
+CONFIG_COMMAND                  =   11
+CONFIG_STATUS                   =   12
+CONFIG_DCOMMAND                 =   13
+CONFIG_DSTATUS                  =   14
+CONFIG_LCOMMAND                 =   15
+CONFIG_LSTATUS                  =   16
+DBG_FLAGS                       =   17
+BAR_SELECT                      =   18
+BAR_ADDR0                       =   19
+BAR_ADDR1                       =   20
+BAR_ADDR2                       =   21
+BAR_ADDR3                       =   22
+BAR_ADDR4                       =   23
+BAR_ADDR5                       =   24
+
+BAR_ADDR_BASE                   =   19
+
+
 
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
@@ -54,6 +64,7 @@ CTRL_BIT_ENABLE_LOCAL_READ      =   3
 CTRL_BIT_ENABLE_EXT_RESET       =   4
 CTRL_BIT_MANUAL_USER_RESET      =   5
 CTRL_BIT_RESET_DBG_REGS         =   6
+CTRL_BIT_READ_BAR_ADDR_STB      =   7
 
 STS_BIT_PCIE_RESET              =   0
 STS_BIT_LINKUP                  =   1
@@ -73,6 +84,7 @@ STS_BIT_GTP_RESET_DONE          =   27
 STS_BIT_RX_ELEC_IDLE            =   28
 STS_BIT_CFG_TO_TURNOFF          =   29
 STS_BIT_PCIE_EXT_RESET          =   30
+STS_BIT_AXI_RECEIVE_READY       =   31
 
 
 DBG_CORRECTABLE                 =   0
@@ -153,13 +165,16 @@ class ArtemisPCIEDriver(driver.Driver):
         self.set_register_bit(CONTROL, CTRL_BIT_SEND_CONTROL_BLOCK)
 
     def cancel_block_send_from_local_buffer(self):
-        self.set_register_bit(CONTORL, CTRL_BIT_CANCEL_SEND_BLOCK)
+        self.set_register_bit(CONTROL, CTRL_BIT_CANCEL_SEND_BLOCK)
 
     def get_status(self):
         return self.read_register(STATUS)
 
     def is_pcie_reset(self):
         return self.is_register_bit_set(STATUS, STS_BIT_PCIE_RESET)
+
+    def is_axi_receive_ready(self):
+        return self.is_register_bit_set(STATUS, STS_BIT_AXI_RECEIVE_READY)
 
     def is_linkup(self):
         return self.is_register_bit_set(STATUS, STS_BIT_LINKUP)
@@ -407,4 +422,18 @@ class ArtemisPCIEDriver(driver.Driver):
         return self.enable_register_bit(CONTROL, CTRL_BIT_MANUAL_USER_RESET)
 
     def get_bar_select(self):
-        return self.read_register(BAR_SELECT);
+        return self.read_register(BAR_SELECT)
+
+    def get_num_block_reads(self):
+        return self.read_register(NUM_BLOCK_READ)
+
+    def get_bar_address(self, bar_index):
+        if bar_index > 5:
+            return 0
+        if bar_index < 0:
+            return 0
+        return self.read_register(BAR_ADDR_BASE + bar_index)
+
+
+    def get_config_data(self):
+        self.set_register_bit(CONTROL, CTRL_BIT_READ_BAR_ADDR_STB)

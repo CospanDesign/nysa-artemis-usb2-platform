@@ -196,6 +196,8 @@ module pcie_axi_bridge #(
   input       [9:0] cfg_dwaddr,
   input             cfg_rd_en,
 
+  output            user_enable_comm,
+
   // Configuration: Error
   input             cfg_err_ur,
   input             cfg_err_cor,
@@ -221,6 +223,7 @@ module pcie_axi_bridge #(
   output            cfg_to_turnoff,
   input             cfg_pm_wake,
 
+  //Core Controller
   // Configuration: System/Status
   output      [2:0] cfg_pcie_link_state,
   input             cfg_trn_pending,
@@ -253,7 +256,7 @@ module pcie_axi_bridge #(
   input   [2:0]     tx_pre_emphasis,
   output  [4:0]     cfg_ltssm_state,
 
-  output  [6:0]     o_bar_select,
+  output  [6:0]     o_bar_hit,
   output            dbg_reg_detected_correctable,
   output            dbg_reg_detected_fatal,
   output            dbg_reg_detected_non_fatal,
@@ -375,7 +378,7 @@ wire          cfg_link_control_extended_sync;
 wire          cfg_command_interrupt_disable;
 wire          cfg_command_serr_en;
 wire          cfg_command_bus_master_enable;
-wire          cfg_command_mem_enable;
+//wire          cfg_command_mem_enable;
 wire          cfg_command_io_enable;
 
 wire          cfg_dev_status_ur_detected;
@@ -545,9 +548,9 @@ pcie_bram_top_s6 #(
 //***************************************************************************
 // PCI Express GTA1_DUAL Wrapper Instance
 //***************************************************************************
-localparam GT_CLK25_DIVIDER  = (REF_CLK_FREQ == 0) ? 4 : 5;
-localparam GT_PLL_DIVSEL_FB  = (REF_CLK_FREQ == 0) ? 5 : 2;
-localparam GT_PLL_DIVSEL_REF = (REF_CLK_FREQ == 0) ? 2 : 1;
+localparam GT_CLK25_DIVIDER       = (REF_CLK_FREQ == 0) ? 4 : 5;
+localparam GT_PLL_DIVSEL_FB       = (REF_CLK_FREQ == 0) ? 5 : 2;
+localparam GT_PLL_DIVSEL_REF      = (REF_CLK_FREQ == 0) ? 2 : 1;
 
 GTPA1_DUAL_WRAPPER #(
   // Simulation attributes
@@ -706,58 +709,58 @@ axi_basic_top #(
 
 // TRN TX
 //-----------
-.trn_td                   (trn_td),             //  output
-.trn_tsof                 (trn_tsof),           //  output
-.trn_teof                 (trn_teof),           //  output
-.trn_tsrc_rdy             (trn_tsrc_rdy),       //  output
-.trn_tdst_rdy             (!trn_tdst_rdy_n),    //  input
-.trn_tsrc_dsc             (trn_tsrc_dsc),       //  output
-.trn_trem                 (),                   //  output
-.trn_terrfwd              (trn_terrfwd),        //  output
-.trn_tstr                 (trn_tstr),           //  output
-.trn_tbuf_av              (tx_buf_av),          //  input
-.trn_tecrc_gen            (),                   //  output
+.trn_td                   (trn_td              ), // output
+.trn_tsof                 (trn_tsof            ), // output
+.trn_teof                 (trn_teof            ), // output
+.trn_tsrc_rdy             (trn_tsrc_rdy        ), // output
+.trn_tdst_rdy             (!trn_tdst_rdy_n     ), // input
+.trn_tsrc_dsc             (trn_tsrc_dsc        ), // output
+.trn_trem                 (                    ), // output
+.trn_terrfwd              (trn_terrfwd         ), // output
+.trn_tstr                 (trn_tstr            ), // output
+.trn_tbuf_av              (tx_buf_av           ), // input
+.trn_tecrc_gen            (                    ), // output
 
 // TRN RX
 //-----------
-.trn_rd                   (trn_rd),             //  input
-.trn_rsof                 (!trn_rsof_n),        //  input
-.trn_reof                 (!trn_reof_n),        //  input
-.trn_rsrc_rdy             (!trn_rsrc_rdy_n),    //  input
-.trn_rdst_rdy             (trn_rdst_rdy),       //  output
-.trn_rsrc_dsc             (!trn_rsrc_dsc_n),    //  input
-.trn_rrem                 (1'b1),               //  input
-.trn_rerrfwd              (!trn_rerrfwd_n),     //  input
-.trn_rbar_hit             (~trn_rbar_hit_n),    //  input
-.trn_recrc_err            (1'b0),               //  input
+.trn_rd                   (trn_rd              ), // input
+.trn_rsof                 (!trn_rsof_n         ), // input
+.trn_reof                 (!trn_reof_n         ), // input
+.trn_rsrc_rdy             (!trn_rsrc_rdy_n     ), // input
+.trn_rdst_rdy             (trn_rdst_rdy        ), // output
+.trn_rsrc_dsc             (!trn_rsrc_dsc_n     ), // input
+.trn_rrem                 (1'b1                ), // input
+.trn_rerrfwd              (!trn_rerrfwd_n      ), // input
+.trn_rbar_hit             (~trn_rbar_hit_n     ), // input
+.trn_recrc_err            (1'b0                ), // input
 
 // TRN Misc.
 //-----------
-.trn_tcfg_req             (tx_cfg_req),         //  input
-.trn_tcfg_gnt             (trn_tcfg_gnt),       //  output
-.trn_lnk_up               (user_lnk_up),        //  input
+.trn_tcfg_req             (tx_cfg_req          ), // input
+.trn_tcfg_gnt             (trn_tcfg_gnt        ), // output
+.trn_lnk_up               (user_lnk_up         ), // input
 
 // Artix/Kintex/Virtex PM
 //-----------
-.cfg_pcie_link_state      (cfg_pcie_link_state),//  input
+.cfg_pcie_link_state      (cfg_pcie_link_state ), // input
 
 // Virtex6 PM
 //-----------
-.cfg_pm_send_pme_to       (1'b0),               //  input  NOT USED FOR EP
-.cfg_pmcsr_powerstate     (2'b00),              //  input
-.trn_rdllp_data           (32'h0),              //  input
-.trn_rdllp_src_rdy        (1'b0),               //  input
+.cfg_pm_send_pme_to       (1'b0                ), // input  NOT USED FOR EP
+.cfg_pmcsr_powerstate     (2'b00               ), // input
+.trn_rdllp_data           (32'h0               ), // input
+.trn_rdllp_src_rdy        (1'b0                ), // input
 
 // Power Mgmt for S6/V6
 //-----------
-.cfg_to_turnoff           (cfg_to_turnoff),     //  input
-.cfg_turnoff_ok           (cfg_turnoff_ok_w),   //  output
+.cfg_to_turnoff           (cfg_to_turnoff      ), // input
+.cfg_turnoff_ok           (cfg_turnoff_ok_w    ), // output
 
 // System
 //-----------
-.user_clk                 (user_clk_out),       //  input
-.user_rst                 (user_reset_out),     //  input
-.np_counter               ()                    //  output
+.user_clk                 (user_clk_out        ), // input
+.user_rst                 (user_reset_out      ), // input
+.np_counter               (                    )  // output
 );
 
 //***************************************************************************
@@ -858,8 +861,10 @@ PCIE_A1 #(
   .VC0_TOTAL_CREDITS_PD               (VC0_TOTAL_CREDITS_PD                     ),
   .VC0_TOTAL_CREDITS_PH               (VC0_TOTAL_CREDITS_PH                     ),
   .VC0_TX_LASTPACKET                  (VC0_TX_LASTPACKET                        )
+
 ) PCIE_A1 (
 
+  //Config Interface
   .CFGBUSNUMBER                       (cfg_bus_number                           ),
   .CFGCOMMANDBUSMASTERENABLE          (cfg_command_bus_master_enable            ),
   .CFGCOMMANDINTERRUPTDISABLE         (cfg_command_interrupt_disable            ),
@@ -923,6 +928,7 @@ PCIE_A1 #(
 
   .CLOCKLOCKED                        (clock_locked                             ),
 
+  //Debug
   .DBGBADDLLPSTATUS                   (dbg_bad_dllp_status                      ),
   .DBGBADTLPLCRC                      (dbg_bad_tlp_lcrc                         ),
   .DBGBADTLPSEQNUM                    (dbg_bad_tlp_seq_num                      ),
@@ -948,6 +954,7 @@ PCIE_A1 #(
   .DBGURUNSUPMSG                      (dbg_ur_unsup_msg                         ),
   .MGTCLK                             (mgt_clk                                  ),
 
+  //Local Block RAM Interface
   .MIMRXRADDR                         (mim_rx_raddr                             ),
   .MIMRXRDATA                         (mim_rx_rdata                             ),
   .MIMRXREN                           (mim_rx_ren                               ),
@@ -961,6 +968,7 @@ PCIE_A1 #(
   .MIMTXWDATA                         (mim_tx_wdata                             ),
   .MIMTXWEN                           (mim_tx_wen                               ),
 
+  //GTP Interface
   .PIPEGTPOWERDOWNA                   (pipe_gt_power_down_a                     ),
   .PIPEGTPOWERDOWNB                   (pipe_gt_power_down_b                     ),
   .PIPEGTRESETDONEA                   (pipe_gt_reset_done_a                     ),
@@ -994,6 +1002,7 @@ PCIE_A1 #(
 
   .RECEIVEDHOTRESET                   (received_hot_reset                       ),
 
+  //Flow Control
   .TRNFCCPLD                          (fc_cpld                                  ),
   .TRNFCCPLH                          (fc_cplh                                  ),
   .TRNFCNPD                           (fc_npd                                   ),
@@ -1001,29 +1010,38 @@ PCIE_A1 #(
   .TRNFCPD                            (fc_pd                                    ),
   .TRNFCPH                            (fc_ph                                    ),
   .TRNFCSEL                           (fc_sel                                   ),
+
+  //Link Up
   .TRNLNKUPN                          (user_lnk_up_w                            ),
+
+  //BAR Select
   .TRNRBARHITN                        (trn_rbar_hit_n                           ),
-  .TRNRD                              (trn_rd                                   ),
-  .TRNRDSTRDYN                        (!trn_rdst_rdy                            ),
+
+  //Receive Path
+  .TRNRSOFN                           (trn_rsof_n                               ),
   .TRNREOFN                           (trn_reof_n                               ),
+  .TRNRDSTRDYN                        (!trn_rdst_rdy                            ),
   .TRNRERRFWDN                        (trn_rerrfwd_n                            ),
   .TRNRNPOKN                          (!rx_np_ok                                ),
-  .TRNRSOFN                           (trn_rsof_n                               ),
   .TRNRSRCDSCN                        (trn_rsrc_dsc_n                           ),
   .TRNRSRCRDYN                        (trn_rsrc_rdy_n                           ),
+  .TRNRD                              (trn_rd                                   ),
+
+  //Transmit Path
   .TRNTBUFAV                          (tx_buf_av                                ),
   .TRNTCFGGNTN                        (!trn_tcfg_gnt                            ),
   .TRNTCFGREQN                        (trn_tcfg_req_n                           ),
-  .TRNTD                              (trn_td                                   ),
   .TRNTDSTRDYN                        (trn_tdst_rdy_n                           ),
   .TRNTEOFN                           (!trn_teof                                ),
   .TRNTERRDROPN                       (trn_terr_drop_n                          ),
   .TRNTERRFWDN                        (!trn_terrfwd                             ),
   .TRNTSOFN                           (!trn_tsof                                ),
   .TRNTSRCDSCN                        (!trn_tsrc_dsc                            ),
-  .TRNTSRCRDYN                        (!trn_tsrc_rdy                            ),
   .TRNTSTRN                           (!trn_tstr                                ),
+  .TRNTSRCRDYN                        (!trn_tsrc_rdy                            ),
+  .TRNTD                              (trn_td                                   ),
 
+  //System
   .SYSRESETN                          (sys_reset_n                              ),
   .USERCLK                            (user_clk_out                             ),
   .USERRSTN                           (user_reset_out_w                         )
@@ -1113,7 +1131,9 @@ assign      cfg_lcommand  = {8'h0,
                             1'b0,
                             cfg_link_control_aspm_control};
 
-assign      o_bar_select  = ~trn_rbar_hit_n;
+assign      o_bar_hit  = ~trn_rbar_hit_n;
+
+assign      user_enable_comm  = cfg_command_bus_master_enable;
 
 
 endmodule

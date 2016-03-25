@@ -169,41 +169,41 @@ module axi_basic_top #(
 //---------------------------------------------//
 
 axi_basic_rx #(
-  .C_DATA_WIDTH( C_DATA_WIDTH ),
-  .C_FAMILY( C_FAMILY ),
+  .C_DATA_WIDTH     (C_DATA_WIDTH     ),
+  .C_FAMILY         (C_FAMILY         ),
 
-  .TCQ( TCQ ),
-  .REM_WIDTH( REM_WIDTH ),
-  .STRB_WIDTH( STRB_WIDTH )
+  .TCQ              (TCQ              ),
+  .REM_WIDTH        (REM_WIDTH        ),
+  .STRB_WIDTH       (STRB_WIDTH       )
 ) rx_inst (
 
   // Outgoing AXI TX
   //-----------
-  .m_axis_rx_tdata( m_axis_rx_tdata ),
-  .m_axis_rx_tvalid( m_axis_rx_tvalid ),
-  .m_axis_rx_tready( m_axis_rx_tready ),
-  .m_axis_rx_tkeep( m_axis_rx_tkeep ),
-  .m_axis_rx_tlast( m_axis_rx_tlast ),
-  .m_axis_rx_tuser( m_axis_rx_tuser ),
+  .m_axis_rx_tdata  (m_axis_rx_tdata  ),
+  .m_axis_rx_tvalid (m_axis_rx_tvalid ),
+  .m_axis_rx_tready (m_axis_rx_tready ),
+  .m_axis_rx_tkeep  (m_axis_rx_tkeep  ),
+  .m_axis_rx_tlast  (m_axis_rx_tlast  ),
+  .m_axis_rx_tuser  (m_axis_rx_tuser  ),
 
   // Incoming TRN RX
   //-----------
-  .trn_rd( trn_rd ),
-  .trn_rsof( trn_rsof ),
-  .trn_reof( trn_reof ),
-  .trn_rsrc_rdy( trn_rsrc_rdy ),
-  .trn_rdst_rdy( trn_rdst_rdy ),
-  .trn_rsrc_dsc( trn_rsrc_dsc ),
-  .trn_rrem( trn_rrem ),
-  .trn_rerrfwd( trn_rerrfwd ),
-  .trn_rbar_hit( trn_rbar_hit ),
-  .trn_recrc_err( trn_recrc_err ),
+  .trn_rd           (trn_rd           ),
+  .trn_rsof         (trn_rsof         ),
+  .trn_reof         (trn_reof         ),
+  .trn_rsrc_rdy     (trn_rsrc_rdy     ),
+  .trn_rdst_rdy     (trn_rdst_rdy     ),
+  .trn_rsrc_dsc     (trn_rsrc_dsc     ),
+  .trn_rrem         (trn_rrem         ),
+  .trn_rerrfwd      (trn_rerrfwd      ),
+  .trn_rbar_hit     (trn_rbar_hit     ),
+  .trn_recrc_err    (trn_recrc_err    ),
 
   // System
   //-----------
-  .np_counter( np_counter ),
-  .user_clk( user_clk ),
-  .user_rst( user_rst )
+  .np_counter       (np_counter       ),
+  .user_clk         (user_clk         ),
+  .user_rst         (user_rst         )
 );
 
 

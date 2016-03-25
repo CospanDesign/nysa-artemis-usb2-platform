@@ -120,7 +120,7 @@ pcie_brams_s6 #(
   .RAM_RADDR_LATENCY(TL_TX_RAM_RADDR_LATENCY),
   .RAM_RDATA_LATENCY(TL_TX_RAM_RDATA_LATENCY),
   .RAM_WRITE_LATENCY(TL_TX_RAM_WRITE_LATENCY)
-)pcie_brams_tx (
+) pcie_brams_tx(
   .user_clk_i(user_clk_i),
   .reset_i(reset_i),
 

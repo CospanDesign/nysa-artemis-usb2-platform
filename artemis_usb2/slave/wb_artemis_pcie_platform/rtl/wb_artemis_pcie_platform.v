@@ -64,33 +64,35 @@ SOFTWARE.
 */
 `include "project_defines.v"
 
-`define CTRL_BIT_ENABLE             0
-`define CTRL_BIT_SEND_CONTROL_BLOCK 1
-`define CTRL_BIT_CANCEL_SEND_BLOCK  2
-`define CTRL_BIT_ENABLE_LOCAL_READ  3
-`define CTRL_BIT_ENABLE_EXT_RESET   4
-`define CTRL_BIT_MANUAL_USER_RESET  5
-`define CTRL_BIT_RESET_DBG_REGS     6
+`define CTRL_BIT_ENABLE               0
+`define CTRL_BIT_SEND_CONTROL_BLOCK   1
+`define CTRL_BIT_CANCEL_SEND_BLOCK    2
+`define CTRL_BIT_ENABLE_LOCAL_READ    3
+`define CTRL_BIT_ENABLE_EXT_RESET     4
+`define CTRL_BIT_MANUAL_USER_RESET    5
+`define CTRL_BIT_RESET_DBG_REGS       6
+`define CTRL_BIT_READ_BAR_ADDR_STB    7
 
-`define STS_BIT_PCIE_RESET          0
-`define STS_BIT_LINKUP              1
-`define STS_BIT_RECEIVED_HOT_RESET  2
-`define STS_BITS_PCIE_LINK_STATE    6:4
-`define STS_BITS_PCIE_BUS_NUM       15:8
-`define STS_BITS_PCIE_DEV_NUM       19:16
-`define STS_BITS_PCIE_FUNC_NUM      22:20
-`define STS_BITS_LOCAL_MEM_IDLE     24
-`define STS_BIT_GTP_PLL_LOCK_DETECT 25
-`define STS_BIT_PLL_LOCK_DETECT     26
-`define STS_BIT_GTP_RESET_DONE      27
-`define STS_BIT_RX_ELEC_IDLE        28
-`define STS_BIT_CFG_TO_TURNOFF      29
-`define STS_BIT_PCIE_EXT_RESET      30
+`define STS_BIT_PCIE_RESET            0
+`define STS_BIT_LINKUP                1
+`define STS_BIT_RECEIVED_HOT_RESET    2
+`define STS_BITS_PCIE_LINK_STATE      6:4
+`define STS_BITS_PCIE_BUS_NUM         15:8
+`define STS_BITS_PCIE_DEV_NUM         19:16
+`define STS_BITS_PCIE_FUNC_NUM        22:20
+`define STS_BITS_LOCAL_MEM_IDLE       24
+`define STS_BIT_GTP_PLL_LOCK_DETECT   25
+`define STS_BIT_PLL_LOCK_DETECT       26
+`define STS_BIT_GTP_RESET_DONE        27
+`define STS_BIT_RX_ELEC_IDLE          28
+`define STS_BIT_CFG_TO_TURNOFF        29
+`define STS_BIT_PCIE_EXT_RESET        30
+`define STS_BIT_AXI_RECEIVE_READY     31
 
-`define DBG_CORRECTABLE             0
-`define DBG_FATAL                   1
-`define DBG_NON_FATAL               2
-`define DBG_UNSUPPORTED             3
+`define DBG_CORRECTABLE               0
+`define DBG_FATAL                     1
+`define DBG_NON_FATAL                 2
+`define DBG_UNSUPPORTED               3
 
 `define DBG_BAD_DLLP_STATUS           0
 `define DBG_BAD_TLP_LCRC              1
@@ -117,7 +119,7 @@ SOFTWARE.
 
 
 module wb_artemis_pcie_platform #(
-  parameter           CONTROL_FIFO_DEPTH = 7,
+  parameter           CONTROL_FIFO_DEPTH = 9,
   parameter           DATA_FIFO_DEPTH = 9
 ) (
   input               clk,
@@ -169,22 +171,28 @@ localparam    TX_DIFF_CTRL        = 6;
 localparam    RX_EQUALIZER_CTRL   = 7;
 localparam    LTSSM_STATE         = 8;
 localparam    TX_PRE_EMPH         = 9;
-localparam    DBG_DATA            = 9;
-localparam    CONFIG_COMMAND      = 10;
-localparam    CONFIG_STATUS       = 11;
-localparam    CONFIG_DCOMMAND     = 12;
-localparam    CONFIG_DSTATUS      = 13;
-localparam    CONFIG_LCOMMAND     = 14;
-localparam    CONFIG_LSTATUS      = 15;
-localparam    DBG_FLAGS           = 16;
-localparam    BAR_SELECT          = 17;
+localparam    DBG_DATA            = 10;
+localparam    CONFIG_COMMAND      = 11;
+localparam    CONFIG_STATUS       = 12;
+localparam    CONFIG_DCOMMAND     = 13;
+localparam    CONFIG_DSTATUS      = 14;
+localparam    CONFIG_LCOMMAND     = 15;
+localparam    CONFIG_LSTATUS      = 16;
+localparam    DBG_FLAGS           = 17;
+localparam    BAR_SELECT          = 18;
+localparam    BAR_ADDR0           = 19;
+localparam    BAR_ADDR1           = 20;
+localparam    BAR_ADDR2           = 21;
+localparam    BAR_ADDR3           = 22;
+localparam    BAR_ADDR4           = 23;
+localparam    BAR_ADDR5           = 24;
 
 
 //Local Registers/Wires
 
 wire      [31:0]                 status;
 
-reg                              r_enable_pcie;
+reg                              r_enable_pcie = 1;
 //reg                              r_enable_ext_reset;
 //reg                              r_manual_pcie_reset;
 reg       [31:0]                 r_clock_1_sec;
@@ -207,10 +215,10 @@ wire      [11:0]                 fc_cpld;
 
 
 // Host (CFG) Interface
-wire      [31:0]                 cfg_do;
-wire                             cfg_rd_wr_done;
-wire      [9:0]                  cfg_dwaddr;
-wire                             cfg_rd_en;
+//wire      [31:0]                 cfg_do;
+//wire                             cfg_rd_wr_done;
+//wire      [9:0]                  cfg_dwaddr;
+//wire                             cfg_rd_en;
 
 // Configuration: Error
 wire                             cfg_err_ur;
@@ -254,7 +262,7 @@ wire      [15:0]                 cfg_lcommand;
 
 // System Interface
 wire                              pcie_reset;
-wire                              pcie_clk;
+wire                              clk_62p5;
 wire                              received_hot_reset;
 
 reg                               r_ppfifo_2_mem_en;
@@ -316,8 +324,6 @@ reg                               dbg_fatal;
 reg                               dbg_non_fatal;
 reg                               dbg_unsupported;
 
-
-
 wire                              dbg_bad_dllp_status;
 wire                              dbg_bad_tlp_lcrc;
 wire                              dbg_bad_tlp_seq_num;
@@ -360,8 +366,26 @@ reg                               r_dbg_ur_status;
 reg                               r_dbg_ur_unsup_msg;
 
 reg                               r_reset_dbg_regs;
-wire [6:0]                        w_bar_select;
+wire [6:0]                        w_bar_hit;
+wire                              w_receive_axi_ready;
 reg  [6:0]                        r_unrecognized_bar;
+
+wire                              w_rx_data_valid;
+
+reg  [6:0]                        r_bar_hit_temp;
+
+
+wire [31:0]                       w_bar_addr0;
+wire [31:0]                       w_bar_addr1;
+wire [31:0]                       w_bar_addr2;
+wire [31:0]                       w_bar_addr3;
+wire [31:0]                       w_bar_addr4;
+wire [31:0]                       w_bar_addr5;
+
+
+reg                               r_read_bar_addr_stb_a;
+wire                              w_read_bar_addr_stb;
+
 
 //Submodules
 artemis_pcie_interface #(
@@ -370,7 +394,8 @@ artemis_pcie_interface #(
   .SERIAL_NUMBER                     (64'h000000000000C594         )
 )api (
   .clk                               (clk                          ),
-  .rst                               (rst || !r_enable_pcie || !i_pcie_reset_n ),
+  //.rst                               (rst || !r_enable_pcie || !i_pcie_reset_n ),
+  .rst                               (!r_enable_pcie || !i_pcie_reset_n ),
 
   .gtp_clk_p                         (i_clk_100mhz_gtp_p           ),
   .gtp_clk_n                         (i_clk_100mhz_gtp_n           ),
@@ -381,7 +406,7 @@ artemis_pcie_interface #(
 
   // Transaction (TRN) Interface
   .user_lnk_up                       (user_lnk_up                  ),
-  .pcie_clk                          (pcie_clk                     ),
+  .clk_62p5                          (clk_62p5                     ),
 
   // Flow Control
   .fc_sel                            (fc_sel                       ),
@@ -392,11 +417,20 @@ artemis_pcie_interface #(
   .fc_cplh                           (fc_cplh                      ),
   .fc_cpld                           (fc_cpld                      ),
 
+  .o_bar_addr0                       (w_bar_addr0                  ),
+  .o_bar_addr1                       (w_bar_addr1                  ),
+  .o_bar_addr2                       (w_bar_addr2                  ),
+  .o_bar_addr3                       (w_bar_addr3                  ),
+  .o_bar_addr4                       (w_bar_addr4                  ),
+  .o_bar_addr5                       (w_bar_addr5                  ),
+
+
+  .read_bar_addr_stb                 (w_read_bar_addr_stb          ),
   // Host (CFG) Interface
-  .cfg_do                            (cfg_do                       ),
-  .cfg_rd_wr_done                    (cfg_rd_wr_done               ),
-  .cfg_dwaddr                        (cfg_dwaddr                   ),
-  .cfg_rd_en                         (cfg_rd_en                    ),
+  //.cfg_do                            (cfg_do                       ),
+  //.cfg_rd_wr_done                    (cfg_rd_wr_done               ),
+  //.cfg_dwaddr                        (cfg_dwaddr                   ),
+  //.cfg_rd_en                         (cfg_rd_en                    ),
 
   // Configuration: Error
   .cfg_err_ur                        (cfg_err_ur                   ),
@@ -474,10 +508,9 @@ artemis_pcie_interface #(
   .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
   .cfg_ltssm_state                   (cfg_ltssm_state              ),
 
-
-
   //Debug Info
-  .o_bar_select                      (w_bar_select                 ),
+  .o_bar_hit                         (w_bar_hit                 ),
+  .o_receive_axi_ready               (w_receive_axi_ready          ),
 
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
   .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
@@ -519,13 +552,11 @@ adapter_dpb_ppfifo #(
   .o_num_reads                        (w_num_reads            ),
   .o_idle                             (w_idle                 ),
 
-
   .i_bram_we                          (r_lcl_mem_we           ),
   .i_bram_addr                        (w_lcl_mem_addr         ),
   .i_bram_din                         (r_lcl_mem_din          ),
   .o_bram_dout                        (w_lcl_mem_dout         ),
   .o_bram_valid                       (w_lcl_mem_valid        ),
-
 
   .ppfifo_clk                         (clk                    ),
 
@@ -540,34 +571,41 @@ adapter_dpb_ppfifo #(
   .i_read_size                        (w_cmd_in_rd_size       ),
   .i_read_data                        (w_cmd_in_rd_data       ),
   .o_read_stb                         (w_cmd_in_rd_stb        )
-
-
 );
 
-cross_clock_strobe clk_stb(
+cross_clock_strobe clk_stb (
   .rst                                (rst                    ),
   .in_clk                             (clk                    ),
   .in_stb                             (r_1sec_stb_100mhz      ),
 
-  .out_clk                            (pcie_clk               ),
+  .out_clk                            (clk_62p5               ),
   .out_stb                            (w_1sec_stb_65mhz       )
 );
 
-cross_clock_strobe clear_stb(
+cross_clock_strobe clear_stb (
   .rst                                (rst                    ),
   .in_clk                             (clk                    ),
   .in_stb                             (r_reset_dbg_regs       ),
 
-  .out_clk                            (pcie_clk               ),
+  .out_clk                            (clk_62p5               ),
   .out_stb                            (w_reset_strobes        )
+);
+
+cross_clock_strobe read_bar_stb (
+  .rst                                (rst                    ),
+  .in_clk                             (clk                    ),
+  .in_stb                             (r_read_bar_addr_stb_a  ),
+
+  .out_clk                            (clk_62p5               ),
+  .out_stb                            (w_read_bar_addr_stb    )
 );
 
 
 //Asynchronous Logic
 assign  fc_sel                 = 3'h0;
 
-assign  cfg_dwaddr             = 10'h0;
-assign  cfg_rd_en              = 1'b0;
+//assign  cfg_dwaddr             = 10'h0;
+//assign  cfg_rd_en              = 1'b0;
 
 assign  cfg_err_ur             = 0;
 assign  cfg_err_cor            = 0;
@@ -602,7 +640,7 @@ assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
 //assign  !i_pcie_reset_n          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
 //assign  !i_pcie_reset_n          = i_pcie_reset_n;
-assign  o_62p5_clk              = pcie_clk;
+assign  o_62p5_clk              = clk_62p5;
 
 assign  o_debug_data            = { dbg_reg_detected_correctable,
                                     dbg_reg_detected_fatal,
@@ -633,10 +671,10 @@ assign  o_debug_data            = { dbg_reg_detected_correctable,
                                     cfg_ltssm_state};
 //Synchronous Logic
 
-always @ (posedge pcie_clk) begin
+always @ (posedge clk_62p5) begin
   if (!i_pcie_reset_n) begin
-    r_clock_1_sec                <=  0;
-    r_clock_count                <=  0;
+    r_clock_1_sec                <= 0;
+    r_clock_count                <= 0;
 
     dbg_correctable              <= 0;
     dbg_fatal                    <= 0;
@@ -755,7 +793,7 @@ always @ (posedge pcie_clk) begin
     end
     if (dbg_ur_no_bar_hit) begin
       r_dbg_ur_no_bar_hit          <= 1;
-      r_unrecognized_bar           <= w_bar_select;
+      r_unrecognized_bar           <= w_bar_hit;
 
     end
     if (dbg_ur_pois_cfg_wr) begin
@@ -812,6 +850,7 @@ always @ (posedge clk) begin
 
   //THis might need to be moved into the 62.5MHz clock
   r_cfg_trn_pending             <=  0;
+  r_read_bar_addr_stb_a         <=  0;
 
   if (rst) begin
     o_wbs_dat                   <=  32'h0;
@@ -828,8 +867,13 @@ always @ (posedge clk) begin
     r_rx_equalizer_ctrl         <=  2'b11;
     r_tx_diff_ctrl              <=  4'b1001;
     r_tx_pre_emphasis           <=  3'b00;
+
+    r_bar_hit_temp              <=  0;
   end
   else begin
+    if ((r_bar_hit_temp == 0) && (w_bar_hit != 0)) begin
+      r_bar_hit_temp           <= w_bar_hit;
+    end
     //when the master acks our ack, then put our ack down
     if (o_wbs_ack && ~i_wbs_stb)begin
       o_wbs_ack <= 0;
@@ -850,6 +894,7 @@ always @ (posedge clk) begin
               r_reset_dbg_regs    <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
               //r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
               //r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
+              r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
 
             end
             TX_DIFF_CTRL: begin
@@ -895,6 +940,7 @@ always @ (posedge clk) begin
               o_wbs_dat[`STS_BIT_RX_ELEC_IDLE]        <=  rx_elec_idle;
               o_wbs_dat[`STS_BIT_CFG_TO_TURNOFF]      <=  cfg_to_turnoff;
               o_wbs_dat[`STS_BIT_PCIE_EXT_RESET]      <=  !i_pcie_reset_n;
+              o_wbs_dat[`STS_BIT_AXI_RECEIVE_READY]   <=  w_receive_axi_ready;
             end
             NUM_BLOCK_READ: begin
               o_wbs_dat <= w_num_reads;
@@ -978,7 +1024,27 @@ always @ (posedge clk) begin
               o_wbs_dat[`DBG_UR_UNSUP_MSG             ] <=  r_dbg_ur_unsup_msg;
             end
             BAR_SELECT: begin
-              o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};
+              //o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};
+              o_wbs_dat                         <=  {25'h0, r_bar_hit_temp};
+              r_bar_hit_temp                    <=  0;
+            end
+            BAR_ADDR0: begin
+              o_wbs_dat                         <=  w_bar_addr0;
+            end
+            BAR_ADDR1: begin
+              o_wbs_dat                         <=  w_bar_addr1;
+            end
+            BAR_ADDR2: begin
+              o_wbs_dat                         <=  w_bar_addr2;
+            end
+            BAR_ADDR3: begin
+              o_wbs_dat                         <=  w_bar_addr3;
+            end
+            BAR_ADDR4: begin
+              o_wbs_dat                         <=  w_bar_addr4;
+            end
+            BAR_ADDR5: begin
+              o_wbs_dat                         <=  w_bar_addr5;
             end
             default: begin
               if (w_lcl_mem_en) begin

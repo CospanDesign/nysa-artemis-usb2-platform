@@ -42,6 +42,8 @@ reg               r_ih_reset;
 reg               w_clk_100mhz_clk_p;
 reg               w_clk_100mhz_clk_n;
 
+reg               r_pcie_reset_n    = 0;
+
 
 //There is a bug in COCOTB when stiumlating a signal, sometimes it can be corrupted if not registered
 always @ (*) r_rst           = rst;
@@ -182,8 +184,10 @@ wb_artemis_pcie_platform s1 (
   .clk                  (clk                  ),
   .rst                  (r_rst                ),
 
-  .clk_100mhz_gtp_p     (w_clk_100mhz_clk_p   ),
-  .clk_100mhz_gtp_n     (w_clk_100mhz_clk_n   ),
+  .i_clk_100mhz_gtp_p   (w_clk_100mhz_clk_p   ),
+  .i_clk_100mhz_gtp_n   (w_clk_100mhz_clk_n   ),
+
+  .i_pcie_reset_n       (r_pcie_reset_n       ),
 
   .i_wbs_we             (w_wbs1_we            ),
   .i_wbs_sel            (4'b1111              ),
@@ -352,6 +356,15 @@ assign  mem_o_dat               = 0;
 initial begin
   $dumpfile ("design.vcd");
   $dumpvars(0, tb_cocotb);
+end
+
+always @ (posedge clk) begin
+  if (r_rst) begin
+    r_pcie_reset_n  <=  0;
+  end
+  else begin
+    r_pcie_reset_n  <=  1;
+  end
 end
 
 endmodule

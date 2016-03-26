@@ -54,7 +54,7 @@ enum  {
 };
 
 //semaphores
-struct semaphore gSem[NUM_SEMS];
+struct semaphore pcie_semaphore[NUM_SEMS];
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -76,21 +76,21 @@ MODULE_LICENSE("Dual BSD/GPL");
 //Status Flags:
 //       1 = Resouce successfully acquired
 //       0 = Resource not acquired.
-#define HAVE_REGION 0x01               // I/O Memory region
-#define HAVE_IRQ    0x02               // Interupt
-#define HAVE_KREG   0x04               // Kernel registration
+#define HAVE_REGION 0x01                    // I/O Memory region
+#define HAVE_IRQ    0x02                    // Interupt
+#define HAVE_KREG   0x04                    // Kernel registration
 
-int             MAJOR = 240;      // Major number not dynamic.
-unsigned int    STAT_FLAGS = 0x00;     // Status flags used for cleanup.
-unsigned long   BAR_LEN;              // Base register address Length
-unsigned long   BAR_HDWR_ADDR;             // Base register address (Hardware address)
-void           *BAR_VIRT_ADDR = NULL;      // Base register address (Virtual address, for I/O).
-char            DRIVER_NAME[]= "xpcie";   // Name of driver in proc.
-struct pci_dev *DEVICE = NULL;           // PCI device structure.
-int             IRQ;                  // IRQ assigned by PCI system.
-char           *BUFFER_UNALIGNED = NULL;   // Pointer to Unaligned DMA buffer.
-char           *READ_BUFFER      = NULL;   // Pointer to dword aligned DMA buffer.
-char           *WRITE_BUFFER     = NULL;   // Pointer to dword aligned DMA buffer.
+int             MAJOR             = 240;    // Major number not dynamic.
+unsigned int    STAT_FLAGS        = 0x00;   // Status flags used for cleanup.
+unsigned long   BAR_LEN;                    // Base register address Length
+unsigned long   BAR_HDWR_ADDR;              // Base register address (Hardware address)
+void           *BAR_VIRT_ADDR     = NULL;   // Base register address (Virtual address, for I/O).
+char            DRIVER_NAME[]     = "xpcie";// Name of driver in proc.
+struct pci_dev *DEVICE            = NULL;   // PCI device structure.
+int             IRQ;                        // IRQ assigned by PCI system.
+char           *BUFFER_UNALIGNED  = NULL;   // Pointer to Unaligned DMA buffer.
+char           *READ_BUFFER       = NULL;   // Pointer to dword aligned DMA buffer.
+char           *WRITE_BUFFER      = NULL;   // Pointer to dword aligned DMA buffer.
 
 ssize_t xpcie_write_mem(const char *buf, size_t count);
 ssize_t* xpcie_read_mem(char *buf, size_t count);
@@ -168,28 +168,15 @@ ssize_t xpcie_write(struct file *filp, const char *buf, size_t count,
                        loff_t *f_pos){
 	int ret = SUCCESS;
   u32 value;
-  unsigned int i;
-  size_t addr;
+  u8 kernel_buf[512];
+  copy_from_user(kernel_buf, buf, count);
 
-  value = (buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + (buf[3]);
+  value = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2] << 8) | (kernel_buf[3]);
+  //value = (buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + (buf[3]);
 	printk("%s: xpcie_write: Attempt to write 0x%08X to %zX with offset %zX...\n", DRIVER_NAME, value, (size_t) BAR_VIRT_ADDR, (size_t) *f_pos);
 
-  //if (count > 4) {
-  //  xpcie_write_mem(buf, count);
-  //}
-  //else {
-		//memcpy((char *)BAR_VIRT_ADDR, buf, count);
-    //for (i = 0; i < count + 3; i = i + 4){
-  i = 0;
-  value = (buf[i] << 24) + (buf[i + 1] << 16) + (buf[i + 2] << 8) + (buf[i + 3]);
-  //writel(value, ((long long int) BAR_VIRT_ADDR) + (f_pos + i / 4));
-	memcpy(BAR_VIRT_ADDR, &buf[i], 4);
-  //addr = (size_t)(BAR_VIRT_ADDR + 0);
-  //writeb(value, (void*) addr + 1);
-  //writel (value, ((void *)BAR_VIRT_ADDR));
-  //writel (value, ((void *)BAR_HDWR_ADDR));
-    //}
-  //}
+	memcpy(BAR_VIRT_ADDR, &buf[0], 4);
+  //iowrite32(value, BAR_VIRT_ADDR);
 
 	printk("%s: xpcie_write: %zu bytes have been written to %zX...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
 	return (ret);
@@ -250,7 +237,6 @@ static int xpcie_init(void)
     int result = -1;
 
     //Configure the Kernel Side
-
     DEVICE = pci_get_device (PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_XILINX_PCIE, DEVICE);
     if (NULL == DEVICE) {
         printk("%s: Init: Hardware not found.\n", DRIVER_NAME);
@@ -443,7 +429,7 @@ ssize_t* xpcie_read_mem(char *buf, size_t count)
       goto exit;
     }
 
-    down(&gSem[SEM_DMA]);
+    down(&pcie_semaphore[SEM_DMA]);
 
     // pci_map_single return the physical address corresponding to
     // the virtual address passed to it as the 2nd parameter
@@ -466,7 +452,7 @@ ssize_t* xpcie_read_mem(char *buf, size_t count)
     // Unmap the DMA buffer so it is safe for normal access again.
     pci_unmap_single(DEVICE, dma_addr, BUF_SIZE, PCI_DMA_FROMDEVICE);
 
-    up(&gSem[SEM_DMA]);
+    up(&pcie_semaphore[SEM_DMA]);
 
     // Now it is safe to copy the data to user space.
     if ( copy_to_user(buf, READ_BUFFER, BUF_SIZE) )  {
@@ -500,7 +486,7 @@ ssize_t xpcie_write_mem(const char *buf, size_t count)
     printk ("%s: xpcie_write_mem: Try and get the Semaphore\n", DRIVER_NAME);
 
     //set DMA semaphore if in loopback
-    down(&gSem[SEM_DMA]);
+    down(&pcie_semaphore[SEM_DMA]);
 
     printk ("%s: xpcie_write_mem: Got the Semaphore\n", DRIVER_NAME);
 
@@ -523,7 +509,7 @@ ssize_t xpcie_write_mem(const char *buf, size_t count)
 
     // Unmap the DMA buffer so it is safe for normal access again.
     pci_unmap_single(DEVICE, dma_addr, BUF_SIZE, PCI_DMA_FROMDEVICE);
-    up(&gSem[SEM_DMA]);
+    up(&pcie_semaphore[SEM_DMA]);
 
     exit:
       return (ret);

@@ -190,9 +190,9 @@ localparam      CONTROL_FIFO_SIZE     = (2 ** CONTROL_FIFO_DEPTH);
 localparam      DATA_FIFO_SIZE        = (2 ** DATA_FIFO_DEPTH);
 
 
-localparam      CONFIG_SELECT    = 2'b00;
-localparam      CONTROL_SELECT   = 2'b01;
-localparam      DATA_SELECT      = 2'b10;
+localparam      CONTROL_SELECT   = 0;
+localparam      DATA_SELECT      = 1;
+localparam      DMA_SELECT       = 2;
 //registes/wires
 
 
@@ -227,12 +227,12 @@ wire  [31:0]                d_out_rd_data;
 
 //Control Signals
 wire                        c_in_axi_ready;
-reg           [31:0]        c_in_axi_data;
-reg           [3:0]         c_in_axi_keep;
-reg                         c_in_axi_last;
-reg                         c_in_axi_valid;
+wire          [31:0]        c_in_axi_data;
+wire          [3:0]         c_in_axi_keep;
+wire                        c_in_axi_last;
+wire                        c_in_axi_valid;
 
-reg                         c_out_axi_ready;
+wire                        c_out_axi_ready;
 wire          [31:0]        c_out_axi_data;
 wire          [3:0]         c_out_axi_keep;
 wire                        c_out_axi_last;
@@ -241,30 +241,45 @@ wire                        c_out_axi_valid;
 
 //Data Signals
 wire                        d_in_axi_ready;
-reg           [31:0]        d_in_axi_data;
-reg           [3:0]         d_in_axi_keep;
-reg                         d_in_axi_last;
-reg                         d_in_axi_valid;
+wire          [31:0]        d_in_axi_data;
+wire          [3:0]         d_in_axi_keep;
+wire                        d_in_axi_last;
+wire                        d_in_axi_valid;
 
-reg                         d_out_axi_ready;
+wire                        d_out_axi_ready;
 wire          [31:0]        d_out_axi_data;
 wire          [3:0]         d_out_axi_keep;
 wire                        d_out_axi_last;
 wire                        d_out_axi_valid;
 
+//Control Signals
+wire                        dma_in_axi_ready;
+wire          [31:0]        dma_in_axi_data;
+wire          [3:0]         dma_in_axi_keep;
+wire                        dma_in_axi_last;
+wire                        dma_in_axi_valid;
+
+wire                        dma_out_axi_ready;
+wire          [31:0]        dma_out_axi_data;
+wire          [3:0]         dma_out_axi_keep;
+wire                        dma_out_axi_last;
+wire                        dma_out_axi_valid;
+
+
+
 wire          [31:0]        m_axis_rx_tdata;
 wire          [3:0]         m_axis_rx_tkeep;
 wire                        m_axis_rx_tlast;
 wire                        m_axis_rx_tvalid;
-reg                         m_axis_rx_tready;
+wire                        m_axis_rx_tready;
 wire          [21:0]        m_axis_rx_tuser;
 
 wire                        s_axis_tx_tready;
-reg           [31:0]        s_axis_tx_tdata;
-reg           [3:0]         s_axis_tx_tkeep;
+wire          [31:0]        s_axis_tx_tdata;
+wire          [3:0]         s_axis_tx_tkeep;
 wire          [3:0]         s_axis_tx_tuser;
-reg                         s_axis_tx_tlast;
-reg                         s_axis_tx_tvalid;
+wire                        s_axis_tx_tlast;
+wire                        s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
 //assign                      s_axis_tx_tuser = 0;
@@ -669,62 +684,53 @@ assign  o_receive_axi_ready     = m_axis_rx_tready;
 
 //Map the PCIE to PPFIFO FIFO
 
-always @ (*) begin
-  //If not select reset all to zeros
-  c_in_axi_valid          = 1'b0;
-  c_in_axi_data           = 32'h0;
-  c_in_axi_keep           = 3'b0;
-  c_in_axi_last           = 1'b0;
+assign  c_in_axi_data     = m_axis_rx_tdata;
+assign  d_in_axi_data     = m_axis_rx_tdata;
+assign  dma_in_axi_data   = m_axis_rx_tdata;
 
-  d_in_axi_valid          = 1'b0;
-  d_in_axi_data           = 32'h0;
-  d_in_axi_keep           = 3'b0;
-  d_in_axi_last           = 1'b0;
+assign  c_in_axi_keep     = m_axis_rx_tkeep;
+assign  d_in_axi_keep     = m_axis_rx_tkeep;
+assign  dma_in_axi_keep   = m_axis_rx_tkeep;
 
-  s_axis_tx_tvalid        = 1'b0;
-  s_axis_tx_tlast         = 1'b0;
-  s_axis_tx_tkeep         = 3'h0;
-  s_axis_tx_tdata         = 32'h0;
+assign  c_in_axi_last     = m_axis_rx_tlast;
+assign  d_in_axi_last     = m_axis_rx_tlast;
+assign  dma_in_axi_last   = m_axis_rx_tlast;
 
-  case (o_bar_hit)
-    CONTROL_SELECT: begin
-      //Ingress
-      m_axis_rx_tready    = c_in_axi_ready;
-      c_in_axi_valid      = m_axis_rx_tdata;
-      c_in_axi_data       = m_axis_rx_tdata;
-      c_in_axi_keep       = m_axis_rx_tkeep;
-      c_in_axi_last       = m_axis_rx_tlast;
+assign  c_in_axi_valid    = o_bar_hit[CONTROL_SELECT] ? m_axis_rx_tvalid: 1'b0;
+assign  d_in_axi_valid    = o_bar_hit[DATA_SELECT]    ? m_axis_rx_tvalid: 1'b0;
+assign  dma_in_axi_valid  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tvalid: 1'b0;
 
-      //Egress
-      c_out_axi_ready     = s_axis_tx_tready;
-      s_axis_tx_tvalid    = c_out_axi_valid;
-      s_axis_tx_tlast     = c_out_axi_last;
-      s_axis_tx_tkeep     = c_out_axi_keep;
-      s_axis_tx_tdata     = c_out_axi_data;
-    end
-    DATA_SELECT: begin
-      //Ingress
-      m_axis_rx_tready    = d_in_axi_ready;
-      d_in_axi_valid      = m_axis_rx_tdata;
-      d_in_axi_data       = m_axis_rx_tdata;
-      d_in_axi_keep       = m_axis_rx_tkeep;
-      d_in_axi_last       = m_axis_rx_tlast;
+assign  c_out_axi_ready   = o_bar_hit[CONTROL_SELECT] ? s_axis_tx_tready: 1'b0;
+assign  d_out_axi_ready   = o_bar_hit[DATA_SELECT]    ? s_axis_tx_tready: 1'b0;
+assign  dma_in_axi_ready  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tready: 1'b0;
 
-      //Egress
-      d_out_axi_ready     = s_axis_tx_tready;
-      s_axis_tx_tvalid    = d_out_axi_valid;
-      s_axis_tx_tlast     = d_out_axi_last;
-      s_axis_tx_tkeep     = d_out_axi_keep;
-      s_axis_tx_tdata     = d_out_axi_data;
-    end
-    default: begin
-      m_axis_rx_tready    = 1'b0;
-      c_out_axi_ready     = 1'b0;
-      d_out_axi_ready     = 1'b0;
-    end
-  endcase
-end
+//Many to one
+assign  m_axis_rx_tready  = o_bar_hit[CONTROL_SELECT] ? c_in_axi_ready  :
+                            o_bar_hit[DATA_SELECT]    ? d_in_axi_ready  :
+                            o_bar_hit[DMA_SELECT]     ? dma_in_axi_ready:
+                            1'b0;
 
+//Transmit Data (Many to one)
+assign  s_axis_tx_tdata   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_data  :
+                            o_bar_hit[DATA_SELECT]    ? d_out_axi_data  :
+                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_data:
+                            32'h0;
+
+assign  s_axis_tx_tkeep   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_keep  :
+                            o_bar_hit[DATA_SELECT]    ? d_out_axi_keep  :
+                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_keep:
+                            4'b0000;
+
+assign  s_axis_tx_tlast   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_last  :
+                            o_bar_hit[DATA_SELECT]    ? d_out_axi_last  :
+                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_last:
+                            1'b0;
+
+
+assign  s_axis_tx_tvalid  = o_bar_hit[CONTROL_SELECT] ? c_out_axi_valid :
+                            o_bar_hit[DATA_SELECT]    ? d_out_axi_valid :
+                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_valid :
+                            1'b0;
 //synchronous logic
 
 //Strobe the cfg_enable whenever the pcie core relinquishes control

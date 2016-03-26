@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/byteorder/generic.h>
 //#include <linux/pci-ats.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
@@ -93,7 +94,7 @@ char           *READ_BUFFER       = NULL;   // Pointer to dword aligned DMA buff
 char           *WRITE_BUFFER      = NULL;   // Pointer to dword aligned DMA buffer.
 
 ssize_t xpcie_write_mem(const char *buf, size_t count);
-ssize_t* xpcie_read_mem(char *buf, size_t count);
+ssize_t xpcie_read_mem(char *buf, size_t count);
 
 //-----------------------------------------------------------------------------
 // File Operations
@@ -169,14 +170,28 @@ ssize_t xpcie_write(struct file *filp, const char *buf, size_t count,
 	int ret = SUCCESS;
   u32 value;
   u8 kernel_buf[512];
+  u32 addr = 0;
   copy_from_user(kernel_buf, buf, count);
 
   value = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2] << 8) | (kernel_buf[3]);
   //value = (buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + (buf[3]);
 	printk("%s: xpcie_write: Attempt to write 0x%08X to %zX with offset %zX...\n", DRIVER_NAME, value, (size_t) BAR_VIRT_ADDR, (size_t) *f_pos);
 
-	memcpy(BAR_VIRT_ADDR, &buf[0], 4);
-  //iowrite32(value, BAR_VIRT_ADDR);
+	//memcpy(BAR_VIRT_ADDR, &buf[0], count);
+	//memcpy(BAR_VIRT_ADDR, &kernel_buf[0], count);
+	//memcpy(BAR_VIRT_ADDR, &buf[0], count);
+
+  //Data is written down a byte at a time
+  //memcpy(BAR_VIRT_ADDR, kernel_buf, count);
+
+  //*** When I use this the data is written down in the correct order!
+	//memcpy(BAR_VIRT_ADDR, &buf[0], 4);
+
+  //**** When I use this the data is written down in reverse order
+  //iowrite32(value, BAR_VIRT_ADDR + addr);
+  writel(cpu_to_be32(value), BAR_VIRT_ADDR + addr);
+
+  //xpcie_write_mem(buf, count);
 
 	printk("%s: xpcie_write: %zu bytes have been written to %zX...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
 	return (ret);
@@ -228,24 +243,27 @@ struct file_operations xpcie_intf = {
 //-----------------------------------------------------------------------------
 void    xpcie_irq_handler (int irq, void *dev_id, struct pt_regs *regs);
 void    initcode(void);
-u32     xpcie_readReg (u32 dw_offset);
-void    xpcie_writeReg (u32 dw_offset, u32 val);
+u32     xpcie_read_reg (u32 dw_offset);
+void    xpcie_write_reg (u32 dw_offset, u32 val);
 
 static int xpcie_init(void)
 {
 
-    int result = -1;
-
+    int result = 0;
+    int i = 0;
+    //Initialize Semaphors
+    for (i = 0; i < NUM_SEMS; i++){
+      sema_init(&pcie_semaphore[i], 1);
+    }
     //Configure the Kernel Side
     DEVICE = pci_get_device (PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_XILINX_PCIE, DEVICE);
     if (NULL == DEVICE) {
         printk("%s: Init: Hardware not found.\n", DRIVER_NAME);
-        return (-1);
+        return -1;
     }
-
     if (0 > pci_enable_device(DEVICE)) {
         printk("%s: Init: Device not enabled.\n", DRIVER_NAME);
-        return (-1);
+        return -1;
     }
     pci_enable_pcie_error_reporting(DEVICE);
     if (0 > pci_set_dma_mask(DEVICE, DMA_BIT_MASK(32))){
@@ -253,23 +271,19 @@ static int xpcie_init(void)
         return (-1);
     }
 
-    // Get Base Address of registers from pci structure. Should come from pci_dev
-    // structure, but that element seems to be missing on the development system.
+    //Get the start address of the control bar within io memory
     BAR_HDWR_ADDR = pci_resource_start (DEVICE, CONTROL_BAR);
     if (0 > BAR_HDWR_ADDR) {
         printk("%s: Init: Base Address not set.\n", DRIVER_NAME);
         return (-1);
     }
     printk("%s: Base hw val %X\n", DRIVER_NAME, (unsigned int)BAR_HDWR_ADDR);
-
+    //Get the length of the control bar
     BAR_LEN = pci_resource_len (DEVICE, CONTROL_BAR);
     printk("%s: Base hw len %d\n", DRIVER_NAME, (unsigned int)BAR_LEN);
 
-    // Remap the I/O register block so that it can be safely accessed.
-    // I/O register block starts at BAR_HDWR_ADDR and is 512 bytes long.
-    // It is cast to char because that is the way Linus does it.
-    // Reference "/usr/src/Linux-2.4/Documentation/IO-mapping.txt".
-
+    //Tell the processor translator to give us a reference to BAR in an accessable location
+    //  (within virtual memory)
     BAR_VIRT_ADDR = ioremap(BAR_HDWR_ADDR, BAR_LEN);
     if (!BAR_VIRT_ADDR) {
         printk("%s: Init: Could not remap memory.\n", DRIVER_NAME);
@@ -279,15 +293,16 @@ static int xpcie_init(void)
 
     // Get IRQ from pci_dev structure. It may have been remapped by the kernel,
     // and this value will be the correct one.
-
     IRQ = DEVICE->irq;
     printk("%s: irq: %d\n", DRIVER_NAME, IRQ);
 
-    //--- START: Initialize Hardware
+    //Allow the PCIE device to initiate transfers
     pci_set_master(DEVICE);
+    //Increase the sampling size of the device to 512 (Max)
     pcie_set_mps(DEVICE, 512);
 
-    if (request_mem_region(BAR_HDWR_ADDR, KINBURN_REGISTER_SIZE, DRIVER_NAME) == NULL) {
+    //Tell the kernel that we want to have access to this memory region (it does not allocate space!)
+    if (request_mem_region(BAR_HDWR_ADDR, BAR_LEN, DRIVER_NAME) == NULL) {
         printk("%s: Init: Memory in use.\n", DRIVER_NAME);
         return (-1);
     }
@@ -304,12 +319,6 @@ static int xpcie_init(void)
 #endif
 
     initcode();
-    //pci_enable_ats(DEVICE, BAR_HDWR_ADDR);
-
-    //--- END: Initialize Hardware
-
-    //--- START: Allocate Buffers
-
     BUFFER_UNALIGNED = kmalloc(BUF_SIZE, GFP_KERNEL);
 
     READ_BUFFER = BUFFER_UNALIGNED;
@@ -338,7 +347,7 @@ static int xpcie_init(void)
 
     printk("%s driver is loaded\n", DRIVER_NAME);
 
-  return 0;
+  return result;
 }
 
 static void xpcie_exit(void)
@@ -346,7 +355,7 @@ static void xpcie_exit(void)
 
   //pci_release_regions(DEVICE);
   if (STAT_FLAGS & HAVE_REGION) {
-     (void) release_mem_region(BAR_HDWR_ADDR, KINBURN_REGISTER_SIZE);}
+     (void) release_mem_region(BAR_HDWR_ADDR, BAR_LEN);}
 
     // Release IRQ
     if (STAT_FLAGS & HAVE_IRQ) {
@@ -400,7 +409,7 @@ void initcode(void)
 {
 }
 
-u32 xpcie_readReg (u32 dw_offset)
+u32 xpcie_read_reg (u32 dw_offset)
 {
         size_t ret = 0;
         size_t reg_addr = (size_t)(BAR_VIRT_ADDR + dw_offset);
@@ -410,13 +419,13 @@ u32 xpcie_readReg (u32 dw_offset)
         return ret;
 }
 
-void xpcie_writeReg (u32 dw_offset, u32 val)
+void xpcie_write_reg (u32 dw_offset, u32 val)
 {
         size_t reg_addr = (size_t)(BAR_VIRT_ADDR + dw_offset);
-        writeb(val, (void*)reg_addr);
+        writel(cpu_to_be32(val), (void*)reg_addr);
 }
 
-ssize_t* xpcie_read_mem(char *buf, size_t count)
+ssize_t xpcie_read_mem(char *buf, size_t count)
 {
 
     int ret = 0;
@@ -461,7 +470,10 @@ ssize_t* xpcie_read_mem(char *buf, size_t count)
         goto exit;
     }
     exit:
-      return ((ssize_t*)ret);
+      //return ((ssize_t*) ret);
+      //return ((ssize_t*) &BUF_SIZE);
+      return 0;
+    return 0;
 }
 
 ssize_t xpcie_write_mem(const char *buf, size_t count)
@@ -492,7 +504,7 @@ ssize_t xpcie_write_mem(const char *buf, size_t count)
 
     // pci_map_single return the physical address corresponding to
     // the virtual address passed to it as the 2nd parameter
-    dma_addr = pci_map_single(DEVICE, WRITE_BUFFER, BUF_SIZE, PCI_DMA_FROMDEVICE);
+    dma_addr = pci_map_single(DEVICE, WRITE_BUFFER, BUF_SIZE, PCI_DMA_TODEVICE);
     if ( 0 == dma_addr )  {
         printk("%s: xpcie_write_mem: Map error.\n",DRIVER_NAME);
         ret = -1;
@@ -508,7 +520,7 @@ ssize_t xpcie_write_mem(const char *buf, size_t count)
     printk("%s: xpcie_write_mem: WriteBuf Virt Addr = %zX Phy Addr = %zX.\n", DRIVER_NAME, (size_t)READ_BUFFER, (size_t)dma_addr);
 
     // Unmap the DMA buffer so it is safe for normal access again.
-    pci_unmap_single(DEVICE, dma_addr, BUF_SIZE, PCI_DMA_FROMDEVICE);
+    pci_unmap_single(DEVICE, dma_addr, BUF_SIZE, PCI_DMA_TODEVICE);
     up(&pcie_semaphore[SEM_DMA]);
 
     exit:

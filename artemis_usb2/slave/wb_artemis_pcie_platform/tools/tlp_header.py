@@ -37,7 +37,6 @@ LAST_BE = "last_be"
 HAS_DATA = "has_data"
 
 DESCRIPTION_DICT = {
-    ADDRESS:        "32-bit or 64-bit Address of data",
     DEVICE_NUM:     "Device index within PCI Bus",
     BUS_NUM:        "PCI Bus Number",
     FUNCTION_NUM:   "Function of the PCI Device",
@@ -162,6 +161,7 @@ TRANSFER_HEADER_FIELDS = [ADDRESS, BUS_NUM, DEVICE_NUM, FUNCTION_NUM, TAG, REQUE
 class TLPTransferHeader(TLPHeader):
     @staticmethod
     def get_fields():
+        fields =[]
         fields.extend(TLPHeader.get_fields())
         fields.extend(TRANSFER_HEADER_FIELDS)
         return fields
@@ -245,6 +245,7 @@ class TLPTransferHeader(TLPHeader):
             super(TLPTransferHeader, self).set_value(key, value)
         elif key in TRANSFER_HEADER_FIELDS:
             if key == ADDRESS:
+                print "Address: %d" % value
                 self.address = value
             if key == BUS_NUM:
                 self.bus_num = value

@@ -51,7 +51,8 @@ class TLPManager(object):
     def set_value(self, key, value):
         if key == "type":
             self.initialize(value)
-        elif key in get_fields(self.header.get_value("type")):
+        #elif key in get_fields(self.header.get_value("type")):
+        elif key in self.header.get_fields():
             self.header.set_value(key, value)
         else:
             raise AssertionError("Failed to find type: %s" % key)

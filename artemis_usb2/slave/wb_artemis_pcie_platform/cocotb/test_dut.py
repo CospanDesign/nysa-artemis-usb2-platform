@@ -62,10 +62,17 @@ def test_local_buffer(dut):
     c = CocotbPCIE(dut)
     tm = TLPManager()
     tm.set_value("type", "mwr")
+    tm.set_value("address", 0x00000008)
+    data_in = tm.generate_raw()
+    data_in.extend([0x00, 0x00, 0x00, 0x01])
+    print "TLP Packet:"
+    print_32bit_hex_array(data_in[0:16])
+
     #f = cocotb.fork(c.main_control())
     #Test Stuff
 
 
+    '''
     dut.log.info("Write to the local buffer")
     size = yield cocotb.external(driver.get_local_buffer_size)()
     data_out = Array("B")
@@ -95,25 +102,25 @@ def test_local_buffer(dut):
     yield (nysa.wait_clocks(100))
 
     dut.log.info("Enable PPFIFO 2 Local Memory")
+    '''
     yield cocotb.external(driver.enable_pcie_read_block)(True)
     yield (nysa.wait_clocks(10))
 
     #Wrote Data
     
-    w = cocotb.fork(c.send_PCIE_command(tm.generate_raw()))
+    w = cocotb.fork(c.send_PCIE_command(data_in))
     r = cocotb.fork(c.listen_for_comm())
 
-    yield (nysa.wait_clocks(10))
+    yield (nysa.wait_clocks(500))
     yield cocotb.external(driver.enable_pcie_read_block)(False)
     yield (nysa.wait_clocks(500))
-    data_in = yield cocotb.external(driver.read_local_buffer)()
-    print_32bit_hex_array(data_in[0:16])
 
     yield cocotb.external(driver.send_block_from_local_buffer)()
     yield (nysa.wait_clocks(1000))
-    data_out = c.get_read_data()
-    dut.log.info("Data out length: %d" % len(data_out))
-    print_32bit_hex_array(data_out[0:16])
+
+    #data_out = c.get_read_data()
+    #dut.log.info("Data out length: %d" % len(data_out))
+    #print_32bit_hex_array(data_out[0:16])
 
 @cocotb.test(skip = True)
 def test_local_buffer_to_pcie(dut):

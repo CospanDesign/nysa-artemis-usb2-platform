@@ -7,6 +7,6 @@
     <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.0">
       <skipped />
     </testcase>
-    <testcase classname="test_dut" name="test_local_buffer" time="1.4749269485473633" />
+    <testcase classname="test_dut" name="test_local_buffer" time="0.5532970428466797" />
   </testsuite>
 </testsuites>

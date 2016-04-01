@@ -55,10 +55,9 @@ module pcie_controller (
   output  reg [31:0]        o_status_addr,
   output  reg [31:0]        o_buffer_size,
   output  reg [31:0]        o_ping_value,
+  output  reg [31:0]        o_update_buf_status,
 
-  output      [31:0]        o_status,
-
-  output  reg [1:0]         o_dev_sel,
+  output  reg               o_reg_write_stb,
 
   //Control Interface
   output  reg [31:0]        o_dword_size,
@@ -145,6 +144,7 @@ localparam  CMD_SWAP                = 8'h12;
 localparam  CMD_COMPARE_AND_SWAP    = 8'h13;
 localparam  CMD_LPRF                = 8'h14;
 localparam  CMD_EPRF                = 8'h15;
+localparam  CMD_UNKNOWN             = 8'h16;
 
 
 //Write Transaction Type

@@ -57,4 +57,8 @@
 `define BAR_ADDR4 10'h020
 `define BAR_ADDR5 10'h024
 
+
+//Completer
+`define CMPLT_LOWER_ADDR_RANGE 6:0
+
 `endif //__PCIE_DEFINES__

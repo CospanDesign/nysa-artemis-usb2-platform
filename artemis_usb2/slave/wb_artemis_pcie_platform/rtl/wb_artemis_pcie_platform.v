@@ -203,7 +203,7 @@ reg       [31:0]                r_host_clock_count;
 reg                             r_1sec_stb_100mhz;
 wire                            w_1sec_stb_65mhz;
 reg                             r_irq_stb = 0;
-reg                             r_irq_channel;
+reg       [7:0]                 r_irq_channel;
 wire                            w_irq_stb;
 
 // Transaction (TRN) Interface
@@ -321,58 +321,6 @@ reg   [3:0]                       r_tx_diff_ctrl      = 4'h9;
 reg   [2:0]                       r_tx_pre_emphasis   = 3'b00;
 wire  [4:0]                       cfg_ltssm_state;
 
-wire                              dbg_reg_detected_correctable;
-wire                              dbg_reg_detected_fatal;
-wire                              dbg_reg_detected_non_fatal;
-wire                              dbg_reg_detected_unsupported;
-
-reg                               dbg_correctable;
-reg                               dbg_fatal;
-reg                               dbg_non_fatal;
-reg                               dbg_unsupported;
-
-wire                              dbg_bad_dllp_status;
-wire                              dbg_bad_tlp_lcrc;
-wire                              dbg_bad_tlp_seq_num;
-wire                              dbg_bad_tlp_status;
-wire                              dbg_dl_protocol_status;
-wire                              dbg_fc_protocol_err_status;
-wire                              dbg_mlfrmd_length;
-wire                              dbg_mlfrmd_mps;
-wire                              dbg_mlfrmd_tcvc;
-wire                              dbg_mlfrmd_tlp_status;
-wire                              dbg_mlfrmd_unrec_type;
-wire                              dbg_poistlpstatus;
-wire                              dbg_rcvr_overflow_status;
-wire                              dbg_rply_rollover_status;
-wire                              dbg_rply_timeout_status;
-wire                              dbg_ur_no_bar_hit;
-wire                              dbg_ur_pois_cfg_wr;
-wire                              dbg_ur_status;
-wire                              dbg_ur_unsup_msg;
-
-
-reg                               r_dbg_bad_dllp_status;
-reg                               r_dbg_bad_tlp_lcrc;
-reg                               r_dbg_bad_tlp_seq_num;
-reg                               r_dbg_bad_tlp_status;
-reg                               r_dbg_dl_protocol_status;
-reg                               r_dbg_fc_protocol_err_status;
-reg                               r_dbg_mlfrmd_length;
-reg                               r_dbg_mlfrmd_mps;
-reg                               r_dbg_mlfrmd_tcvc;
-reg                               r_dbg_mlfrmd_tlp_status;
-reg                               r_dbg_mlfrmd_unrec_type;
-reg                               r_dbg_poistlpstatus;
-reg                               r_dbg_rcvr_overflow_status;
-reg                               r_dbg_rply_rollover_status;
-reg                               r_dbg_rply_timeout_status;
-reg                               r_dbg_ur_no_bar_hit;
-reg                               r_dbg_ur_pois_cfg_wr;
-reg                               r_dbg_ur_status;
-reg                               r_dbg_ur_unsup_msg;
-
-reg                               r_reset_dbg_regs;
 wire [6:0]                        w_bar_hit;
 wire                              w_receive_axi_ready;
 reg  [6:0]                        r_unrecognized_bar;
@@ -521,34 +469,9 @@ artemis_pcie_interface #(
   .cfg_ltssm_state                   (cfg_ltssm_state              ),
 
   //Debug Info
-  .o_bar_hit                         (w_bar_hit                 ),
-  .o_receive_axi_ready               (w_receive_axi_ready          ),
+  .o_bar_hit                         (w_bar_hit                    ),
+  .o_receive_axi_ready               (w_receive_axi_ready          )
 
-  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
-  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
-  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal   ),
-  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported ),
-
-
-  .dbg_bad_dllp_status               (dbg_bad_dllp_status          ),
-  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc             ),
-  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num          ),
-  .dbg_bad_tlp_status                (dbg_bad_tlp_status           ),
-  .dbg_dl_protocol_status            (dbg_dl_protocol_status       ),
-  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status   ),
-  .dbg_mlfrmd_length                 (dbg_mlfrmd_length            ),
-  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps               ),
-  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc              ),
-  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status        ),
-  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type        ),
-  .dbg_poistlpstatus                 (dbg_poistlpstatus            ),
-  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status     ),
-  .dbg_rply_rollover_status          (dbg_rply_rollover_status     ),
-  .dbg_rply_timeout_status           (dbg_rply_timeout_status      ),
-  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit            ),
-  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr           ),
-  .dbg_ur_status                     (dbg_ur_status                ),
-  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg             )
 
 );
 
@@ -592,15 +515,6 @@ cross_clock_strobe clk_stb (
 
   .out_clk                            (clk_62p5               ),
   .out_stb                            (w_1sec_stb_65mhz       )
-);
-
-cross_clock_strobe clear_stb (
-  .rst                                (rst                    ),
-  .in_clk                             (clk                    ),
-  .in_stb                             (r_reset_dbg_regs       ),
-
-  .out_clk                            (clk_62p5               ),
-  .out_stb                            (w_reset_strobes        )
 );
 
 cross_clock_strobe read_bar_stb (
@@ -664,29 +578,7 @@ assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFS
 //assign  !i_pcie_reset_n          = i_pcie_reset_n;
 assign  o_62p5_clk              = clk_62p5;
 
-assign  o_debug_data            = { dbg_reg_detected_correctable,
-                                    dbg_reg_detected_fatal,
-                                    dbg_reg_detected_non_fatal,
-                                    dbg_reg_detected_unsupported,
-                                    dbg_bad_dllp_status,
-                                    dbg_bad_tlp_lcrc,
-                                    dbg_bad_tlp_seq_num,
-                                    dbg_bad_tlp_status,
-                                    dbg_dl_protocol_status,
-                                    dbg_fc_protocol_err_status,
-                                    dbg_mlfrmd_length,
-                                    dbg_mlfrmd_mps,
-                                    dbg_mlfrmd_tcvc,
-                                    dbg_mlfrmd_tlp_status,
-                                    dbg_mlfrmd_unrec_type,
-                                    dbg_poistlpstatus,
-                                    dbg_rcvr_overflow_status,
-                                    dbg_rply_rollover_status,
-                                    dbg_rply_timeout_status,
-                                    dbg_ur_no_bar_hit,
-                                    dbg_ur_pois_cfg_wr,
-                                    dbg_ur_status,
-                                    dbg_ur_unsup_msg,
+assign  o_debug_data            = { 26'h0,
                                     pll_lock_detect,
                                     pcie_reset,
                                     user_lnk_up,
@@ -698,34 +590,9 @@ always @ (posedge clk_62p5) begin
     r_clock_1_sec                <= 0;
     r_clock_count                <= 0;
 
-    dbg_correctable              <= 0;
-    dbg_fatal                    <= 0;
-    dbg_non_fatal                <= 0;
-    dbg_unsupported              <= 0;
-
     cfg_turnoff_ok               <= 0;
     trn_pending                  <= 0;
 
-    r_dbg_bad_dllp_status        <= 0;
-    r_dbg_bad_tlp_lcrc           <= 0;
-    r_dbg_bad_tlp_seq_num        <= 0;
-    r_dbg_bad_tlp_status         <= 0;
-    r_dbg_dl_protocol_status     <= 0;
-    r_dbg_fc_protocol_err_status <= 0;
-    r_dbg_mlfrmd_length          <= 0;
-    r_dbg_mlfrmd_mps             <= 0;
-    r_dbg_mlfrmd_tcvc            <= 0;
-    r_dbg_mlfrmd_tlp_status      <= 0;
-    r_dbg_mlfrmd_unrec_type      <= 0;
-    r_dbg_poistlpstatus          <= 0;
-    r_dbg_rcvr_overflow_status   <= 0;
-    r_dbg_rply_rollover_status   <= 0;
-    r_dbg_rply_timeout_status    <= 0;
-    r_dbg_ur_no_bar_hit          <= 0;
-    r_dbg_ur_pois_cfg_wr         <= 0;
-    r_dbg_ur_status              <= 0;
-    r_dbg_ur_unsup_msg           <= 0;
-    r_unrecognized_bar           <= 0;
 
   end
   else begin
@@ -733,19 +600,6 @@ always @ (posedge clk_62p5) begin
     if (w_1sec_stb_65mhz) begin
       r_clock_1_sec   <=  r_clock_count;
       r_clock_count   <=  0;
-    end
-
-    if (dbg_reg_detected_correctable) begin
-      dbg_correctable <= 1;
-    end
-    if (dbg_reg_detected_fatal) begin
-      dbg_fatal       <= 1;
-    end
-    if (dbg_reg_detected_non_fatal) begin
-      dbg_non_fatal   <= 1;
-    end
-    if (dbg_reg_detected_unsupported) begin
-      dbg_unsupported <= 1;
     end
 
     //Power Controller
@@ -756,107 +610,12 @@ always @ (posedge clk_62p5) begin
       cfg_turnoff_ok    <=  0;
     end
 
-    if (dbg_bad_dllp_status) begin
-      r_dbg_bad_dllp_status        <= 1;
-    end
-    if (dbg_bad_tlp_lcrc) begin
-      r_dbg_bad_tlp_lcrc           <= 1;
-    end
-    if (dbg_bad_tlp_seq_num) begin
-      r_dbg_bad_tlp_seq_num        <= 1;
 
-    end
-    if (dbg_bad_tlp_status) begin
-      r_dbg_bad_tlp_status         <= 1;
-
-    end
-    if (dbg_dl_protocol_status) begin
-      r_dbg_dl_protocol_status     <= 1;
-
-    end
-    if (dbg_fc_protocol_err_status) begin
-      r_dbg_fc_protocol_err_status <= 1;
-
-    end
-    if (dbg_mlfrmd_length) begin
-      r_dbg_mlfrmd_length          <= 1;
-
-    end
-    if (dbg_mlfrmd_mps) begin
-      r_dbg_mlfrmd_mps             <= 1;
-
-    end
-    if (dbg_mlfrmd_tcvc) begin
-      r_dbg_mlfrmd_tcvc            <= 1;
-
-    end
-    if (dbg_mlfrmd_tlp_status) begin
-      r_dbg_mlfrmd_tlp_status      <= 1;
-    end
-    if (dbg_mlfrmd_unrec_type) begin
-      r_dbg_mlfrmd_unrec_type      <= 1;
-
-    end
-    if (dbg_poistlpstatus) begin
-      r_dbg_poistlpstatus          <= 1;
-
-    end
-    if (dbg_rcvr_overflow_status) begin
-      r_dbg_rcvr_overflow_status   <= 1;
-
-    end
-    if (dbg_rply_rollover_status) begin
-      r_dbg_rply_rollover_status   <= 1;
-
-    end
-    if (dbg_rply_timeout_status) begin
-      r_dbg_rply_timeout_status    <= 1;
-
-    end
-    if (dbg_ur_no_bar_hit) begin
-      r_dbg_ur_no_bar_hit          <= 1;
-      r_unrecognized_bar           <= w_bar_hit;
-
-    end
-    if (dbg_ur_pois_cfg_wr) begin
-      r_dbg_ur_pois_cfg_wr         <= 1;
-
-    end
-    if (dbg_ur_status) begin
-      r_dbg_ur_status              <= 1;
-
-    end
-    if (dbg_ur_unsup_msg) begin
-      r_dbg_ur_unsup_msg           <= 1;
-
-    end
-
+    /*
     if (w_reset_strobes) begin
-      r_dbg_ur_unsup_msg           <= 0;
-      r_dbg_ur_status              <= 0;
-      r_dbg_ur_pois_cfg_wr         <= 0;
-      r_dbg_ur_no_bar_hit          <= 0;
-      r_dbg_rply_timeout_status    <= 0;
-      r_dbg_rply_rollover_status   <= 0;
-      r_dbg_rcvr_overflow_status   <= 0;
-      r_dbg_poistlpstatus          <= 0;
-      r_dbg_mlfrmd_unrec_type      <= 0;
-      r_dbg_mlfrmd_tlp_status      <= 0;
-      r_dbg_mlfrmd_tcvc            <= 0;
-      r_dbg_mlfrmd_mps             <= 0;
-      r_dbg_mlfrmd_length          <= 0;
-      r_dbg_fc_protocol_err_status <= 0;
-      r_dbg_dl_protocol_status     <= 0;
-      r_dbg_bad_tlp_status         <= 0;
-      r_dbg_bad_tlp_seq_num        <= 0;
-      r_dbg_bad_tlp_lcrc           <= 0;
-      r_dbg_bad_dllp_status        <= 0;
-      dbg_unsupported              <= 0;
-      dbg_non_fatal                <= 0;
-      dbg_fatal                    <= 0;
-      dbg_correctable              <= 0;
       r_unrecognized_bar           <= 0;
     end
+    */
   end
 end
 
@@ -868,7 +627,6 @@ always @ (posedge clk) begin
   r_cancel_write_stb            <=  0;
   r_lcl_mem_we                  <=  0;
   r_1sec_stb_100mhz             <=  0;
-  r_reset_dbg_regs              <=  0;
 
   //THis might need to be moved into the 62.5MHz clock
   r_cfg_trn_pending             <=  0;
@@ -915,7 +673,7 @@ always @ (posedge clk) begin
               r_mem_2_ppfifo_stb    <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
               r_cancel_write_stb    <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
               r_ppfifo_2_mem_en     <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              r_reset_dbg_regs      <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
+              //r_reset_dbg_regs      <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
               //r_enable_ext_reset    <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
               //r_manual_pcie_reset   <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
               r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
@@ -1000,10 +758,10 @@ always @ (posedge clk) begin
             end
             DBG_DATA: begin
               o_wbs_dat       <=  0;
-              o_wbs_dat[`DBG_CORRECTABLE ] <=  dbg_correctable;
-              o_wbs_dat[`DBG_FATAL       ] <=  dbg_fatal;
-              o_wbs_dat[`DBG_NON_FATAL   ] <=  dbg_non_fatal;
-              o_wbs_dat[`DBG_UNSUPPORTED ] <=  dbg_unsupported;
+              //o_wbs_dat[`DBG_CORRECTABLE ] <=  dbg_correctable;
+              //o_wbs_dat[`DBG_FATAL       ] <=  dbg_fatal;
+              //o_wbs_dat[`DBG_NON_FATAL   ] <=  dbg_non_fatal;
+              //o_wbs_dat[`DBG_UNSUPPORTED ] <=  dbg_unsupported;
             end
             CONFIG_COMMAND: begin
               o_wbs_dat       <=  0;
@@ -1031,25 +789,6 @@ always @ (posedge clk) begin
             end
             DBG_FLAGS: begin
               o_wbs_dat       <=  0;
-              o_wbs_dat[`DBG_BAD_DLLP_STATUS          ] <=  r_dbg_bad_dllp_status;
-              o_wbs_dat[`DBG_BAD_TLP_LCRC             ] <=  r_dbg_bad_tlp_lcrc;
-              o_wbs_dat[`DBG_BAD_TLP_SEQ_NUM          ] <=  r_dbg_bad_tlp_seq_num;
-              o_wbs_dat[`DBG_BAD_TLP_STATUS           ] <=  r_dbg_bad_tlp_status;
-              o_wbs_dat[`DBG_DL_PROTOCOL_STATUS       ] <=  r_dbg_dl_protocol_status;
-              o_wbs_dat[`DBG_FC_PROTOCOL_ERR_STATUS   ] <=  r_dbg_fc_protocol_err_status;
-              o_wbs_dat[`DBG_MLFMD_LENGTH             ] <=  r_dbg_mlfrmd_length;
-              o_wbs_dat[`DBG_MLFMD_MPS                ] <=  r_dbg_mlfrmd_mps;
-              o_wbs_dat[`DBG_MLFMD_TCVC               ] <=  r_dbg_mlfrmd_tcvc;
-              o_wbs_dat[`DBG_MLFMD_TLP_STATUS         ] <=  r_dbg_mlfrmd_tlp_status;
-              o_wbs_dat[`DBG_MLFMD_UNREC_TYPE         ] <=  r_dbg_mlfrmd_unrec_type;
-              o_wbs_dat[`DBG_POISTLPSTATUS            ] <=  r_dbg_poistlpstatus;
-              o_wbs_dat[`DBG_RCVR_OVERFLOW_STATUS     ] <=  r_dbg_rcvr_overflow_status;
-              o_wbs_dat[`DBG_RPLY_ROLLOVER_STATUS     ] <=  r_dbg_rply_rollover_status;
-              o_wbs_dat[`DBG_RPLY_TIMEOUT_STATUS      ] <=  r_dbg_rply_timeout_status;
-              o_wbs_dat[`DBG_UR_NO_BAR_HIT            ] <=  r_dbg_ur_no_bar_hit;
-              o_wbs_dat[`DBG_UR_POIS_CFG_WR           ] <=  r_dbg_ur_pois_cfg_wr;
-              o_wbs_dat[`DBG_UR_STATUS                ] <=  r_dbg_ur_status;
-              o_wbs_dat[`DBG_UR_UNSUP_MSG             ] <=  r_dbg_ur_unsup_msg;
             end
             BAR_SELECT: begin
               //o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};

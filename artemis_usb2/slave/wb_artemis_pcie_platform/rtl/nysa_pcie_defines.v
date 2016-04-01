@@ -7,7 +7,7 @@
 `define WRITE_BUF_B_ADDR      32'h00000003
 `define READ_BUF_A_ADDR       32'h00000004
 `define READ_BUF_B_ADDR       32'h00000005
-`define BUFER_SIZE            32'h00000006
+`define BUFFER_SIZE           32'h00000006
 `define PING_VALUE            32'h00000007
 
 //The total number of items in the configuration registers

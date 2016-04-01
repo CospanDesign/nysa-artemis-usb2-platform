@@ -27,8 +27,6 @@ from tlp_header_factory import get_description
 
 from tlp_type import TLPType
 
-from tlp_common import print_raw_packet
-
 
 class TLPManager(object):
 

@@ -36,37 +36,37 @@ module sim_pcie_axi_bridge #(
 )(
 
   // PCI Express Fabric Interface
-  output                    pci_exp_txp,
-  output                    pci_exp_txn,
-  input                     pci_exp_rxp,
-  input                     pci_exp_rxn,
+  output                    pci_exp_txp,  //Not Applicable
+  output                    pci_exp_txn,  //Not Applicable
+  input                     pci_exp_rxp,  //Not Applicable
+  input                     pci_exp_rxn,  //Not Applicable
 
   // Transaction (TRN) Interface
-  output  reg               user_lnk_up,
+  output  reg               user_lnk_up,  //Finished
 
   // Tx
-  output  reg               s_axis_tx_tready,
-  input       [31:0]        s_axis_tx_tdata,
-  input       [3:0]         s_axis_tx_tkeep,
-  input       [3:0]         s_axis_tx_tuser,
-  input                     s_axis_tx_tlast,
-  input                     s_axis_tx_tvalid,
+  output  reg               s_axis_tx_tready, //SIM: Not Finished
+  input       [31:0]        s_axis_tx_tdata,  //SIM: Not Finished
+  input       [3:0]         s_axis_tx_tkeep,  //SIM: Not Finished
+  input       [3:0]         s_axis_tx_tuser,  //SIM: Not Finished
+  input                     s_axis_tx_tlast,  //SIM: Not Finished
+  input                     s_axis_tx_tvalid, //SIM: Not Finished
 
   output  reg [5:0]         tx_buf_av,
   output  reg               tx_err_drop,
   input                     tx_cfg_gnt,
   output  reg               tx_cfg_req,
 
-  output  reg               user_enable_comm,
+  output  reg               user_enable_comm, //SIM: Not Finished
 
   // Rx
   output  reg [31:0]        m_axis_rx_tdata,
-  output  reg [3:0]         m_axis_rx_tkeep,
+  output  reg [3:0]         m_axis_rx_tkeep = 4'b1111,
   output  reg               m_axis_rx_tlast,
   output  reg               m_axis_rx_tvalid,
   input                     m_axis_rx_tready,
   output      [21:0]        m_axis_rx_tuser,
-  input                     rx_np_ok,
+  input                     rx_np_ok,         //SIM: Not Finished
 
   // Flow Control
   input       [2:0]         fc_sel,
@@ -78,10 +78,10 @@ module sim_pcie_axi_bridge #(
   output      [11:0]        fc_cpld,
 
   // Host (CFG) Interface
-  output  reg [31:0]        cfg_do,
-  output  reg               cfg_rd_wr_done,
-  input       [9:0]         cfg_dwaddr,
-  input                     cfg_rd_en,
+  output  reg [31:0]        cfg_do,           //SIM: Finished
+  output  reg               cfg_rd_wr_done,   //SIM: Finished
+  input       [9:0]         cfg_dwaddr,       //SIM: Finished
+  input                     cfg_rd_en,        //SIM: Finished
 
   // Configuration: Error
   input                     cfg_err_ur,
@@ -96,21 +96,21 @@ module sim_pcie_axi_bridge #(
 
   // Conifguration: Interrupt
   input                     cfg_interrupt,
-  output                    cfg_interrupt_rdy,
+  output  reg               cfg_interrupt_rdy,
   input                     cfg_interrupt_assert,
-  output      [7:0]         cfg_interrupt_do,
+  output  reg [7:0]         cfg_interrupt_do  = 0,
   input       [7:0]         cfg_interrupt_di,
-  output      [2:0]         cfg_interrupt_mmenable,
-  output                    cfg_interrupt_msienable,
+  output  reg [2:0]         cfg_interrupt_mmenable = 0,
+  output  reg               cfg_interrupt_msienable = 0,
 
   // Configuration: Power Management
-  input                     cfg_turnoff_ok,
-  output                    cfg_to_turnoff,
-  input                     cfg_pm_wake,
+  input                     cfg_turnoff_ok,       //Not Applicable
+  output                    cfg_to_turnoff,       //Not Applicable
+  input                     cfg_pm_wake,          //Not Applicable
 
   //Core Controller
   // Configuration: System/Status
-  output      [2:0]         cfg_pcie_link_state,
+  output      [2:0]         cfg_pcie_link_state,  //Not Applicable
   input                     cfg_trn_pending,
   input       [63:0]        cfg_dsn,
   output      [7:0]         cfg_bus_number,
@@ -132,7 +132,7 @@ module sim_pcie_axi_bridge #(
   output                    user_reset_out,
   output                    received_hot_reset,
 
-// Not Finished
+  // Not Finished
   output                    pll_lock_detect,
   output                    gtp_pll_lock_detect,
   output                    gtp_reset_done,
@@ -141,34 +141,33 @@ module sim_pcie_axi_bridge #(
   input       [3:0]         tx_diff_ctrl,
   input       [2:0]         tx_pre_emphasis,
   output      [6:0]         o_bar_hit,
-  output                    dbg_reg_detected_correctable,
-  output                    dbg_reg_detected_fatal,
-  output                    dbg_reg_detected_non_fatal,
-  output                    dbg_reg_detected_unsupported,
 
-  output                    dbg_bad_dllp_status,
-  output                    dbg_bad_tlp_lcrc,
-  output                    dbg_bad_tlp_seq_num,
-  output                    dbg_bad_tlp_status,
-  output                    dbg_dl_protocol_status,
-  output                    dbg_fc_protocol_err_status,
-  output                    dbg_mlfrmd_length,
-  output                    dbg_mlfrmd_mps,
-  output                    dbg_mlfrmd_tcvc,
-  output                    dbg_mlfrmd_tlp_status,
-  output                    dbg_mlfrmd_unrec_type,
-  output                    dbg_poistlpstatus,
-  output                    dbg_rcvr_overflow_status,
-  output                    dbg_rply_rollover_status,
-  output                    dbg_rply_timeout_status,
-  output                    dbg_ur_no_bar_hit,
-  output                    dbg_ur_pois_cfg_wr,
-  output                    dbg_ur_status,
-  output                    dbg_ur_unsup_msg,
+  output                    dbg_reg_detected_correctable, //Not Applicable
+  output                    dbg_reg_detected_fatal,       //Not Applicable
+  output                    dbg_reg_detected_non_fatal,   //Not Applicable
+  output                    dbg_reg_detected_unsupported, //Not Applicable
 
+  output                    dbg_bad_dllp_status,          //Not Applicable
+  output                    dbg_bad_tlp_lcrc,             //Not Applicable
+  output                    dbg_bad_tlp_seq_num,          //Not Applicable
+  output                    dbg_bad_tlp_status,           //Not Applicable
+  output                    dbg_dl_protocol_status,       //Not Applicable
+  output                    dbg_fc_protocol_err_status,   //Not Applicable
+  output                    dbg_mlfrmd_length,            //Not Applicable
+  output                    dbg_mlfrmd_mps,               //Not Applicable
+  output                    dbg_mlfrmd_tcvc,              //Not Applicable
+  output                    dbg_mlfrmd_tlp_status,        //Not Applicable
+  output                    dbg_mlfrmd_unrec_type,        //Not Applicable
+  output                    dbg_poistlpstatus,            //Not Applicable
+  output                    dbg_rcvr_overflow_status,     //Not Applicable
+  output                    dbg_rply_rollover_status,     //Not Applicable
+  output                    dbg_rply_timeout_status,      //Not Applicable
+  output                    dbg_ur_no_bar_hit,            //Not Applicable
+  output                    dbg_ur_pois_cfg_wr,           //Not Applicable
+  output                    dbg_ur_status,                //Not Applicable
+  output                    dbg_ur_unsup_msg,             //Not Applicable
 
   output                    rx_elec_idle
-
 );
 
 assign                pll_lock_detect = 1'b1;
@@ -243,10 +242,10 @@ assign  fc_cpld                   = 0;
 
 assign  cfg_err_cpl_rdy           = 0;
 
-assign  cfg_interrupt_rdy         = 0;
-assign  cfg_interrupt_do          = 0;
-assign  cfg_interrupt_mmenable    = 0;
-assign  cfg_interrupt_msienable   = 0;
+//assign  cfg_interrupt_rdy         = 0;
+//assign  cfg_interrupt_do          = 0;
+//assign  cfg_interrupt_mmenable    = 0;
+//assign  cfg_interrupt_msienable   = 0;
 
 assign  cfg_to_turnoff            = 0;
 
@@ -337,6 +336,13 @@ assign  m_axis_rx_tuser   =  {13'h0,
                               m_axis_rx_tvalid,
                               1'b0};
 
+
+always @ (posedge clk) begin
+  if (rst) begin
+    m_axis_rx_tkeep   <=  4'b1111;
+  end
+end
+/*
 always @ (posedge clk) begin
   m_axis_rx_tlast     <=  0;
   m_axis_rx_tvalid    <=  0;
@@ -383,9 +389,9 @@ always @ (posedge clk) begin
     endcase
   end
 end
+*/
 
-
-
+//Linkup
 reg prev_user_lnk_up;
 reg [3:0] linkup_count;
 
@@ -405,6 +411,7 @@ always @ (posedge clk) begin
   end
 end
 
+//Configuration Read
 always @ (posedge clk) begin
   cfg_rd_wr_done    <=  0;
   if (rst) begin
@@ -427,7 +434,9 @@ always @ (posedge clk) begin
 end
 
 
+//AXI Data D2H
 //Data From Core to PCIE Reader
+/*
 reg [3:0] ds_state;
 always @ (posedge clk) begin
   s_axis_tx_tready  <=  0;
@@ -465,5 +474,6 @@ always @ (posedge clk) begin
     endcase
   end
 end
+*/
 
 endmodule

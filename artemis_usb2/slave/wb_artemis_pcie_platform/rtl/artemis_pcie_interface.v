@@ -337,8 +337,8 @@ assign  cfg_trn_pending       =  1'b0;
 assign  tx_cfg_gnt            =  1'b1;
 assign  rx_np_ok              =  1'b1;
 
-pcie_axi_bridge pcie_interface
-//sim_pcie_axi_bridge pcie_interface
+//pcie_axi_bridge pcie_interface
+sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface

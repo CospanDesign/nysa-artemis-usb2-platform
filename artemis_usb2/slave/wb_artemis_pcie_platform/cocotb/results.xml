@@ -1,8 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites name="results">
   <testsuite name="all" package="all" tests="0">
-    <testcase classname="test_dut" name="test_config_read" time="0.6520280838012695" />
-    <testcase classname="test_dut" name="test_local_buffer" time="1.2862529754638672" />
-    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.4640369415283203" />
+    <testcase classname="test_dut" name="test_config_read" time="0.0">
+      <skipped />
+    </testcase>
+    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.0">
+      <skipped />
+    </testcase>
+    <testcase classname="test_dut" name="test_local_buffer" time="1.4749269485473633" />
   </testsuite>
 </testsuites>

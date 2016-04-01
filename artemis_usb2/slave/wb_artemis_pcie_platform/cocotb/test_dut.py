@@ -5,31 +5,28 @@ import cocotb
 import logging
 from cocotb.result import TestFailure
 from nysa.host.sim.sim_host import NysaSim
+from nysa.common.print_utils import *
 from cocotb.clock import Clock
 import time
 from array import array as Array
 from dut_driver import ArtemisPCIEDriver
+from cocotb_pcie_controller import CocotbPCIE
+
 
 SIM_CONFIG = "sim_config.json"
 
 
 CLK_PERIOD = 10
 
+#MODULE_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "tools")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "tools")))
 MODULE_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "rtl")
 MODULE_PATH = os.path.abspath(MODULE_PATH)
 
+from tlp_manager import TLPManager
 
 def setup_dut(dut):
     cocotb.fork(Clock(dut.clk, CLK_PERIOD).start())
-
-@cocotb.coroutine
-def wait_ready(nysa, dut):
-
-    #while not dut.hd_ready.value.get_value():
-    #    yield(nysa.wait_clocks(1))
-
-    #yield(nysa.wait_clocks(100))
-    pass
 
 @cocotb.test(skip = False)
 def test_local_buffer(dut):
@@ -59,6 +56,14 @@ def test_local_buffer(dut):
     v = yield cocotb.external(driver.get_control)()
 
     dut.log.info("V: %d" % v)
+
+
+    #Test Stuff
+    c = CocotbPCIE(dut)
+    tm = TLPManager()
+    tm.set_value("type", "mwr")
+    #f = cocotb.fork(c.main_control())
+    #Test Stuff
 
 
     dut.log.info("Write to the local buffer")
@@ -91,13 +96,26 @@ def test_local_buffer(dut):
 
     dut.log.info("Enable PPFIFO 2 Local Memory")
     yield cocotb.external(driver.enable_pcie_read_block)(True)
-    yield (nysa.wait_clocks(100))
+    yield (nysa.wait_clocks(10))
+
+    #Wrote Data
+    
+    w = cocotb.fork(c.send_PCIE_command(tm.generate_raw()))
+    r = cocotb.fork(c.listen_for_comm())
+
+    yield (nysa.wait_clocks(10))
     yield cocotb.external(driver.enable_pcie_read_block)(False)
-    yield (nysa.wait_clocks(1000))
+    yield (nysa.wait_clocks(500))
     data_in = yield cocotb.external(driver.read_local_buffer)()
+    print_32bit_hex_array(data_in[0:16])
 
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+    yield (nysa.wait_clocks(1000))
+    data_out = c.get_read_data()
+    dut.log.info("Data out length: %d" % len(data_out))
+    print_32bit_hex_array(data_out[0:16])
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_local_buffer_to_pcie(dut):
     """
     Description:
@@ -140,7 +158,7 @@ def test_local_buffer_to_pcie(dut):
     yield cocotb.external(driver.send_block_from_local_buffer)()
     yield (nysa.wait_clocks(100))
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_config_read(dut):
     """
     Description:

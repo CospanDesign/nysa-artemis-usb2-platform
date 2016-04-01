@@ -72,6 +72,7 @@ SOFTWARE.
 `define CTRL_BIT_MANUAL_USER_RESET    5
 `define CTRL_BIT_RESET_DBG_REGS       6
 `define CTRL_BIT_READ_BAR_ADDR_STB    7
+`define CTRL_BIT_SEND_IRQ             8
 
 `define STS_BIT_PCIE_RESET            0
 `define STS_BIT_LINKUP                1
@@ -186,32 +187,36 @@ localparam    BAR_ADDR2           = 21;
 localparam    BAR_ADDR3           = 22;
 localparam    BAR_ADDR4           = 23;
 localparam    BAR_ADDR5           = 24;
+localparam    IRQ_CHANNEL_SELECT  = 25;
 
 
 //Local Registers/Wires
 
-wire      [31:0]                 status;
+wire      [31:0]                status;
 
-reg                              r_enable_pcie = 1;
-//reg                              r_enable_ext_reset;
-//reg                              r_manual_pcie_reset;
-reg       [31:0]                 r_clock_1_sec;
-reg       [31:0]                 r_clock_count;
-reg       [31:0]                 r_host_clock_count;
-reg                              r_1sec_stb_100mhz;
-wire                             w_1sec_stb_65mhz;
+reg                             r_enable_pcie = 1;
+//reg                             r_enable_ext_reset;
+//reg                             r_manual_pcie_reset;
+reg       [31:0]                r_clock_1_sec;
+reg       [31:0]                r_clock_count;
+reg       [31:0]                r_host_clock_count;
+reg                             r_1sec_stb_100mhz;
+wire                            w_1sec_stb_65mhz;
+reg                             r_irq_stb = 0;
+reg                             r_irq_channel;
+wire                            w_irq_stb;
 
 // Transaction (TRN) Interface
-wire                             user_lnk_up;
+wire                            user_lnk_up;
 
   // Flow Control
-wire      [2:0]                  fc_sel;
-wire      [7:0]                  fc_nph;
-wire      [11:0]                 fc_npd;
-wire      [7:0]                  fc_ph;
-wire      [11:0]                 fc_pd;
-wire      [7:0]                  fc_cplh;
-wire      [11:0]                 fc_cpld;
+wire      [2:0]                 fc_sel;
+wire      [7:0]                 fc_nph;
+wire      [11:0]                fc_npd;
+wire      [7:0]                 fc_ph;
+wire      [11:0]                fc_pd;
+wire      [7:0]                 fc_cplh;
+wire      [11:0]                fc_cpld;
 
 
 // Host (CFG) Interface
@@ -232,6 +237,7 @@ wire      [47:0]                 cfg_err_tlp_cpl_header;
 wire                             cfg_err_cpl_rdy;
 
 // Conifguration: Interrupt
+/*
 wire                             cfg_interrupt;
 wire                             cfg_interrupt_rdy;
 wire                             cfg_interrupt_assert;
@@ -239,6 +245,7 @@ wire      [7:0]                  cfg_interrupt_do;
 wire      [7:0]                  cfg_interrupt_di;
 wire      [2:0]                  cfg_interrupt_mmenable;
 wire                             cfg_interrupt_msienable;
+*/
 
 // Configuration: Power Management
 reg                              cfg_turnoff_ok = 0;
@@ -444,6 +451,7 @@ artemis_pcie_interface #(
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
 
   // Conifguration: Interrupt
+  /*
   .cfg_interrupt                     (cfg_interrupt                ),
   .cfg_interrupt_rdy                 (cfg_interrupt_rdy            ),
   .cfg_interrupt_assert              (cfg_interrupt_assert         ),
@@ -451,6 +459,10 @@ artemis_pcie_interface #(
   .cfg_interrupt_di                  (cfg_interrupt_di             ),
   .cfg_interrupt_mmenable            (cfg_interrupt_mmenable       ),
   .cfg_interrupt_msienable           (cfg_interrupt_msienable      ),
+  */
+
+  .i_interrupt_stb                    (w_irq_stb                    ),
+  .i_interrupt_channel                (r_irq_channel                ),
 
   // Configuration: Power Management
   .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
@@ -600,6 +612,16 @@ cross_clock_strobe read_bar_stb (
   .out_stb                            (w_read_bar_addr_stb    )
 );
 
+cross_clock_strobe irq_strobber (
+  .rst                                (rst                    ),
+  .in_clk                             (clk                    ),
+  .in_stb                             (r_irq_stb              ),
+
+  .out_clk                            (clk_62p5               ),
+  .out_stb                            (w_irq_stb              )
+
+);
+
 
 //Asynchronous Logic
 assign  fc_sel                 = 3'h0;
@@ -616,9 +638,9 @@ assign  cfg_err_posted         = 0;
 assign  cfg_err_locked         = 0;
 assign  cfg_err_tlp_cpl_header = 0;
 
-assign  cfg_interrupt          = 0;
-assign  cfg_interrupt_assert   = 0;
-assign  cfg_interrupt_di       = 0;
+//assign  cfg_interrupt          = 0;
+//assign  cfg_interrupt_assert   = 0;
+//assign  cfg_interrupt_di       = 0;
 
 //assign  cfg_turnoff_ok         = 0;
 assign  cfg_pm_wake            = 0;
@@ -851,6 +873,7 @@ always @ (posedge clk) begin
   //THis might need to be moved into the 62.5MHz clock
   r_cfg_trn_pending             <=  0;
   r_read_bar_addr_stb_a         <=  0;
+  r_irq_stb                     <=  0;
 
   if (rst) begin
     o_wbs_dat                   <=  32'h0;
@@ -869,6 +892,7 @@ always @ (posedge clk) begin
     r_tx_pre_emphasis           <=  3'b00;
 
     r_bar_hit_temp              <=  0;
+    r_irq_channel               <=  0;
   end
   else begin
     if ((r_bar_hit_temp == 0) && (w_bar_hit != 0)) begin
@@ -887,14 +911,15 @@ always @ (posedge clk) begin
           case (i_wbs_adr)
             CONTROL: begin
               $display("ADDR: %h user wrote %h", i_wbs_adr, i_wbs_dat);
-              r_enable_pcie       <=  i_wbs_dat[`CTRL_BIT_ENABLE];
-              r_mem_2_ppfifo_stb  <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
-              r_cancel_write_stb  <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
-              r_ppfifo_2_mem_en   <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              r_reset_dbg_regs    <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
-              //r_enable_ext_reset  <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
-              //r_manual_pcie_reset <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
+              r_enable_pcie         <=  i_wbs_dat[`CTRL_BIT_ENABLE];
+              r_mem_2_ppfifo_stb    <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
+              r_cancel_write_stb    <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
+              r_ppfifo_2_mem_en     <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
+              r_reset_dbg_regs      <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
+              //r_enable_ext_reset    <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
+              //r_manual_pcie_reset   <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
               r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
+              r_irq_stb             <=  i_wbs_dat[`CTRL_BIT_SEND_IRQ];
 
             end
             TX_DIFF_CTRL: begin
@@ -911,6 +936,9 @@ always @ (posedge clk) begin
                 r_lcl_mem_we                          <=  1;
                 r_lcl_mem_din                         <=  i_wbs_dat;
               end
+            end
+            IRQ_CHANNEL_SELECT: begin
+              r_irq_channel       <=  i_wbs_dat[7:0];
             end
           endcase
           o_wbs_ack <= 1;
@@ -1045,6 +1073,9 @@ always @ (posedge clk) begin
             end
             BAR_ADDR5: begin
               o_wbs_dat                         <=  w_bar_addr5;
+            end
+            IRQ_CHANNEL_SELECT: begin
+              o_wbs_dat                         <=  {24'h0, r_irq_channel};
             end
             default: begin
               if (w_lcl_mem_en) begin

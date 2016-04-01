@@ -77,9 +77,10 @@ MODULE_LICENSE("Dual BSD/GPL");
 //Status Flags:
 //       1 = Resouce successfully acquired
 //       0 = Resource not acquired.
-#define HAVE_REGION 0x01                    // I/O Memory region
-#define HAVE_IRQ    0x02                    // Interupt
-#define HAVE_KREG   0x04                    // Kernel registration
+#define HAVE_KREG                 0x04                    // Kernel registration
+
+//MSI Vector Count
+//#define NUM_MSI_VECS              11
 
 int             MAJOR             = 240;    // Major number not dynamic.
 unsigned int    STAT_FLAGS        = 0x00;   // Status flags used for cleanup.
@@ -92,9 +93,30 @@ int             IRQ;                        // IRQ assigned by PCI system.
 char           *BUFFER_UNALIGNED  = NULL;   // Pointer to Unaligned DMA buffer.
 char           *READ_BUFFER       = NULL;   // Pointer to dword aligned DMA buffer.
 char           *WRITE_BUFFER      = NULL;   // Pointer to dword aligned DMA buffer.
+char           *STATUS_BUFFER     = NULL;
+dma_addr_t      write_dma_addr;
+dma_addr_t      read_dma_addr;
+dma_addr_t      status_dma_addr;
 
 ssize_t xpcie_write_mem(const char *buf, size_t count);
 ssize_t xpcie_read_mem(char *buf, size_t count);
+
+enum MSI_ISR
+{
+  NYSA_RESET = 0,
+  NYSA_CMD_DONE,
+  NYSA_CONTROL_WRITE,
+  NYSA_CONTROL_READ,
+  NYSA_MEM_WRITE,
+  NYSA_MEM_READ,
+  NYSA_DMA_WRITE,
+  NYSA_DMA_READ,
+  NYSA_GEN_INTERRUPT,
+  NYSA_DMA_INGRESS_INTERRUPT,
+  NYSA_DMA_EGRESS_INTERRUPT,
+  NYSA_PACKET_DONE,
+  NUM_MSI_VECS
+};
 
 //-----------------------------------------------------------------------------
 // File Operations
@@ -241,16 +263,54 @@ struct file_operations xpcie_intf = {
 //-----------------------------------------------------------------------------
 // Prototypes
 //-----------------------------------------------------------------------------
-void    xpcie_irq_handler (int irq, void *dev_id, struct pt_regs *regs);
-void    initcode(void);
 u32     xpcie_read_reg (u32 dw_offset);
 void    xpcie_write_reg (u32 dw_offset, u32 val);
+
+
+//MSI ISRs
+static irqreturn_t msi_isr(int irq, void *data)
+{
+
+  printk("%s: msi_isr Entered Interrupt: ISR #: %d\n", DRIVER_NAME, irq);
+  switch (irq){
+    case NYSA_RESET:
+      break;
+    case NYSA_CMD_DONE:
+      break;
+    case NYSA_CONTROL_WRITE:
+      break;
+    case NYSA_CONTROL_READ:
+      break;
+    case NYSA_MEM_WRITE:
+      break;
+    case NYSA_MEM_READ:
+      break;
+    case NYSA_DMA_WRITE:
+      break;
+    case NYSA_DMA_READ:
+      break;
+    case NYSA_GEN_INTERRUPT:
+      break;
+    case NYSA_DMA_INGRESS_INTERRUPT:
+      break;
+    case NYSA_DMA_EGRESS_INTERRUPT:
+      break;
+    case NYSA_PACKET_DONE:
+      break;
+    default:
+      break;
+  }
+
+  return IRQ_HANDLED;
+}
 
 static int xpcie_init(void)
 {
 
     int result = 0;
     int i = 0;
+    int msi_vec_count = 0;
+
     //Initialize Semaphors
     for (i = 0; i < NUM_SEMS; i++){
       sema_init(&pcie_semaphore[i], 1);
@@ -291,10 +351,11 @@ static int xpcie_init(void)
     }
     printk("%s: Virt hw val %zX\n", DRIVER_NAME, (size_t)BAR_VIRT_ADDR);
 
+
     // Get IRQ from pci_dev structure. It may have been remapped by the kernel,
     // and this value will be the correct one.
-    IRQ = DEVICE->irq;
-    printk("%s: irq: %d\n", DRIVER_NAME, IRQ);
+    //IRQ = DEVICE->irq;
+    //printk("%s: irq: %d\n", DRIVER_NAME, IRQ);
 
     //Allow the PCIE device to initiate transfers
     pci_set_master(DEVICE);
@@ -309,33 +370,56 @@ static int xpcie_init(void)
     STAT_FLAGS = STAT_FLAGS | HAVE_REGION;
     printk("%s: Init:  Initialize Hardware Done..\n",DRIVER_NAME);
 
-    // Request IRQ from OS.
-#if 0
-    if (0 > request_irq(IRQ, &xpcie_irq_handler,/* SA_INTERRUPT |*/ SA_SHIRQ, DRIVER_NAME, DEVICE)) {
-        printk(/*KERN_WARNING*/"%s: Init: Unable to allocate IRQ",DRIVER_NAME);
-        return (-1);
+    msi_vec_count = pci_msi_vec_count(DEVICE);
+    printk("%s: Init: MSI Vector Count: %d\n", DRIVER_NAME, msi_vec_count);
+    //result = pci_enable_msi(DEVICE);
+    //result = pci_enable_msi_exact(DEVICE, NUM_MSI_VECS);
+    //result = pci_enable_msi_exact(DEVICE, msi_vec_count);
+    result = pci_enable_msi_range(DEVICE, 1, NUM_MSI_VECS);
+    //if (result != 0){
+    if (result < 1){
+      printk("%s: Init: Failed to enable MSI Vectors, driver reports: %d\n", DRIVER_NAME, result);
+      result = -1;
+      goto fail_setup_irq;
+    }
+    result = request_irq(DEVICE->irq, msi_isr, IRQF_SHARED, DRIVER_NAME, DEVICE);
+    if (result != 0){
+      printk("%s: Init: Failed to get IRQ, request result: %d\n", DRIVER_NAME, result);
+      result = -1;
+      goto fail_gen_irq_vectors;
     }
     STAT_FLAGS = STAT_FLAGS | HAVE_IRQ;
-#endif
 
-    initcode();
+    //Connect MSI Interrupt vectors
+    //for (int i = 0; i < NUM_MSI_VECS; i++){
+    //  request_irq
+    //}
+
+
+
+
     BUFFER_UNALIGNED = kmalloc(BUF_SIZE, GFP_KERNEL);
 
     READ_BUFFER = BUFFER_UNALIGNED;
     if (NULL == BUFFER_UNALIGNED) {
         printk("%s: Init: Unable to allocate gBuffer.\n",DRIVER_NAME);
-        return (-1);
+        result = -1;
+        goto fail_read_buffer;
     }
 
     WRITE_BUFFER = kmalloc(BUF_SIZE, GFP_KERNEL);
     if (NULL == WRITE_BUFFER) {
         printk("%s: Init: Unable to allocate gBuffer.\n",DRIVER_NAME);
-        return (-1);
+        result = -1;
+        goto fail_write_buffer;
+    }
+    STATUS_BUFFER = kmalloc(BUF_SIZE, GFP_KERNEL);
+    if (NULL == STATUS_BUFFER) {
+      printk("%s: Init: Unable to allocate status buffer.\n", DRIVER_NAME);
+      result = -1;
+      goto fail_status_buffer;
     }
 
-    //--- END: Allocate Buffers
-
-    //--- START: Register Driver
     // Register with the kernel as a character device.
     // Abort if it fails.
     if (0 > register_chrdev(MAJOR, DRIVER_NAME, &xpcie_intf)) {
@@ -345,13 +429,62 @@ static int xpcie_init(void)
     printk("%s: Init: module registered\n", DRIVER_NAME);
     STAT_FLAGS = STAT_FLAGS | HAVE_KREG;
 
-    printk("%s driver is loaded\n", DRIVER_NAME);
+    //Create the DMA Mapping
+    status_dma_addr = pci_map_single(DEVICE, STATUS_BUFFER, BUF_SIZE, PCI_DMA_FROMDEVICE);
+    if (0 == status_dma_addr){
+      printk("%s: Failed to map status buffer.\n", DRIVER_NAME);
+      result = -1;
+      goto fail_map_status;
+    }
+    printk("%s: Init: Status DMA mapped to: %X\n", DRIVER_NAME, (unsigned int)status_dma_addr);
 
-  return result;
+
+    printk("%s driver is loaded\n", DRIVER_NAME);
+    return result;
+
+
+    //Fail Section
+    fail_map_status:
+      printk("%s: Relesaing Status Buffer\n", DRIVER_NAME);
+
+    kfree(STATUS_BUFFER);
+
+    fail_status_buffer:
+      printk("%s: Relesaing Write Buffer\n", DRIVER_NAME);
+
+    kfree(WRITE_BUFFER);
+
+    fail_write_buffer:
+      printk("%s: Releasing Read Buffer\n", DRIVER_NAME);
+
+    kfree(READ_BUFFER);
+
+    fail_read_buffer:
+      printk("%s: Free IRQ\n", DRIVER_NAME);
+
+    free_irq(DEVICE->irq, DEVICE);
+
+    fail_gen_irq_vectors:
+      printk("%s: Disabling MSI\n", DRIVER_NAME);
+
+    pci_disable_msi(DEVICE);
+
+    fail_setup_irq:
+      printk("%s: Releasing Memory Region\n", DRIVER_NAME);
+
+    release_mem_region(BAR_HDWR_ADDR, BAR_LEN);
+
+    printk("%s: Unmap IO Region\n", DRIVER_NAME);
+    iounmap(BAR_VIRT_ADDR);
+
+    return result;
 }
 
 static void xpcie_exit(void)
 {
+
+  //Release all DMA mappings
+  pci_unmap_single(DEVICE, status_dma_addr, BUF_SIZE, PCI_DMA_FROMDEVICE);
 
   //pci_release_regions(DEVICE);
   if (STAT_FLAGS & HAVE_REGION) {
@@ -359,7 +492,8 @@ static void xpcie_exit(void)
 
     // Release IRQ
     if (STAT_FLAGS & HAVE_IRQ) {
-        (void) free_irq(IRQ, DEVICE);
+      free_irq(DEVICE->irq, DEVICE);
+      pci_disable_msi(DEVICE);
     }
 
 
@@ -368,9 +502,12 @@ static void xpcie_exit(void)
         (void) kfree(READ_BUFFER);
     if (NULL != WRITE_BUFFER)
         (void) kfree(WRITE_BUFFER);
+    if (NULL != STATUS_BUFFER)
+        (void) kfree(STATUS_BUFFER);
 
     READ_BUFFER = NULL;
     WRITE_BUFFER = NULL;
+    STATUS_BUFFER = NULL;
 
 
     if (BAR_VIRT_ADDR != NULL) {
@@ -382,11 +519,7 @@ static void xpcie_exit(void)
 
     // Unregister Device Driver
     if (STAT_FLAGS & HAVE_KREG) {
-	unregister_chrdev(MAJOR, DRIVER_NAME);
-//        if (unregister_chrdev(MAJOR, DRIVER_NAME) > 0) {
-//            printk(KERN_WARNING"%s: Cleanup: unregister_chrdev failed\n",
-//                   DRIVER_NAME);
-//        }
+	    unregister_chrdev(MAJOR, DRIVER_NAME);
     }
 
     STAT_FLAGS = 0;
@@ -400,14 +533,6 @@ module_exit(xpcie_exit);
 //-----------------------------------------------------------------------------
 // Internal Functions
 //-----------------------------------------------------------------------------
-
-void xpcie_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
-{
-}
-
-void initcode(void)
-{
-}
 
 u32 xpcie_read_reg (u32 dw_offset)
 {

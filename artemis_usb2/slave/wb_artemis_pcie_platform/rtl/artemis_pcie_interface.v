@@ -82,6 +82,7 @@ module artemis_pcie_interface #(
   output                    cfg_err_cpl_rdy,
 
   // Conifguration: Interrupt
+/*
   input                     cfg_interrupt,
   output                    cfg_interrupt_rdy,
   input                     cfg_interrupt_assert,
@@ -89,6 +90,11 @@ module artemis_pcie_interface #(
   input       [7:0]         cfg_interrupt_di,
   output      [2:0]         cfg_interrupt_mmenable,
   output                    cfg_interrupt_msienable,
+*/
+
+
+  input                     i_interrupt_stb,
+  input       [7:0]         i_interrupt_channel,
 
   // Configuration: Power Management
   input                     cfg_turnoff_ok,
@@ -158,6 +164,8 @@ module artemis_pcie_interface #(
 
   output      [6:0]         o_bar_hit,
   output                    o_receive_axi_ready,
+
+
 
   output                    dbg_reg_detected_correctable,
   output                    dbg_reg_detected_fatal,
@@ -283,6 +291,16 @@ wire                        s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
 //assign                      s_axis_tx_tuser = 0;
+
+reg                         cfg_interrupt;
+wire                        cfg_interrupt_rdy;
+wire                        cfg_interrupt_assert;
+wire          [7:0]         cfg_interrupt_do;
+wire          [7:0]         cfg_interrupt_di;
+wire          [2:0]         cfg_interrupt_mmenable;
+wire                        cfg_interrupt_msienable;
+
+
 
 
 wire                        s_axis_tx_discont;
@@ -731,9 +749,39 @@ assign  s_axis_tx_tvalid  = o_bar_hit[CONTROL_SELECT] ? c_out_axi_valid :
                             o_bar_hit[DATA_SELECT]    ? d_out_axi_valid :
                             o_bar_hit[DMA_SELECT]     ? dma_out_axi_valid :
                             1'b0;
-//synchronous logic
 
 //Strobe the cfg_enable whenever the pcie core relinquishes control
 assign  cfg_enable  =  read_bar_addr_stb;
+
+assign  cfg_interrupt_di  = i_interrupt_channel;
+
+//synchronous logic
+localparam  IDLE = 0;
+localparam  SEND_INTERRUPT = 1;
+
+reg int_state = IDLE;
+
+always @ (posedge clk_62p5) begin
+  if (pcie_reset) begin
+    cfg_interrupt         <=  0;
+    int_state             <=  IDLE;
+  end
+  else begin
+    case (int_state)
+      IDLE: begin
+        cfg_interrupt     <=  0;
+        if (i_interrupt_stb)
+          int_state       <=  SEND_INTERRUPT;
+      end
+      SEND_INTERRUPT: begin
+        cfg_interrupt     <=  1;
+        if (cfg_interrupt_rdy) begin
+          int_state       <=  IDLE;
+          cfg_interrupt   <=  0;
+        end
+      end
+    endcase
+  end
+end
 
 endmodule

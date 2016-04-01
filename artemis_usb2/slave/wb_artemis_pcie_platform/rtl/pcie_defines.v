@@ -37,6 +37,12 @@
 `define PCIE_LPRF         8'b1000XXXX
 `define PCIE_EPRF         8'b1001XXXX
 
+`define PCIE_TYPE_MRD 5'b00000;
+`define PCIE_TYPE_MWR 5'b00000;
+
+//Number of DWORDs of packet
+`define PCIE_DWORD_PKT_CNT_RANGE 9:0
+
 //For our current architecture (Spartan 6) the max payload size is 512
 //THIS MAY CHANGE FOR KINTEX!
 `define MAX_PAYLOAD_SIZE  512

@@ -52,6 +52,7 @@ BAR_ADDR2                       =   21
 BAR_ADDR3                       =   22
 BAR_ADDR4                       =   23
 BAR_ADDR5                       =   24
+IRQ_CHANNEL_SELECT              =   25
 
 BAR_ADDR_BASE                   =   19
 
@@ -65,6 +66,7 @@ CTRL_BIT_ENABLE_EXT_RESET       =   4
 CTRL_BIT_MANUAL_USER_RESET      =   5
 CTRL_BIT_RESET_DBG_REGS         =   6
 CTRL_BIT_READ_BAR_ADDR_STB      =   7
+CTRL_BIT_SEND_IRQ               =   8
 
 STS_BIT_PCIE_RESET              =   0
 STS_BIT_LINKUP                  =   1
@@ -434,6 +436,16 @@ class ArtemisPCIEDriver(driver.Driver):
             return 0
         return self.read_register(BAR_ADDR_BASE + bar_index)
 
-
     def get_config_data(self):
         self.set_register_bit(CONTROL, CTRL_BIT_READ_BAR_ADDR_STB)
+
+    def send_irq(self):
+        self.set_register_bit(CONTROL, CTRL_BIT_SEND_IRQ)
+
+    def set_interrupt_channel(self, channel):
+        self.write_register(IRQ_CHANNEL_SELECT, channel)
+
+    def get_interrupt_channel(self):
+        return self.read_register(IRQ_CHANNEL_SELECT)
+
+

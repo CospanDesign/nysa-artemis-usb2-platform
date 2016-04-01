@@ -162,6 +162,14 @@ class Test (unittest.TestCase):
         #self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
         self.driver.read_debug_flags()
 
+        print ""
+        self.s.Important("Interrupt Test")
+        self.s.Info("Setting interrupt channel to 0x00")
+        self.driver.set_interrupt_channel(0x01)
+        self.s.Info("Sending interrupt...")
+        self.driver.send_irq()
+        print ""
+
         self.driver.get_config_data()
         for i in range (6):
             self.s.Info("Bus Address:           0x%08X" % self.driver.get_bar_address(i))

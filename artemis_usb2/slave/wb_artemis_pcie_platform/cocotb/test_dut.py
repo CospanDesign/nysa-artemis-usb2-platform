@@ -29,19 +29,19 @@ def setup_dut(dut):
     cocotb.fork(Clock(dut.clk, CLK_PERIOD).start())
 
 @cocotb.test(skip = False)
-def test_local_buffer(dut):
+def test_write_pcie_register(dut):
     """
     Description:
-        Test to make sure that we can read/write to/from local buffer
+        Test to make sure that we can write to all the local registers
 
     Test ID: 0
 
     Expected Results:
-        Data written into the buffer is the same as the data read out of the buffer
+        Values written into the registers are the same as the values read by Cocotb
     """
 
     dut.test_id = 0
-    print "module path: %s" % MODULE_PATH
+    #print "module path: %s" % MODULE_PATH
     nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
     setup_dut(dut)
     yield(nysa.reset())
@@ -52,161 +52,45 @@ def test_local_buffer(dut):
     #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
     driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
     yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+    #c = CocotbPCIE(dut, debug = True)
     yield (nysa.wait_clocks(100))
     v = yield cocotb.external(driver.get_control)()
 
-    dut.log.info("V: %d" % v)
+    #Register Writes
+    status_addr   = 0x55555555
+    buffer_ready  = 0x03
+    wr_buf_a_addr = 0x88888888
+    wr_buf_b_addr = 0x99999999
+    rd_buf_a_addr = 0xAAAAAAAA
+    rd_buf_b_addr = 0xBBBBBBBB
+    buf_size      = 0x000007FF
 
-
-    #Test Stuff
-    c = CocotbPCIE(dut)
-    tm = TLPManager()
-    tm.set_value("type", "mwr")
-    tm.set_value("address", 0x00000008)
-    data_in = tm.generate_raw()
-    data_in.extend([0x00, 0x00, 0x00, 0x01])
-    print "TLP Packet:"
-    print_32bit_hex_array(data_in[0:16])
-
-    #f = cocotb.fork(c.main_control())
-    #Test Stuff
-
-
-    '''
-    dut.log.info("Write to the local buffer")
-    size = yield cocotb.external(driver.get_local_buffer_size)()
-    data_out = Array("B")
-    for i in range (0, size, 4):
-        data_out.append((i + 0) % 256)
-        data_out.append((i + 1) % 256)
-        data_out.append((i + 2) % 256)
-        data_out.append((i + 3) % 256)
-
-    if len(data_out) > 0:
-        yield cocotb.external(driver.write_local_buffer)(data_out)
-
-    yield (nysa.wait_clocks(100))
-
-    data_in = yield cocotb.external(driver.read_local_buffer)()
-
-    error_count = 0
-    for i in range(len(data_in)):
-        if data_in[i] != data_out[i]:
-            error_count += 1
-            if error_count < 16:
-                print "Data Out != Data In @ 0x%02X 0x%02X != 0x%02X" % (i, data_out[i], data_in[i])
-
-    if error_count > 0:
-        print "Found Errors in the local buffer"
-
-    yield (nysa.wait_clocks(100))
-
-    dut.log.info("Enable PPFIFO 2 Local Memory")
-    '''
-    yield cocotb.external(driver.enable_pcie_read_block)(True)
-    yield (nysa.wait_clocks(10))
-
-    #Wrote Data
-    
-    w = cocotb.fork(c.send_PCIE_command(data_in))
-    r = cocotb.fork(c.listen_for_comm())
+    c.set_status_buf_addr(status_addr)
+    c.set_buffer_ready_status(buffer_ready)
+    c.set_write_buf_a_addr(wr_buf_a_addr)
+    c.set_write_buf_b_addr(wr_buf_b_addr)
+    c.set_read_buf_a_addr(rd_buf_a_addr)
+    c.set_read_buf_b_addr(rd_buf_b_addr)
+    c.set_buffer_size(buf_size)
 
     yield (nysa.wait_clocks(500))
-    yield cocotb.external(driver.enable_pcie_read_block)(False)
-    yield (nysa.wait_clocks(500))
 
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(1000))
-
-    #data_out = c.get_read_data()
-    #dut.log.info("Data out length: %d" % len(data_out))
-    #print_32bit_hex_array(data_out[0:16])
-
-@cocotb.test(skip = True)
-def test_local_buffer_to_pcie(dut):
-    """
-    Description:
-        Write to the local buffer and send the data out over PCIE
-
-    Test ID: 1
-
-    Expected Results:
-        Data written into the buffer is the same as the data read out of the buffer
-    """
+    if dut.s1.api.write_path.o_status_addr.value != status_addr:
+        dut.log.error("Status Buffer Address: 0x%08X != 0x%08X" % (status_addr, dut.s1.api.write_path.o_status_addr.value))
+    if dut.s1.api.write_path.o_update_buf.value != buffer_ready:
+        dut.log.error("Buffer Ready: 0x%08X != 0x%08X" % (buffer_ready, dut.s1.api.write_path.o_update_buf.value))
+    if dut.s1.api.write_path.o_write_a_addr.value != wr_buf_a_addr:
+        dut.log.error("Wr buf A Address: 0x%08X != 0x%08X" % (wr_buf_a_addr, dut.s1.api.write_path.o_write_a_addr.value))
+    if dut.s1.api.write_path.o_write_b_addr.value != wr_buf_b_addr:
+        dut.log.error("Wr buf B Address: 0x%08X != 0x%08X" % (wr_buf_b_addr, dut.s1.api.write_path.o_write_b_addr.value))
+    if dut.s1.api.write_path.o_read_a_addr.value != rd_buf_a_addr:
+        dut.log.error("Rd buf A Address: 0x%08X != 0x%08X" % (rd_buf_a_addr, dut.s1.api.write_path.o_read_a_addr.value))
+    if dut.s1.api.write_path.o_read_b_addr.value != rd_buf_b_addr:
+        dut.log.error("Rd buf B Address: 0x%08X != 0x%08X" % (rd_buf_b_addr, dut.s1.api.write_path.o_read_b_addr.value))
+    if dut.s1.api.write_path.o_buffer_size.value != buf_size:
+        dut.log.error("Buffer Size: 0x%08X != 0x%08X" % (buf_size, dut.s1.api.write_path.o_buffer_size.value))
 
 
-    dut.test_id = 1
-    print "module path: %s" % MODULE_PATH
-    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
-    setup_dut(dut)
-    yield(nysa.reset())
-    nysa.read_sdb()
-    yield (nysa.wait_clocks(10))
-    nysa.pretty_print_sdb()
-    d = nysa.find_device(ArtemisPCIEDriver)[0]
-    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
-    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
-    yield cocotb.external(driver.enable)(True)
-    yield (nysa.wait_clocks(100))
-    v = yield cocotb.external(driver.get_control)()
 
-
-    dut.log.info("Write to the local buffer")
-    size = yield cocotb.external(driver.get_local_buffer_size)()
-    data_out = Array("B")
-    for i in range (size):
-        data_out.append(i % 256)
-
-    if len(data_out) > 0:
-        yield cocotb.external(driver.write_local_buffer)(data_out)
-
-    yield (nysa.wait_clocks(100))
-
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(100))
-
-@cocotb.test(skip = True)
-def test_config_read(dut):
-    """
-    Description:
-        Write to the local buffer and send the data out over PCIE
-
-    Test ID: 2
-
-    Expected Results:
-        Data written into the buffer is the same as the data read out of the buffer
-    """
-
-
-    dut.test_id = 2
-    print "module path: %s" % MODULE_PATH
-    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
-    setup_dut(dut)
-    yield(nysa.reset())
-    nysa.read_sdb()
-    yield (nysa.wait_clocks(10))
-    nysa.pretty_print_sdb()
-    d = nysa.find_device(ArtemisPCIEDriver)[0]
-    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
-    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
-    yield cocotb.external(driver.enable)(True)
-    yield (nysa.wait_clocks(100))
-    v = yield cocotb.external(driver.get_control)()
-
-
-    dut.log.info("Write to the local buffer")
-    size = yield cocotb.external(driver.get_local_buffer_size)()
-    data_out = Array("B")
-    for i in range (size):
-        data_out.append(i % 256)
-
-    if len(data_out) > 0:
-        yield cocotb.external(driver.write_local_buffer)(data_out)
-
-    yield (nysa.wait_clocks(100))
-
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(100))
-    yield cocotb.external(driver.get_config_data)()
-    yield (nysa.wait_clocks(100))
 

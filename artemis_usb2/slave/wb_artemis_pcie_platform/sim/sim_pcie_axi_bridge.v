@@ -60,10 +60,10 @@ module sim_pcie_axi_bridge #(
   output  reg               user_enable_comm, //SIM: Not Finished
 
   // Rx
-  output  reg [31:0]        m_axis_rx_tdata,
+  output  reg [31:0]        m_axis_rx_tdata = 32'h00000000,
   output  reg [3:0]         m_axis_rx_tkeep = 4'b1111,
-  output  reg               m_axis_rx_tlast,
-  output  reg               m_axis_rx_tvalid,
+  output  reg               m_axis_rx_tlast = 1'b0,
+  output  reg               m_axis_rx_tvalid = 1'b0,
   input                     m_axis_rx_tready,
   output      [21:0]        m_axis_rx_tuser,
   input                     rx_np_ok,         //SIM: Not Finished
@@ -338,9 +338,7 @@ assign  m_axis_rx_tuser   =  {13'h0,
 
 
 always @ (posedge clk) begin
-  if (rst) begin
-    m_axis_rx_tkeep   <=  4'b1111;
-  end
+  m_axis_rx_tkeep   <=  4'b1111;
 end
 /*
 always @ (posedge clk) begin

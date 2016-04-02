@@ -36,7 +36,6 @@ module pcie_ingress (
   input                     rst,
 
   //AXI Stream Host 2 Device
-  input                     i_axi_ingress_clk,
   output  reg               o_axi_ingress_ready,
   input       [31:0]        i_axi_ingress_data,
   input       [3:0]         i_axi_ingress_keep,
@@ -227,6 +226,7 @@ always @ (posedge clk) begin
     o_read_b_addr             <=  0;
     o_status_addr             <=  0;
     o_update_buf              <=  0;
+    o_ping_value              <=  0;
 
     //Command Registers
     o_dword_size              <=  0;
@@ -250,7 +250,8 @@ always @ (posedge clk) begin
   else begin
     case (state)
       IDLE: begin
-        r_data_count          <=  0;
+        r_data_count                  <=  0;
+        r_hdr_index                   <=  0;
 
         if (i_axi_ingress_valid) begin
           if (i_bar_hit[0])begin
@@ -265,7 +266,6 @@ always @ (posedge clk) begin
       end
       READY: begin
         o_axi_ingress_ready           <=  1;
-        r_hdr_index                   <=  0;
         r_hdr[r_hdr_index]            <=  i_axi_ingress_data;
         r_hdr_index                   <=  r_hdr_index + 1;
         state                         <=  READ_HDR;

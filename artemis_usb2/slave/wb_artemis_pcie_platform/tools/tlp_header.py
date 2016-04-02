@@ -245,7 +245,7 @@ class TLPTransferHeader(TLPHeader):
             super(TLPTransferHeader, self).set_value(key, value)
         elif key in TRANSFER_HEADER_FIELDS:
             if key == ADDRESS:
-                print "Address: %d" % value
+                #print "Address: %d" % value
                 self.address = value
             if key == BUS_NUM:
                 self.bus_num = value

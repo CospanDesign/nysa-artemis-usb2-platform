@@ -1,12 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites name="results">
   <testsuite name="all" package="all" tests="0">
-    <testcase classname="test_dut" name="test_config_read" time="0.0">
-      <skipped />
-    </testcase>
-    <testcase classname="test_dut" name="test_local_buffer_to_pcie" time="0.0">
-      <skipped />
-    </testcase>
-    <testcase classname="test_dut" name="test_local_buffer" time="0.5532970428466797" />
+    <testcase classname="test_dut" name="test_write_pcie_register" time="0.2389659881591797" />
   </testsuite>
 </testsuites>

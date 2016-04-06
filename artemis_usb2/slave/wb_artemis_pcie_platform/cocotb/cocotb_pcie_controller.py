@@ -1,5 +1,6 @@
 import os
 import sys
+from array import array as Array
 
 
 import cocotb
@@ -33,15 +34,45 @@ from nysa.common.print_utils import *
 NAME="PCIE Controller"
 
 #Register Values
-STATUS_BUF_ADDR       =  0x00
-BUFFER_READY          =  0x01
-WRITE_BUF_A_ADDR      =  0x02
-WRITE_BUF_B_ADDR      =  0x03
-READ_BUF_A_ADDR       =  0x04
-READ_BUF_B_ADDR       =  0x05
-BUFFER_SIZE           =  0x06
-PING_VALUE            =  0x07
+REG_STATUS_BUF_ADDR       = 0x00
+REG_BUFFER_READY          = 0x01
+REG_WRITE_BUF_A_ADDR      = 0x02
+REG_WRITE_BUF_B_ADDR      = 0x03
+REG_READ_BUF_A_ADDR       = 0x04
+REG_READ_BUF_B_ADDR       = 0x05
+REG_BUFFER_SIZE           = 0x06
+REG_PING_VALUE            = 0x07
 
+#Commands
+CMD_COMMAND_RESET         = 0x0080
+CMD_PERIPHERAL_WRITE      = 0x0081
+CMD_PERIPHERAL_WRITE_FIFO = 0x0082
+CMD_PERIPHERAL_READ       = 0x0083
+CMD_PERIPHERAL_READ_FIFO  = 0x0084
+CMD_MEMORY_WRITE          = 0x0085
+CMD_MEMORY_READ           = 0x0086
+CMD_DMA_WRITE             = 0x0087
+CMD_DMA_READ              = 0x0088
+CMD_PING                  = 0x0089
+CMD_READ_CONFIG           = 0x008A
+
+
+
+BAR0_ADDR               = 0x00000000
+STATUS_BUFFER_ADDRESS   = 0x01000000
+WRITE_BUFFER_A_ADDRESS  = 0x02000000
+WRITE_BUFFER_B_ADDRESS  = 0x03000000
+READ_BUFFER_A_ADDRESS   = 0x04000000
+READ_BUFFER_B_ADDRESS   = 0x05000000
+BUFFER_SIZE             = 0x00000800
+
+def dword_to_array(value):
+    out = Array('B')
+    out.append((value >> 24) & 0xFF)
+    out.append((value >> 16) & 0xFF)
+    out.append((value >>  8) & 0xFF)
+    out.append((value >>  0) & 0xFF)
+    return out
 
 class CocotbPCIE (object):
 
@@ -55,6 +86,19 @@ class CocotbPCIE (object):
         self.tm = TLPManager()
         self.w = None
         self.r = None
+        self.base_address = 0x0200
+
+    def set_base_address(self, base_address):
+        self.base_address = base_address
+
+    def configure_FPGA(self):
+        self.set_status_buf_addr(STATUS_BUFFER_ADDRESS)
+        self.set_buffer_ready_status(0x00)
+        self.set_write_buf_a_addr(WRITE_BUFFER_A_ADDRESS)
+        self.set_write_buf_b_addr(WRITE_BUFFER_B_ADDRESS)
+        self.set_read_buf_a_addr(READ_BUFFER_A_ADDRESS)
+        self.set_read_buf_b_addr(READ_BUFFER_B_ADDRESS)
+        self.set_buffer_size(BUFFER_SIZE)
 
     @cocotb.coroutine
     def _acquire_lock(self):
@@ -69,26 +113,29 @@ class CocotbPCIE (object):
 
     @cocotb.coroutine
     def main_control(self):
-        self.dut.log.info("Entered PCIE Control Loop")
+        cocotb.log.info("Entered PCIE Control Loop")
         yield RisingEdge(self.dut.clk)
-        self.dut.log.info("Detected Rising Edge of clock")
+        cocotb.log.info("Detected Rising Edge of clock")
 
     @cocotb.coroutine
     def send_PCIE_command(self, data):
         #yield RisingEdge(self.dut.clk)
-        #self.dut.log.info("Sending command to memory")
+        #cocotb.log.info("Sending command to memory")
         yield self.axm.write(data)
 
     @cocotb.coroutine
-    def listen_for_comm(self):
-        yield self.axs.read_packet()
+    def listen_for_comm(self, wait_for_ready = False):
+        cocotb.log.info("Listen for comm")
+        yield self.axs.read_packet(wait_for_ready)
 
     def get_read_data(self):
         return self.axs.get_data()
 
     def write_register(self, address, data):
+        #Convert Word address to byte address
+        address += self.base_address
         address = address << 2
-        #if self.debug: self.dut.log.info("Entered Write Register")
+        #if self.debug: cocotb.log.info("Entered Write Register")
         self.tm.set_value("type", "mwr")
         self.tm.set_value("address", address)
         self.tm.set_value("dword_count", 1)
@@ -103,26 +150,52 @@ class CocotbPCIE (object):
             self.w.join()
 
     def set_status_buf_addr(self, addr):
-        self.write_register(STATUS_BUF_ADDR, addr)
+        self.write_register(REG_STATUS_BUF_ADDR, addr)
 
     def set_buffer_ready_status(self, ready_status):
-        self.write_register(BUFFER_READY, ready_status)
+        self.write_register(REG_BUFFER_READY, ready_status)
 
     def set_write_buf_a_addr(self, addr):
-        self.write_register(WRITE_BUF_A_ADDR, addr)
+        self.write_register(REG_WRITE_BUF_A_ADDR, addr)
 
     def set_write_buf_b_addr(self, addr):
-        self.write_register(WRITE_BUF_B_ADDR, addr)
+        self.write_register(REG_WRITE_BUF_B_ADDR, addr)
 
     def set_read_buf_a_addr(self, addr):
-        self.write_register(READ_BUF_A_ADDR, addr)
+        self.write_register(REG_READ_BUF_A_ADDR, addr)
 
     def set_read_buf_b_addr(self, addr):
-        self.write_register(READ_BUF_B_ADDR, addr)
+        self.write_register(REG_READ_BUF_B_ADDR, addr)
 
     def set_buffer_size(self, buf_size):
-        self.write_register(BUFFER_SIZE, buf_size)
+        self.write_register(REG_BUFFER_SIZE, buf_size)
 
-    def write_command(self, command, count, address):
-        pass
+    def write_command(self, command, count = 0, address = 0):
+        #Convert Word address to byte address
+        command += self.base_address
+        command = command << 2
+        self.tm.set_value("type", "mwr")
+        self.tm.set_value("address", command)
+        self.tm.set_value("dword_count", 2)
+        data_out = self.tm.generate_raw()
+        data_out.extend(dword_to_array(count))
+        data_out.extend(dword_to_array(address))
+        if self.debug: print_32bit_hex_array(data_out)
+        self.w = cocotb.fork(self.send_PCIE_command(data_out))
+        if self.w:
+            self.w.join()
+
+    @cocotb.coroutine
+    def read_config_regs(self, wait_for_ready = False):
+        #Read a the response, the status register should have the data
+        self.write_command(CMD_READ_CONFIG, count = 0, address = 0x01)
+        yield self.listen_for_comm(wait_for_ready)
+        data = self.get_read_data()
+
+        #print "Raw 32-bit value:"
+        #print_32bit_hex_array(data)
+        self.tm.parse_raw(data)
+        self.tm.pretty_print()
+
+
 

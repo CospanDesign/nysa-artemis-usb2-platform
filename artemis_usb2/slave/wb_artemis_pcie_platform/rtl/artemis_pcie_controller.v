@@ -205,7 +205,6 @@ wire                        s_axis_tx_tlast;
 wire                        s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
-//assign                      s_axis_tx_tuser = 0;
 
 reg                         cfg_interrupt;
 wire                        cfg_interrupt_rdy;
@@ -215,9 +214,8 @@ wire          [7:0]         cfg_interrupt_di;
 wire          [2:0]         cfg_interrupt_mmenable;
 wire                        cfg_interrupt_msienable;
 
-
-
-
+wire          [7:0]         w_interrupt_msi_value;
+wire                        w_interrupt_stb;
 
 //XXX: Configuration Registers this should be read in by the controller
 wire          [31:0]        w_write_a_addr;
@@ -227,32 +225,26 @@ wire          [31:0]        w_read_b_addr;
 wire          [31:0]        w_status_addr;
 wire          [31:0]        w_buffer_size;
 wire          [31:0]        w_ping_value;
-wire          [31:0]        w_update_buf;
+wire          [1:0]         w_update_buf;
+wire                        w_update_buf_stb;
 
 //XXX: Control SM Signals
 wire          [31:0]        w_control_addr_base;
 wire          [3:0]         w_dev_sel;
-wire          [31:0]        w_dword_size;
+wire          [31:0]        w_cmd_data_count;
+wire          [31:0]        w_cmd_data_address;
 
 assign  w_control_addr_base = o_bar_addr0;
 
 
 //XXX: These signals are controlled by the buffer controller
 //BUFFER Interface
-wire                        w_buf_rdy;
 wire          [31:0]        w_buf_offset; //Should be connected to buffer controller to indicate where the buffer is located
 wire                        w_buf_we;
 wire          [31:0]        w_buf_addr;
 wire          [31:0]        w_buf_dat;
 
-assign  w_buf_rdy   = 1;                  //DEBUG Configuration
 assign  w_buf_offset  = 32'h00000000;     //DEBUG Configuration
-
-
-
-
-
-
 
 wire                        s_axis_tx_discont;
 wire                        s_axis_tx_stream;
@@ -295,22 +287,69 @@ wire                        dbg_ur_pois_cfg_wr;
 wire                        dbg_ur_status;
 wire                        dbg_ur_unsup_msg;
 
+wire                        w_enable_config_read;
+wire                        w_finished_config_read;
 
-assign  s_axis_tx_discont     = 0;
-assign  s_axis_tx_stream      = 0;
-assign  s_axis_tx_err_fwd     = 0;
-assign  s_axis_tx_s6_not_used = 0;
+wire                        w_reg_write_stb;
+wire  [3:0]                 w_device_select;
 
-assign  s_axis_tx_tuser       = {s_axis_tx_discont,
-                                 s_axis_tx_stream,
-                                 s_axis_tx_err_fwd,
-                                 s_axis_tx_s6_not_used};
+wire                        w_cmd_rst_stb;
+wire                        w_cmd_wr_stb;
+wire                        w_cmd_rd_stb;
+wire                        w_cmd_ping_stb;
+wire                        w_cmd_rd_cfg_stb;
+wire                        w_cmd_unknown;
+wire                        w_cmd_flg_fifo;
 
-assign  o_bar_hit             = m_axis_rx_tuser[8:2];
+wire                        w_egress_enable;
+wire                        w_egress_finished;
+wire  [7:0]                 w_egress_tlp_command;
+wire  [13:0]                w_egress_tlp_flags;
+wire  [31:0]                w_egress_tlp_address;
+wire  [15:0]                w_egress_tlp_requester_id;
+wire  [7:0]                 w_egress_tag;
 
-assign  cfg_trn_pending       =  1'b0;
-assign  tx_cfg_gnt            =  1'b1;
-assign  rx_np_ok              =  1'b1;
+
+
+/****************************************************************************
+ * Egress FIFO Signals
+ ****************************************************************************/
+
+wire                        w_ctr_fifo_sel;
+wire                        w_mem_fifo_sel;
+wire                        w_dma_fifo_sel;
+
+wire                        w_egress_fifo_rdy;
+wire                        w_egress_fifo_act;
+wire  [23:0]                w_egress_fifo_size;
+wire  [31:0]                w_egress_fifo_data;
+wire                        w_egress_fifo_stb;
+
+wire                        w_ctr_fifo_rdy;
+wire                        w_ctr_fifo_act;
+wire  [23:0]                w_ctr_fifo_size;
+wire  [31:0]                w_ctr_fifo_data;
+wire                        w_ctr_fifo_stb;
+
+wire                        w_mem_fifo_rdy;
+wire                        w_mem_fifo_act;
+wire  [23:0]                w_mem_fifo_size;
+wire  [31:0]                w_mem_fifo_data;
+wire                        w_mem_fifo_stb;
+
+wire                        w_dma_fifo_rdy;
+wire                        w_dma_fifo_act;
+wire  [23:0]                w_dma_fifo_size;
+wire  [31:0]                w_dma_fifo_data;
+wire                        w_dma_fifo_stb;
+
+
+/****************************************************************************
+ * Interrupt State Machine Signals
+ ****************************************************************************/
+
+
+
 
 //pcie_axi_bridge pcie_interface
 sim_pcie_axi_bridge pcie_interface
@@ -456,337 +495,291 @@ sim_pcie_axi_bridge pcie_interface
   .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg           )
 );
 
-
+/****************************************************************************
+ * Read the BAR Addresses from Config Space
+ ****************************************************************************/
 config_parser cfg (
-  .rst              (pcie_reset           ),
-  .clk              (clk_62p5             ),
+  .rst                        (pcie_reset                 ),
+  .clk                        (clk_62p5                   ),
 
-  .i_en             (cfg_enable           ),
+  .i_en                       (w_enable_config_read       ),
+  .o_finished                 (w_finished_config_read     ),
 
-  .i_cfg_do         (cfg_do               ),
-  .i_cfg_rd_wr_done (cfg_rd_wr_done       ),
-  .o_cfg_dwaddr     (cfg_dwaddr           ),
-  .o_cfg_rd_en      (cfg_rd_en            ),
+  .i_cfg_do                   (cfg_do                     ),
+  .i_cfg_rd_wr_done           (cfg_rd_wr_done             ),
+  .o_cfg_dwaddr               (cfg_dwaddr                 ),
+  .o_cfg_rd_en                (cfg_rd_en                  ),
 
 
-  .o_bar_addr0      (o_bar_addr0          ),
-  .o_bar_addr1      (o_bar_addr1          ),
-  .o_bar_addr2      (o_bar_addr2          ),
-  .o_bar_addr3      (o_bar_addr3          ),
-  .o_bar_addr4      (o_bar_addr4          ),
-  .o_bar_addr5      (o_bar_addr5          )
+  .o_bar_addr0                (o_bar_addr0                ),
+  .o_bar_addr1                (o_bar_addr1                ),
+  .o_bar_addr2                (o_bar_addr2                ),
+  .o_bar_addr3                (o_bar_addr3                ),
+  .o_bar_addr4                (o_bar_addr4                ),
+  .o_bar_addr5                (o_bar_addr5                )
 );
 
-pcie_ingress write_path(
-  .clk                   (clk_62p5              ),
-  .rst                   (pcie_reset            ),
+pcie_control controller(
+  .clk                        (clk_62p5                   ),
+  .rst                        (pcie_reset                 ),
+
+  .i_write_a_addr             (w_write_a_addr             ),
+  .i_write_b_addr             (w_write_b_addr             ),
+  .i_read_a_addr              (w_read_a_addr              ),
+  .i_read_b_addr              (w_read_b_addr              ),
+  .i_status_addr              (w_status_addr              ),
+  .i_buffer_size              (w_buffer_size              ),
+  .i_ping_value               (w_ping_value               ),
+  .i_update_buf               (w_update_buf               ),
+  .i_update_buf_stb           (w_update_buf_stb           ),
+
+  .i_reg_write_stb            (w_reg_write_stb            ),
+  .i_device_select            (w_device_select            ),
+
+  .i_cmd_rst_stb              (w_cmd_rst_stb              ),
+  .i_cmd_wr_stb               (w_cmd_wr_stb               ),
+  .i_cmd_rd_stb               (w_cmd_rd_stb               ),
+  .i_cmd_ping_stb             (w_cmd_ping_stb             ),
+  .i_cmd_rd_cfg_stb           (w_cmd_rd_cfg_stb           ),
+  .i_cmd_unknown              (w_cmd_unknown              ),
+  .i_cmd_flg_fifo             (w_cmd_flg_fifo             ),
+
+  .i_cmd_data_count           (w_cmd_data_count           ),
+  .i_cmd_data_address         (w_cmd_data_address         ),
+
+  .i_pcie_fc_ready            (tmp_pcie_fc_ready          ),
+
+  .o_egress_enable            (w_egress_enable            ),
+  .i_egress_finished          (w_egress_finished          ),
+  .o_egress_tlp_command       (w_egress_tlp_command       ),
+  .o_egress_tlp_flags         (w_egress_tlp_flags         ),
+  .o_egress_tlp_address       (w_egress_tlp_address       ),
+  .o_egress_tlp_requester_id  (w_egress_tlp_requester_id  ),
+  .o_egress_tag               (w_egress_tag               ),
+
+  .o_egress_cntrl_fifo_select (w_ctr_fifo_sel             ),
+  .o_interrupt_msi_value      (w_interrupt_msi_value      ),
+  .o_interrupt_stb            (w_interrupt_stb            ),
+
+  .o_egress_fifo_rdy          (w_ctr_fifo_rdy             ),
+  .i_egress_fifo_act          (w_ctr_fifo_act             ),
+  .o_egress_fifo_size         (w_ctr_fifo_size            ),
+  .i_egress_fifo_stb          (w_ctr_fifo_stb             ),
+  .o_egress_fifo_data         (w_ctr_fifo_data            ),
+
+  .o_sys_rst                  (o_sys_rst                  )
+);
+
+pcie_ingress ingress(
+  .clk                        (clk_62p5                   ),
+  .rst                        (pcie_reset                 ),
 
   //AXI Stream Host 2 Device
-  .o_axi_ingress_ready   (m_axis_rx_tready      ),
-  .i_axi_ingress_data    (m_axis_rx_tdata       ),
-  .i_axi_ingress_keep    (m_axis_rx_tkeep       ),
-  .i_axi_ingress_last    (m_axis_rx_tlast       ),
-  .i_axi_ingress_valid   (m_axis_rx_tvalid      ),
+  .o_axi_ingress_ready        (m_axis_rx_tready           ),
+  .i_axi_ingress_data         (m_axis_rx_tdata            ),
+  .i_axi_ingress_keep         (m_axis_rx_tkeep            ),
+  .i_axi_ingress_last         (m_axis_rx_tlast            ),
+  .i_axi_ingress_valid        (m_axis_rx_tvalid           ),
 
   //Configuration
-  .o_reg_write_stb       (o_reg_write_stb       ),  //Strobes when new register data is detected
+  .o_reg_write_stb            (w_reg_write_stb            ),  //Strobes when new register data is detected
 
   //Parsed out Register Values
-  .o_write_a_addr        (w_write_a_addr        ),
-  .o_write_b_addr        (w_write_b_addr        ),
-  .o_read_a_addr         (w_read_a_addr         ),
-  .o_read_b_addr         (w_read_b_addr         ),
-  .o_status_addr         (w_status_addr         ),
-  .o_buffer_size         (w_buffer_size         ),
-  .o_ping_value          (w_ping_value          ),
-  .o_update_buf          (w_update_buf          ),
+  .o_write_a_addr             (w_write_a_addr             ),
+  .o_write_b_addr             (w_write_b_addr             ),
+  .o_read_a_addr              (w_read_a_addr              ),
+  .o_read_b_addr              (w_read_b_addr              ),
+  .o_status_addr              (w_status_addr              ),
+  .o_buffer_size              (w_buffer_size              ),
+  .o_ping_value               (w_ping_value               ),
+  .o_update_buf               (w_update_buf               ),
+  .o_update_buf_stb           (w_update_buf_stb           ),
 
   //Command Interface
-  .o_dev_sel             (w_dev_sel             ),
+  .o_device_select            (w_device_select            ),
 
-  .o_cmd_rst_stb         (o_cmd_rst_stb         ),  //Strobe when a reset command is detected
-  .o_cmd_wr_stb          (o_cmd_wr_stb          ),  //Strobes when a write request is detected
-  .o_cmd_rd_stb          (o_cmd_rd_stb          ),  //Strobes when a read request is detected
-  .o_cmd_ping_stb        (o_cmd_ping_stb        ),  //Strobes when a ping request is detected
-  .o_cmd_rd_cfg_stb      (o_cmd_rd_cfg_stb      ),  //Strobes when a read configuration id detected
-  .o_cmd_unknown         (o_cmd_unknown         ),
-  .o_flg_fifo            (o_flg_fifo            ),  //Flag indicating that transfer shouldn't auto increment addr
+  .o_cmd_rst_stb              (w_cmd_rst_stb              ),  //Strobe when a reset command is detected
+  .o_cmd_wr_stb               (w_cmd_wr_stb               ),  //Strobes when a write request is detected
+  .o_cmd_rd_stb               (w_cmd_rd_stb               ),  //Strobes when a read request is detected
+  .o_cmd_ping_stb             (w_cmd_ping_stb             ),  //Strobes when a ping request is detected
+  .o_cmd_rd_cfg_stb           (w_cmd_rd_cfg_stb           ),  //Strobes when a read configuration id detected
+  .o_cmd_unknown              (w_cmd_unknown              ),
+  .o_cmd_flg_fifo             (w_cmd_flg_fifo             ),  //Flag indicating that transfer shouldn't auto increment addr
 
   //Input Configuration Registers from either PCIE_A1 or controller
-  .i_bar_hit             (o_bar_hit             ),
+  .i_bar_hit                  (o_bar_hit                  ),
   //Local Address of where BAR0 is located (Used to do address translation)
-  .i_control_addr_base   (w_control_addr_base   ),
-  //This is set high when the controller is expecting to read data from the host
-  .i_enable_data_path    (i_enable_data_path    ),
+  .i_control_addr_base        (w_control_addr_base        ),
+  .o_enable_config_read       (w_enable_config_read       ),
+  .i_finished_config_read     (w_finished_config_read     ),
 
   //When a command is detected the size of the transaction is reported here
-  .o_dword_size          (w_dword_size          ),
+  .o_cmd_data_count           (w_cmd_data_count           ),
+  .o_cmd_data_address         (w_cmd_data_address         ),
 
   //Buffer interface, the buffer controller will manage this
-  .i_buf_offset          (w_buf_offset          ),
-  .i_buf_rdy             (w_buf_rdy             ),
-  .o_buf_we              (w_buf_we              ),
-  .o_buf_addr            (w_buf_addr            ),
-  .o_buf_dat             (w_buf_dat             )
+  .i_buf_offset               (tmp_buf_offset             ),
+  .o_buf_we                   (tmp_buf_we                 ),
+  .o_buf_addr                 (tmp_buf_addr               ),
+  .o_buf_data                 (tmp_buf_data               )
 );
 
-/*
-adapter_axi_stream_2_ppfifo cntrl_a2p (
-  .rst              (pcie_reset           ),
+pcie_egress egress(
+  .clk                        (clk_62p5                   ),
+  .rst                        (pcie_reset                 ),
 
-  //AXI Stream Input
-  .i_axi_clk        (clk_62p5             ),
-  .o_axi_ready      (c_in_axi_ready       ),
-  .i_axi_data       (c_in_axi_data        ),
-  .i_axi_keep       (c_in_axi_keep        ),
-  .i_axi_last       (c_in_axi_last        ),
-  .i_axi_valid      (c_in_axi_valid       ),
+  .i_enable                   (w_egress_enable            ),
+  .o_finished                 (w_egress_finished          ),
+  .i_command                  (w_egress_tlp_command       ),
+  .i_flags                    (w_egress_tlp_flags         ),
+  .i_address                  (w_egress_tlp_address       ),
+  .i_requester_id             (w_egress_tlp_requester_id  ),
+  .i_tag                      (w_egress_tag               ),
 
-  //Ping Pong FIFO Write Controller
-  //.o_ppfifo_clk     (clk_62p5             ),
-  .o_ppfifo_clk     (                     ),
-  .i_ppfifo_rdy     (c_in_wr_ready        ),
-  .o_ppfifo_act     (c_in_wr_activate     ),
-  .i_ppfifo_size    (c_in_wr_size         ),
-  .o_ppfifo_stb     (c_in_wr_stb          ),
-  .o_ppfifo_data    (c_in_wr_data         )
+  .i_axi_egress_ready         (s_axis_tx_tready           ),
+  .o_axi_egress_data          (s_axis_tx_tdata            ),
+  .o_axi_egress_keep          (s_axis_tx_tkeep            ),
+  .o_axi_egress_last          (s_axis_tx_tlast            ),
+  .o_axi_egress_valid         (s_axis_tx_tvalid           ),
+
+  .i_fifo_rdy                 (w_egress_fifo_rdy          ),
+  .o_fifo_act                 (w_egress_fifo_act          ),
+  .i_fifo_size                (w_egress_fifo_size         ),
+  .i_fifo_data                (w_egress_fifo_data         ),
+  .o_fifo_stb                 (w_egress_fifo_stb          )
 );
 
-ppfifo #(
-  .DATA_WIDTH       (32                   ),
-  .ADDRESS_WIDTH    (CONTROL_FIFO_DEPTH - 2)
-) pcie_control_ingress (
+/****************************************************************************
+ * FIFO Multiplexer
+ ****************************************************************************/
+assign  w_egress_fifo_rdy     = (w_ctr_fifo_sel)  ? w_ctr_fifo_rdy:
+                                (w_mem_fifo_sel)  ? w_mem_fifo_rdy:
+                                (w_dma_fifo_sel)  ? w_dma_fifo_rdy:
+                                1'b0;
 
-  //Control Signals
-  .reset            (pcie_reset           ),
+assign  w_egress_fifo_size    = (w_ctr_fifo_sel)  ? w_ctr_fifo_size:
+                                (w_mem_fifo_sel)  ? w_mem_fifo_size:
+                                (w_dma_fifo_sel)  ? w_dma_fifo_size:
+                                24'h0;
 
-  //Write Side
-  .write_clock      (clk_62p5             ),
-  .write_ready      (c_in_wr_ready        ),
-  .write_activate   (c_in_wr_activate     ),
-  .write_fifo_size  (c_in_wr_size         ),
-  .write_strobe     (c_in_wr_stb          ),
-  .write_data       (c_in_wr_data         ),
-  .starved          (                     ),
+assign  w_egress_fifo_data    = (w_ctr_fifo_sel)  ? w_ctr_fifo_data:
+                                (w_mem_fifo_sel)  ? w_mem_fifo_data:
+                                (w_dma_fifo_sel)  ? w_dma_fifo_data:
+                                32'h00;
 
-  //Read Size
-  .read_clock       (clk                  ),
-  .read_strobe      (i_cmd_in_rd_stb      ),
-  .read_ready       (o_cmd_in_rd_ready    ),
-  .read_activate    (i_cmd_in_rd_activate ),
-  .read_count       (o_cmd_in_rd_count    ),
-  .read_data        (o_cmd_in_rd_data     ),
-  .inactive         (                     )
-);
+assign  w_ctr_fifo_act        = (w_ctr_fifo_sel)  ? w_egress_fifo_act:
+                                    1'b0;
+assign  w_ctr_fifo_stb        = (w_ctr_fifo_sel)  ? w_egress_fifo_stb:
+                                    1'b0;
 
-ppfifo #(
-  .DATA_WIDTH       (32                   ),
-  .ADDRESS_WIDTH    (CONTROL_FIFO_DEPTH - 2)
-) pcie_control_egress (
+assign  w_mem_fifo_act        = (w_mem_fifo_sel)  ? w_egress_fifo_act:
+                                    1'b0;
+assign  w_mem_fifo_stb        = (w_mem_fifo_sel)  ? w_egress_fifo_stb:
+                                    1'b0;
 
-  //Control Signals
-  .reset            (pcie_reset           ),
-
-  //Write Side
-  .write_clock      (clk                  ),
-  .write_ready      (o_cmd_out_wr_ready   ),
-  .write_activate   (i_cmd_out_wr_activate),
-  .write_fifo_size  (o_cmd_out_wr_size    ),
-  .write_strobe     (i_cmd_out_wr_stb     ),
-  .write_data       (i_cmd_out_wr_data    ),
-  .starved          (                     ),
-
-  //Read Size
-  .read_clock       (clk_62p5             ),
-  .read_strobe      (c_out_rd_stb         ),
-  .read_ready       (c_out_rd_ready       ),
-  .read_activate    (c_out_rd_activate    ),
-  .read_count       (c_out_rd_size        ),
-  .read_data        (c_out_rd_data        ),
-  .inactive         (                     )
-);
+assign  w_dma_fifo_act        = (w_dma_fifo_sel)  ? w_egress_fifo_act:
+                                    1'b0;
+assign  w_dma_fifo_stb        = (w_dma_fifo_sel)  ? w_egress_fifo_stb:
+                                    1'b0;
 
 
-adapter_ppfifo_2_axi_stream control_p2a (
-  .rst              (pcie_reset           ),
 
-  //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (clk_62p5             ),
-  .i_ppfifo_rdy     (c_out_rd_ready       ),
-  .o_ppfifo_act     (c_out_rd_activate    ),
-  .i_ppfifo_size    (c_out_rd_size        ),
-  .i_ppfifo_data    (c_out_rd_data        ),
-  .o_ppfifo_stb     (c_out_rd_stb         ),
+/****************************************************************************
+ * Temporary Debug Signals
+ ****************************************************************************/
 
-  //AXI Stream Output (clock read from i_ppfifo_clk)
-  .o_axi_clk        (                     ),
-  .i_axi_ready      (c_out_axi_ready      ),
-  .o_axi_data       (c_out_axi_data       ),
-  .o_axi_keep       (c_out_axi_keep       ),
-  .o_axi_last       (c_out_axi_last       ),
-  .o_axi_valid      (c_out_axi_valid      )
+assign  w_mem_fifo_rdy  = 1'b0;
+assign  w_mem_fifo_size = 24'h0;
+assign  w_mem_fifo_data = 32'h00;
 
-);
+assign  w_dma_fifo_rdy  = 1'b0;
+assign  w_dma_fifo_size = 24'h0;
+assign  w_dma_fifo_data = 32'h00;
 
-//Data FIFOs
-adapter_axi_stream_2_ppfifo data_a2p (
-  .rst              (pcie_reset           ),
-
-  //AXI Stream Input
-  .i_axi_clk        (clk_62p5             ),
-  .o_axi_ready      (d_in_axi_ready       ),
-  .i_axi_data       (d_in_axi_data        ),
-  .i_axi_keep       (d_in_axi_keep        ),
-  .i_axi_last       (d_in_axi_last        ),
-  .i_axi_valid      (d_in_axi_valid       ),
-
-  //AXI Stream Output (clock read from i_ppfifo_clk)
-  //Ping Pong FIFO Write Controller
-  .o_ppfifo_clk     (                     ),
-  .i_ppfifo_rdy     (d_in_wr_ready        ),
-  .o_ppfifo_act     (d_in_wr_activate     ),
-  .i_ppfifo_size    (d_in_wr_size         ),
-  .o_ppfifo_stb     (d_in_wr_stb          ),
-  .o_ppfifo_data    (d_in_wr_data         )
-);
-
-ppfifo #(
-  .DATA_WIDTH       (32                   ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2  )
-) pcie_data_ingress (
-
-  //Control Signals
-  .reset            (pcie_reset           ),
-
-  //Write Side
-  .write_clock      (clk_62p5             ),
-  .write_ready      (d_in_wr_ready        ),
-  .write_activate   (d_in_wr_activate     ),
-  .write_fifo_size  (d_in_wr_size         ),
-  .write_strobe     (d_in_wr_stb          ),
-  .write_data       (d_in_wr_data         ),
-  .starved          (                     ),
-
-  //Read Size
-  .read_clock       (clk                  ),
-  .read_strobe      (i_data_in_rd_stb     ),
-  .read_ready       (o_data_in_rd_ready   ),
-  .read_activate    (i_data_in_rd_activate),
-  .read_count       (o_data_in_rd_count   ),
-  .read_data        (o_data_in_rd_data    ),
-  .inactive         (                     )
-);
-
-ppfifo #(
-  .DATA_WIDTH       (32                   ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH - 2  )
-) pcie_data_egress (
-
-  //Control Signals
-  .reset            (pcie_reset           ),
-
-  //Write Side
-  .write_clock      (clk                  ),
-  .write_ready      (o_data_out_wr_ready  ),
-  .write_activate   (i_data_out_wr_activate),
-  .write_fifo_size  (o_data_out_wr_size   ),
-  .write_strobe     (i_data_out_wr_stb    ),
-  .write_data       (i_data_out_wr_data   ),
-  .starved          (),
-
-  //Read Size
-  .read_clock       (clk_62p5             ),
-  .read_strobe      (d_out_rd_stb         ),
-  .read_ready       (d_out_rd_ready       ),
-  .read_activate    (d_out_rd_activate    ),
-  .read_count       (d_out_rd_size        ),
-  .read_data        (d_out_rd_data        ),
-  .inactive         (                     )
-);
-
-adapter_ppfifo_2_axi_stream data_p2a (
-  .rst              (pcie_reset           ),
-
-  //Ping Poing FIFO Read Interface
-  .i_ppfifo_clk     (clk_62p5             ),
-  .i_ppfifo_rdy     (d_out_rd_ready       ),
-  .o_ppfifo_act     (d_out_rd_activate    ),
-  .i_ppfifo_size    (d_out_rd_size        ),
-  .i_ppfifo_data    (d_out_rd_data        ),
-  .o_ppfifo_stb     (d_out_rd_stb         ),
-
-  //AXI Stream Output
-  .o_axi_clk        (                     ),
-  .i_axi_ready      (d_out_axi_ready      ),
-  .o_axi_data       (d_out_axi_data       ),
-  .o_axi_keep       (d_out_axi_keep       ),
-  .o_axi_last       (d_out_axi_last       ),
-  .o_axi_valid      (d_out_axi_valid      )
-);
-*/
-
-//asynchronous logic
-assign  o_receive_axi_ready     = m_axis_rx_tready;
-
-//Map the PCIE to PPFIFO FIFO
-/*
-assign  c_in_axi_data     = m_axis_rx_tdata;
-assign  d_in_axi_data     = m_axis_rx_tdata;
-assign  dma_in_axi_data   = m_axis_rx_tdata;
-
-assign  c_in_axi_keep     = m_axis_rx_tkeep;
-assign  d_in_axi_keep     = m_axis_rx_tkeep;
-assign  dma_in_axi_keep   = m_axis_rx_tkeep;
-
-assign  c_in_axi_last     = m_axis_rx_tlast;
-assign  d_in_axi_last     = m_axis_rx_tlast;
-assign  dma_in_axi_last   = m_axis_rx_tlast;
-
-assign  c_in_axi_valid    = o_bar_hit[CONTROL_SELECT] ? m_axis_rx_tvalid: 1'b0;
-assign  d_in_axi_valid    = o_bar_hit[DATA_SELECT]    ? m_axis_rx_tvalid: 1'b0;
-assign  dma_in_axi_valid  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tvalid: 1'b0;
-
-assign  c_out_axi_ready   = o_bar_hit[CONTROL_SELECT] ? s_axis_tx_tready: 1'b0;
-assign  d_out_axi_ready   = o_bar_hit[DATA_SELECT]    ? s_axis_tx_tready: 1'b0;
-assign  dma_in_axi_ready  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tready: 1'b0;
-
-//Many to one
-assign  m_axis_rx_tready  = o_bar_hit[CONTROL_SELECT] ? c_in_axi_ready  :
-                            o_bar_hit[DATA_SELECT]    ? d_in_axi_ready  :
-                            o_bar_hit[DMA_SELECT]     ? dma_in_axi_ready:
-                            1'b0;
-
-//Transmit Data (Many to one)
-assign  s_axis_tx_tdata   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_data  :
-                            o_bar_hit[DATA_SELECT]    ? d_out_axi_data  :
-                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_data:
-                            32'h0;
-
-assign  s_axis_tx_tkeep   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_keep  :
-                            o_bar_hit[DATA_SELECT]    ? d_out_axi_keep  :
-                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_keep:
-                            4'b0000;
-
-assign  s_axis_tx_tlast   = o_bar_hit[CONTROL_SELECT] ? c_out_axi_last  :
-                            o_bar_hit[DATA_SELECT]    ? d_out_axi_last  :
-                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_last:
-                            1'b0;
+//This used to go to the wishbone slave device
+assign  o_receive_axi_ready = 0;
 
 
-assign  s_axis_tx_tvalid  = o_bar_hit[CONTROL_SELECT] ? c_out_axi_valid :
-                            o_bar_hit[DATA_SELECT]    ? d_out_axi_valid :
-                            o_bar_hit[DMA_SELECT]     ? dma_out_axi_valid :
-                            1'b0;
-*/
+//Need to create a flow controller
+wire    tmp_pcie_fc_ready;
+assign  tmp_pcie_fc_ready = 1;
 
+wire  [31:0]  tmp_buf_offset;
+wire  [31:0]  tmp_buf_addr;
+wire          tmp_buf_we;
+wire  [31:0]  tmp_buf_data;
+
+assign  tmp_buf_offset  = 32'h0;
+
+
+
+wire  tmp_mem_fifo_sel;
+wire  tmp_dma_fifo_sel;
+
+
+
+assign  tmp_mem_fifo_sel  = 1'b0;
+assign  tmp_dma_fifo_sel  = 1'b0;
+
+assign  w_mem_fifo_sel  = tmp_mem_fifo_sel;
+assign  w_dma_fifo_sel  = tmp_dma_fifo_sel;
+
+
+
+
+
+/****************************************************************************
+ * AXI Signals from the user to the PCIE_A1 Core
+ ****************************************************************************/
+assign  s_axis_tx_discont     = 0;
+assign  s_axis_tx_stream      = 0;
+assign  s_axis_tx_err_fwd     = 0;
+assign  s_axis_tx_s6_not_used = 0;
+
+assign  s_axis_tx_tuser       = {s_axis_tx_discont,
+                                 s_axis_tx_stream,
+                                 s_axis_tx_err_fwd,
+                                 s_axis_tx_s6_not_used};
+
+//Use this BAR Hist because it is buffered with the AXI transaction
+assign  o_bar_hit             = m_axis_rx_tuser[8:2];
+
+/****************************************************************************
+ * The Following Signals Need to be integrated into the core
+ ****************************************************************************/
+//XXX: THIS SIGNAL MIGHT NEED TO BE SET HIGH WHEN AN UPSTREAM DATA REQUEST IS SENT
+assign  cfg_trn_pending       =  1'b0;
+//Allow PCIE_A1 Core to have priority over transactions
+assign  tx_cfg_gnt            =  1'b1;
+//Allow PCIE_A1 Core to send non-posted transactions to the user application (Flow Control from user app)
+assign  rx_np_ok              =  1'b1;
+
+
+
+/****************************************************************************
+ * Add the configuration state machine controller to a command, the user
+ * should be able to send an initialization signal from the host, this will
+ * Trigger the configuration controller to read the internal address register
+ * of the bars... is this needed anymore? The host will only write small
+ * transactions to configure the state machine, there doesn't seem to be a
+ * reason for the configuration state machine any more
+ ****************************************************************************/
 //Strobe the cfg_enable whenever the pcie core relinquishes control
-assign  cfg_enable  =  read_bar_addr_stb;
+//assign  cfg_enable        =  read_bar_addr_stb;
 
-assign  cfg_interrupt_di  = i_interrupt_channel;
+//assign  cfg_interrupt_di  = i_interrupt_channel;
+//assign  cfg_interrupt_stb = i_interrupt_stb;
+assign  cfg_interrupt_di  = w_interrupt_msi_value;
+assign  cfg_interrupt_stb = w_interrupt_stb;
 
+
+/****************************************************************************
+ * Interrupt State Machine
+ ****************************************************************************/
+//asynchronous logic
 //synchronous logic
-localparam  IDLE = 0;
-localparam  SEND_INTERRUPT = 1;
+localparam  IDLE            = 0;
+localparam  SEND_INTERRUPT  = 1;
 
 reg int_state = IDLE;
 
@@ -799,7 +792,7 @@ always @ (posedge clk_62p5) begin
     case (int_state)
       IDLE: begin
         cfg_interrupt     <=  0;
-        if (i_interrupt_stb)
+        if (cfg_interrupt_stb)
           int_state       <=  SEND_INTERRUPT;
       end
       SEND_INTERRUPT: begin

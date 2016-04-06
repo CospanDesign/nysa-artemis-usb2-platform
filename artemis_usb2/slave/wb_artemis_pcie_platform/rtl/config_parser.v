@@ -42,6 +42,7 @@ module config_parser (
   input                     clk,
 
   input                     i_en,
+  output  reg               o_finished,
 
   // Host (CFG) Interface
   input       [31:0]        i_cfg_do,
@@ -101,10 +102,13 @@ always @ (posedge clk) begin
     o_bar_addr3       <=  0;
     o_bar_addr4       <=  0;
     o_bar_addr5       <=  0;
+
+    o_finished        <=  0;
   end
   else begin
     case (state)
       IDLE: begin
+        o_finished        <=  0;
         index             <=  0;
         if (i_en) begin
           state           <=  PREP_ADDR;
@@ -180,7 +184,10 @@ always @ (posedge clk) begin
             index         <=  index + 1;
           end
           else begin
-            state         <=  IDLE;
+            o_finished    <=  1;
+            if (!i_en) begin
+              state       <=  IDLE;
+            end
           end
         end
       end

@@ -9,7 +9,6 @@ def print_tlp_line_hex(name, value, description, tab = 0):
     output_str = "\t" * tab
     output_str += "{0:<15}[0x{1:>03X}]: {2}\n".format(name, value, description)
     return output_str
- 
 
 def print_raw_packet(raw_packet, tab = 0):
     output_str = ""

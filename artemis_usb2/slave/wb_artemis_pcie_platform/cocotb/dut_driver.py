@@ -56,8 +56,6 @@ IRQ_CHANNEL_SELECT              =   25
 
 BAR_ADDR_BASE                   =   19
 
-
-
 CTRL_BIT_ENABLE                 =   0
 CTRL_BIT_SEND_CONTROL_BLOCK     =   1
 CTRL_BIT_CANCEL_SEND_BLOCK      =   2
@@ -114,10 +112,7 @@ DBG_UR_POIS_CFG_WR              =   16
 DBG_UR_STATUS                   =   17
 DBG_UR_UNSUP_MSG                =   18
 
-
-
 LOCAL_BUFFER_OFFSET             =   0x100
-
 
 class ArtemisPCIEDriver(driver.Driver):
 

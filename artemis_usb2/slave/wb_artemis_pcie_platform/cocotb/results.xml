@@ -1,6 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites name="results">
   <testsuite name="all" package="all" tests="0">
-    <testcase classname="test_dut" name="test_write_pcie_register" time="0.2389659881591797" />
+    <testcase classname="test_dut" name="test_pcie_command" time="0.3038768768310547" />
+    <testcase classname="test_dut" name="test_pcie_config_read_wait_for_ready" time="0.2850339412689209" />
+    <testcase classname="test_dut" name="test_write_pcie_register" time="0.19723916053771973" />
   </testsuite>
 </testsuites>

@@ -14,6 +14,9 @@
 //Type of packet
 `define PCIE_TYPE_RANGE 31:24
 
+`define PCIE_MRD_32B      8'b00000000
+`define PCIE_MWR_32B      8'b01000000
+
 `define PCIE_MRD          8'b00X00000
 `define PCIE_MRDLK        8'b00X00001
 `define PCIE_MWR          8'b01X00000
@@ -37,11 +40,31 @@
 `define PCIE_LPRF         8'b1000XXXX
 `define PCIE_EPRF         8'b1001XXXX
 
-`define PCIE_TYPE_MRD 5'b00000;
-`define PCIE_TYPE_MWR 5'b00000;
+`define PCIE_TYPE_MRD     5'b00000;
+`define PCIE_TYPE_MWR     5'b00000;
+
+//Packet Flags
+`define PCIE_FLAGS_RANGE  23:10
+
+`define FLAG_NORMAL {1'b0, `FLAG_TC_NORMAL, 1'b0, `FLAG_ID_ORD, 1'b0, `FLAG_PROC_HINT, `FLAG_DIGEST, `FLAG_POISONED, `FLAG_RELAX_ORD, `FLAG_NO_SNOOP, `FLAG_ADDR_TRANS}
+`define FLAG_TC_NORMAL    3'b000
+`define FLAG_POISONED     1'b0
+`define FLAG_ADDR_TRANS   2'b00
+`define FLAG_NO_SNOOP     1'b1
+`define FLAG_PROC_HINT    1'b0
+`define FLAG_RELAX_ORD    1'b0
+`define FLAG_DIGEST       1'b0
+
+//FLAG: ID Based Ordering
+`define FLAG_ID_ORD       1'b0
 
 //Number of DWORDs of packet
 `define PCIE_DWORD_PKT_CNT_RANGE 9:0
+
+
+//Memory Read Transaction
+`define PCIE_RD_REQ_REQUESTER_RANGE  31:16
+`define PCIE_RD_REQ_TAG_RANGE        15:8
 
 //For our current architecture (Spartan 6) the max payload size is 512
 //THIS MAY CHANGE FOR KINTEX!

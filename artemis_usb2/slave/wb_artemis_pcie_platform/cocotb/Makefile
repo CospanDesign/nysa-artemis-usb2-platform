@@ -27,6 +27,8 @@ VERILOG_SOURCES += ${NYSA}/verilog/generic/adapter_ppfifo_2_axi_stream.v
 
 VERILOG_SOURCES += ${TOPDIR}/rtl/config_parser.v
 #VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_interface.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_control.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_egress.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_ingress.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_controller.v
 

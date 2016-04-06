@@ -50,21 +50,21 @@ module pcie_ingress (
   output  reg [31:0]        o_status_addr,
   output  reg [31:0]        o_buffer_size,
   output  reg [31:0]        o_ping_value,
-  output  reg [31:0]        o_update_buf,
+  output  reg               o_update_buf_stb,
+  output  reg [1:0]         o_update_buf,
 
 
   //Bar Hit
   input       [6:0]         i_bar_hit,
   input       [31:0]        i_control_addr_base,
-
+  output  reg               o_enable_config_read,
+  input                     i_finished_config_read,
 
   //Ingress Data Path
-  input                     i_enable_data_path,
-
   output  reg               o_reg_write_stb,
 
   //Commands
-  output  reg [3:0]         o_dev_sel,
+  output  reg [3:0]         o_device_select,
 
   output  reg               o_cmd_rst_stb,
   output  reg               o_cmd_wr_stb,
@@ -72,29 +72,28 @@ module pcie_ingress (
   output  reg               o_cmd_ping_stb,
   output  reg               o_cmd_rd_cfg_stb,
   output  reg               o_cmd_unknown,
-  output  reg               o_flg_fifo,
-
-
+  output  reg               o_cmd_flg_fifo,
 
   //Command Interface
-  output  reg [31:0]        o_dword_size,
+  output  reg [31:0]        o_cmd_data_count,
+  output  reg [31:0]        o_cmd_data_address,
 
   //Buffer Interface
   input       [31:0]        i_buf_offset,
-  input                     i_buf_rdy,
   output  reg               o_buf_we,
   output  reg [31:0]        o_buf_addr,
-  output  reg [31:0]        o_buf_dat
+  output  reg [31:0]        o_buf_data
 );
 
 //local parameters
 localparam  IDLE                    = 4'h0;
 localparam  READY                   = 4'h1;
 localparam  READ_HDR                = 4'h2;
-localparam  WRITE_REG               = 4'h3;
-localparam  WRITE_CMD               = 4'h4;
+localparam  WRITE_REG_CMD           = 4'h3;
+localparam  READ_ADDR               = 4'h4;
 localparam  READ_CMPLT              = 4'h5;
-localparam  FLUSH                   = 4'h6;
+localparam  READ_BAR_ADDR           = 4'h6;
+localparam  FLUSH                   = 4'h7;
 
 //Commands
 localparam  CMD_MEM_READ            = 8'h00;
@@ -141,6 +140,8 @@ wire                        w_cme_en;
 
 reg   [31:0]                r_buf_cnt;
 wire  [6:0]                 w_cmplt_lower_addr;
+
+reg                         r_config_space_done;
 
 
 wire  [31:0]                w_hdr0;
@@ -214,7 +215,9 @@ always @ (posedge clk) begin
   o_cmd_ping_stb              <=  0;
   o_cmd_rd_cfg_stb            <=  0;
   o_cmd_unknown               <=  0;
-  o_flg_fifo                  <=  0;
+  o_cmd_flg_fifo              <=  0;
+
+  o_update_buf_stb            <=  0;
 
   if (rst) begin
     state                     <=  IDLE;
@@ -227,11 +230,13 @@ always @ (posedge clk) begin
     o_status_addr             <=  0;
     o_update_buf              <=  0;
     o_ping_value              <=  0;
+    o_buffer_size             <=  0;
 
     //Command Registers
-    o_dword_size              <=  0;
+    o_cmd_data_count          <=  0;
+    o_cmd_data_address        <=  0;
 
-    o_dev_sel                 <=  `SELECT_CONTROL;
+    o_device_select           <=  `SELECT_CONTROL;
 
     //Counts
     r_data_count              <=  0;
@@ -240,8 +245,10 @@ always @ (posedge clk) begin
     //Buffer Interface
     r_buf_cnt                 <=  0;
     o_buf_addr                <=  0;
-    o_buf_dat                 <=  0;
+    o_buf_data                <=  0;
     o_axi_ingress_ready       <=  0;
+    o_enable_config_read      <=  0;
+    r_config_space_done       <=  0;
 
     for (i = 0; i < 4; i = i + 1) begin
       r_hdr[i]                <=  0;
@@ -252,15 +259,15 @@ always @ (posedge clk) begin
       IDLE: begin
         r_data_count                  <=  0;
         r_hdr_index                   <=  0;
+        o_enable_config_read          <=  0;
 
         if (i_axi_ingress_valid) begin
-          if (i_bar_hit[0])begin
-            //This is a config register or a new command
-            state                     <=  READY;
+          if (!r_config_space_done && (i_bar_hit != 0)) begin
+            state                     <= READ_BAR_ADDR;
           end
-          else if (i_enable_data_path && i_buf_rdy) begin
-            //We are reading data from the host computer
-            state                     <=  READY;
+          else begin
+            //This is a config register or a new command
+            state                       <=  READY;
           end
         end
       end
@@ -276,12 +283,7 @@ always @ (posedge clk) begin
         if (r_hdr_index + 1 >= r_hdr_size) begin
           case (r_hdr_cmd)
             CMD_MEM_WRITE: begin
-              if (w_cmd_en) begin
-                state                 <=  WRITE_CMD;
-              end
-              else begin
-                state                 <=  WRITE_REG;
-              end
+              state                   <=  WRITE_REG_CMD;
             end
             CMD_COMPLETE_DATA: begin
               state                   <=  READ_CMPLT;
@@ -292,98 +294,106 @@ always @ (posedge clk) begin
           endcase
         end
       end
-      WRITE_REG: begin
-        case (w_reg_addr)
-          `STATUS_BUF_ADDR: begin
-            o_status_addr             <=  i_axi_ingress_data;
-          end
-          `BUFFER_READY: begin
-            o_update_buf              <=  i_axi_ingress_data[`BUFFER_READY_RANGE];
-          end
-          `WRITE_BUF_A_ADDR: begin
-            o_write_a_addr            <=  i_axi_ingress_data;
-          end
-          `WRITE_BUF_B_ADDR: begin
-            o_write_b_addr            <=  i_axi_ingress_data;
-          end
-          `READ_BUF_A_ADDR: begin
-            o_read_a_addr             <=  i_axi_ingress_data;
-          end
-          `READ_BUF_B_ADDR: begin
-            o_read_b_addr             <=  i_axi_ingress_data;
-          end
-          `BUFFER_SIZE: begin
-            o_buffer_size             <=  i_axi_ingress_data;
-          end
-          default: begin
-          end
-        endcase
-        o_reg_write_stb               <=  1;
-        state                         <=  FLUSH;
+      WRITE_REG_CMD: begin
+        if (w_cmd_en) begin
+          o_update_buf                        <=  2'b11;
+          o_update_buf_stb                    <=  1;
+          o_cmd_data_count                    <=  i_axi_ingress_data;
+          case (w_reg_addr)
+            `COMMAND_RESET: begin
+              r_config_space_done             <=  0;
+              o_device_select                 <=  `SELECT_CONTROL;
+            end
+            `PERIPHERAL_WRITE: begin
+              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_wr_stb                    <=  1;
+            end
+            `PERIPHERAL_WRITE_FIFO: begin
+              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_wr_stb                    <=  1;
+              o_cmd_flg_fifo                  <=  1;
+            end
+            `PERIPHERAL_READ: begin
+              o_cmd_rd_stb                    <=  1;
+              o_device_select                 <=  `SELECT_PERIPH;
+            end
+            `PERIPHERAL_READ_FIFO: begin
+              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_rd_stb                    <=  1;
+              o_cmd_flg_fifo                  <=  1;
+            end
+            `MEMORY_WRITE: begin
+              o_device_select                 <=  `SELECT_MEM;
+              o_cmd_wr_stb                    <=  1;
+            end
+            `MEMORY_READ: begin
+              o_device_select                 <=  `SELECT_MEM;
+              o_cmd_rd_stb                    <=  1;
+            end
+            `DMA_WRITE: begin
+              o_device_select                 <=  `SELECT_DMA;
+              o_cmd_wr_stb                    <=  1;
+            end
+            `DMA_READ: begin
+              o_device_select                 <=  `SELECT_DMA;
+              o_cmd_rd_stb                    <=  1;
+            end
+            `PING: begin
+              o_device_select                 <=  `SELECT_CONTROL;
+              o_cmd_ping_stb                  <=  1;
+              o_ping_value                    <=  i_axi_ingress_data;
+            end
+            `READ_CONFIG: begin
+              o_device_select                 <=  `SELECT_CONTROL;
+              o_cmd_rd_cfg_stb                <=  1;
+            end
+            default: begin
+              o_device_select                 <=  `SELECT_CONTROL;
+              o_cmd_unknown                   <=  1;
+            end
+          endcase
+          state                               <=  READ_ADDR;
+        end
+        else begin
+          case (w_reg_addr)
+            `STATUS_BUF_ADDR: begin
+              o_status_addr           <=  i_axi_ingress_data;
+            end
+            `BUFFER_READY: begin
+              o_update_buf            <=  i_axi_ingress_data[`BUFFER_READY_RANGE];
+              o_update_buf_stb        <=  1;
+            end
+            `WRITE_BUF_A_ADDR: begin
+              o_write_a_addr          <=  i_axi_ingress_data;
+            end
+            `WRITE_BUF_B_ADDR: begin
+              o_write_b_addr          <=  i_axi_ingress_data;
+            end
+            `READ_BUF_A_ADDR: begin
+              o_read_a_addr           <=  i_axi_ingress_data;
+            end
+            `READ_BUF_B_ADDR: begin
+              o_read_b_addr           <=  i_axi_ingress_data;
+            end
+            `BUFFER_SIZE: begin
+              o_buffer_size           <=  i_axi_ingress_data;
+            end
+            default: begin
+            end
+          endcase
+          o_reg_write_stb             <=  1;
+          state                       <=  FLUSH;
+        end
       end
-      WRITE_CMD: begin
-        o_update_buf                  <=  2'b11;
-        o_dword_size                  <=  i_axi_ingress_data;
-        state                         <=  FLUSH;
-        case (w_reg_addr)
-          `COMMAND_RESET: begin
-            o_dev_sel                       <=  `SELECT_CONTROL;
-          end
-          `PERIPHERAL_WRITE: begin
-            o_dev_sel                       <=  `SELECT_PERIPH;
-            o_cmd_wr_stb                    <=  1;
-          end
-          `PERIPHERAL_WRITE_FIFO: begin
-            o_dev_sel                       <=  `SELECT_PERIPH;
-            o_cmd_wr_stb                    <=  1;
-            o_flg_fifo                      <=  1;
-          end
-          `PERIPHERAL_READ: begin
-            o_cmd_rd_stb                    <=  1;
-            o_dev_sel                       <=  `SELECT_PERIPH;
-          end
-          `PERIPHERAL_READ_FIFO: begin
-            o_dev_sel                       <=  `SELECT_PERIPH;
-            o_cmd_rd_stb                    <=  1;
-            o_flg_fifo                      <=  1;
-          end
-          `MEMORY_WRITE: begin
-            o_dev_sel                       <=  `SELECT_MEM;
-            o_cmd_wr_stb                    <=  1;
-          end
-          `MEMORY_READ: begin
-            o_dev_sel                       <=  `SELECT_MEM;
-            o_cmd_rd_stb                    <=  1;
-          end
-          `DMA_WRITE: begin
-            o_dev_sel                       <=  `SELECT_DMA;
-            o_cmd_wr_stb                    <=  1;
-          end
-          `DMA_READ: begin
-            o_dev_sel                       <=  `SELECT_DMA;
-            o_cmd_rd_stb                    <=  1;
-          end
-          `PING: begin
-            o_dev_sel                       <=  `SELECT_CONTROL;
-            o_cmd_ping_stb                  <=  1;
-            o_ping_value                    <=  i_axi_ingress_data;
-          end
-          `READ_CONFIG: begin
-            o_dev_sel                       <=  `SELECT_CONTROL;
-            o_cmd_rd_cfg_stb                <=  1;
-          end
-          default: begin
-            o_dev_sel                       <=  `SELECT_CONTROL;
-            o_cmd_unknown                   <=  1;
-          end
-        endcase
+      READ_ADDR: begin
+        o_cmd_data_address            <=  i_axi_ingress_data;
         state                         <=  FLUSH;
       end
       READ_CMPLT: begin
         //The Buffer is available
         if (r_buf_cnt < w_pkt_data_size) begin
           o_buf_addr                  <=  w_buf_pkt_addr_base + r_buf_cnt;
-          o_buf_dat                   <=  i_axi_ingress_data;
+          o_buf_data                  <=  i_axi_ingress_data;
           o_buf_we                    <=  1;
         end
         else begin
@@ -393,6 +403,14 @@ always @ (posedge clk) begin
       FLUSH: begin
         if (!i_axi_ingress_valid) begin
           o_axi_ingress_ready         <=  0;
+          state                       <=  IDLE;
+        end
+      end
+      READ_BAR_ADDR: begin
+        o_enable_config_read          <=  1;
+        if (i_finished_config_read) begin
+          r_config_space_done         <=  1;
+          o_enable_config_read        <=  0;
           state                       <=  IDLE;
         end
       end

@@ -27,8 +27,6 @@
 `define PING                  32'h00000089
 `define READ_CONFIG           32'h0000008A
 
-
-
 //Device Select
 `define SELECT_CONTROL        4'h0
 `define SELECT_PERIPH         4'h1
@@ -44,6 +42,9 @@
 `define STATUS_BIT_READ_CFG     5
 `define STATUS_BIT_UNKNOWN_CMD  6
 `define STATUS_UNUSED           31:7
+
+//Interrupt
+`define NYSA_INTERRUPT_CONFIG   1
 
 
 //Buffer Ready Range

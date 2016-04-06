@@ -27,7 +27,6 @@ class AXIStreamMaster(BusDriver):
 
         self.write_data_busy = Lock("%s_wbusy" % name)
 
-
     @cocotb.coroutine
     def write(self, data):
         """
@@ -72,7 +71,6 @@ class AXIStreamSlave(BusDriver):
 
     def __init__(self, entity, name, clock):
         BusDriver.__init__(self, entity, name, clock)
-
         self.bus.tready <= 0;
         self.read_data_busy = Lock("%s_wbusy" % name)
         self.data = Array('B')
@@ -89,25 +87,42 @@ class AXIStreamSlave(BusDriver):
         return d
 
     @cocotb.coroutine
-    def read_packet(self, count = 0):
+    def read_packet(self, wait_for_valid = False):
         """Read a packe of data from the Axi Ingress stream"""
-        self.read_data_busy.acquire()
-        self.bus.tready <= 1
-
-        while True:
-            yield ReadOnly()
-            if self.bus.tvalid.value:
-                break
-            yield RisingEdge(self.clock)
-
-
+        yield self.read_data_busy.acquire()
         yield RisingEdge(self.clock)
-        while self.bus.tvalid:
-            self.data.extend(self.word_to_array(self.bus.tdata.value))
+
+        if wait_for_valid:
+            while not self.bus.tvalid.value:
+                #cocotb.log.info("Valid Not Detected")
+                yield RisingEdge(self.clock)
+
+            #cocotb.log.info("Found valid!")
             yield RisingEdge(self.clock)
+            self.bus.tready <=  1
+
+            while self.bus.tvalid.value:
+                yield RisingEdge(self.clock)
+                self.data.extend(self.word_to_array(self.bus.tdata.value))
 
 
+        else:
+            self.bus.tready <= 1
+            
+            while True:
+                yield ReadOnly()
+                if self.bus.tvalid.value:
+                    cocotb.log.debug("Found Valid")
+                    break
+                yield RisingEdge(self.clock)
+            
+            
+            while self.bus.tvalid.value:
+                yield RisingEdge(self.clock)
+                self.data.extend(self.word_to_array(self.bus.tdata.value))
+
+
+        cocotb.log.debug("Finished read")
         self.read_data_busy.release()
         self.bus.tready <= 0
-
 

@@ -24,6 +24,7 @@ from array import array as Array
 #sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 from tlp_type import TLPType
 from tlp_flags import TLPFlags
+from tlp_common import print_raw_packet
 
 ADDRESS = "address"
 BUS_NUM = "bus_number"
@@ -37,6 +38,7 @@ LAST_BE = "last_be"
 HAS_DATA = "has_data"
 
 DESCRIPTION_DICT = {
+    ADDRESS:        "32-bit or 64-bit address",
     DEVICE_NUM:     "Device index within PCI Bus",
     BUS_NUM:        "PCI Bus Number",
     FUNCTION_NUM:   "Function of the PCI Device",
@@ -46,7 +48,7 @@ DESCRIPTION_DICT = {
     FIRST_BE:       "First Byte Enable",
     LAST_BE:        "Last Byte Enable",
     HAS_DATA:       "This packet can have data"
-    }
+}
 
 FIELDS = [DWORD_COUNT, HAS_DATA]
 
@@ -182,6 +184,7 @@ class TLPTransferHeader(TLPHeader):
 
     def __init__(self):
         super (TLPTransferHeader, self).__init__()
+        self.data = Array('B')
 
     def initialize(self):
         self.set_value(ADDRESS, 0x01234567)
@@ -233,7 +236,12 @@ class TLPTransferHeader(TLPHeader):
         return raw
 
     def parse_raw(self, raw):
-        pass
+        super (TLPTransferHeader, self).parse_raw(raw)
+        address = (raw[8] << 24) | (raw[9] << 16) | (raw[10] << 8) | raw[11]
+        self.set_value(ADDRESS, address)
+        if len(raw[12:]) > 0:
+            self.data = raw[12:]
+
 
     def get_requester_id(self):
         #Not sure how to generat this yet
@@ -324,6 +332,12 @@ class TLPTransferHeader(TLPHeader):
             output_str += "{0:<8}{1:>7}[0x{2:016X}]: {3}\n".format("Address", "64 bit", address, DESCRIPTION_DICT[ADDRESS])
         else:
             output_str += "{0:<8}{1:>7}[0x{2:08X}]: {3}\n".format("Address", "32 bit", address, DESCRIPTION_DICT[ADDRESS])
+
+        if len(self.data) > 0:
+            output_str += "\t" * (tab)
+            output_str += "Data:\n"
+            output_str += print_raw_packet(self.data, tab = tab + 1)
+
         return output_str
 
 

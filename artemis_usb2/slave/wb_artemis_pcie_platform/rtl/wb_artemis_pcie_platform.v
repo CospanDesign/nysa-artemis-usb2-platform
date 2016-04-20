@@ -203,8 +203,6 @@ reg       [31:0]                r_host_clock_count;
 reg                             r_1sec_stb_100mhz;
 wire                            w_1sec_stb_65mhz;
 reg                             r_irq_stb = 0;
-reg       [7:0]                 r_irq_channel;
-wire                            w_irq_stb;
 
 // Transaction (TRN) Interface
 wire                            user_lnk_up;
@@ -219,12 +217,6 @@ wire      [7:0]                 fc_cplh;
 wire      [11:0]                fc_cpld;
 
 
-// Host (CFG) Interface
-//wire      [31:0]                 cfg_do;
-//wire                             cfg_rd_wr_done;
-//wire      [9:0]                  cfg_dwaddr;
-//wire                             cfg_rd_en;
-
 // Configuration: Error
 wire                             cfg_err_ur;
 wire                             cfg_err_cor;
@@ -236,17 +228,6 @@ wire                             cfg_err_locked;
 wire      [47:0]                 cfg_err_tlp_cpl_header;
 wire                             cfg_err_cpl_rdy;
 
-// Conifguration: Interrupt
-/*
-wire                             cfg_interrupt;
-wire                             cfg_interrupt_rdy;
-wire                             cfg_interrupt_assert;
-wire      [7:0]                  cfg_interrupt_do;
-wire      [7:0]                  cfg_interrupt_di;
-wire      [2:0]                  cfg_interrupt_mmenable;
-wire                             cfg_interrupt_msienable;
-*/
-
 // Configuration: Power Management
 reg                              cfg_turnoff_ok = 0;
 reg                              trn_pending = 0;
@@ -255,7 +236,7 @@ wire                             cfg_pm_wake;
 
 // Configuration: System/Status
 wire      [2:0]                  cfg_pcie_link_state;
-reg                              r_cfg_trn_pending;
+//reg                              r_cfg_trn_pending;
 wire      [7:0]                  cfg_bus_number;
 wire      [4:0]                  cfg_device_number;
 wire      [2:0]                  cfg_function_number;
@@ -292,29 +273,19 @@ wire                              w_lcl_mem_valid;
 wire                              w_lcl_mem_en;
 
 
-wire                              w_cmd_in_rd_stb;
-wire                              w_cmd_in_rd_ready;
-wire                              w_cmd_in_rd_activate;
-wire  [23:0]                      w_cmd_in_rd_size;
-wire  [31:0]                      w_cmd_in_rd_data;
+wire                              w_fifo_ingress_rd_stb;
+wire                              w_fifo_ingress_rd_ready;
+wire                              w_fifo_ingress_rd_activate;
+wire  [23:0]                      w_fifo_ingress_rd_size;
+wire  [31:0]                      w_fifo_ingress_rd_data;
 
-wire  [1:0]                       w_cmd_out_wr_ready;
-wire  [1:0]                       w_cmd_out_wr_activate;
-wire  [23:0]                      w_cmd_out_wr_size;
-wire                              w_cmd_out_wr_stb;
-wire  [31:0]                      w_cmd_out_wr_data;
+wire  [1:0]                       w_fifo_egress_wr_ready;
+wire  [1:0]                       w_fifo_egress_wr_activate;
+wire  [23:0]                      w_fifo_egress_wr_size;
+wire                              w_fifo_egress_wr_stb;
+wire  [31:0]                      w_fifo_egress_wr_data;
 
-wire                              w_data_in_rd_stb;
-wire                              w_data_in_rd_ready;
-wire                              w_data_in_rd_activate;
-wire  [23:0]                      w_data_in_rd_size;
-wire  [31:0]                      w_data_in_rd_data;
 
-wire  [1:0]                       w_data_out_wr_ready;
-wire  [1:0]                       w_data_out_wr_activate;
-wire  [23:0]                      w_data_out_wr_size;
-wire                              w_data_out_wr_stb;
-wire  [31:0]                      w_data_out_wr_data;
 
 reg   [1:0]                       r_rx_equalizer_ctrl = 2'b11;
 reg   [3:0]                       r_tx_diff_ctrl      = 4'h9;
@@ -338,12 +309,10 @@ wire [31:0]                       w_bar_addr4;
 wire [31:0]                       w_bar_addr5;
 
 
-reg                               r_read_bar_addr_stb_a;
-wire                              w_read_bar_addr_stb;
-
 
 //Submodules
-artemis_pcie_interface #(
+//artemis_pcie_interface #(
+artemis_pcie_controller #(
   .CONTROL_FIFO_DEPTH                (CONTROL_FIFO_DEPTH           ),
   .DATA_FIFO_DEPTH                   (DATA_FIFO_DEPTH              ),
   .SERIAL_NUMBER                     (64'h000000000000C594         )
@@ -380,7 +349,6 @@ artemis_pcie_interface #(
   .o_bar_addr5                       (w_bar_addr5                  ),
 
 
-  .read_bar_addr_stb                 (w_read_bar_addr_stb          ),
   // Host (CFG) Interface
   //.cfg_do                            (cfg_do                       ),
   //.cfg_rd_wr_done                    (cfg_rd_wr_done               ),
@@ -398,20 +366,6 @@ artemis_pcie_interface #(
   .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
 
-  // Conifguration: Interrupt
-  /*
-  .cfg_interrupt                     (cfg_interrupt                ),
-  .cfg_interrupt_rdy                 (cfg_interrupt_rdy            ),
-  .cfg_interrupt_assert              (cfg_interrupt_assert         ),
-  .cfg_interrupt_do                  (cfg_interrupt_do             ),
-  .cfg_interrupt_di                  (cfg_interrupt_di             ),
-  .cfg_interrupt_mmenable            (cfg_interrupt_mmenable       ),
-  .cfg_interrupt_msienable           (cfg_interrupt_msienable      ),
-  */
-
-  .i_interrupt_stb                    (w_irq_stb                    ),
-  .i_interrupt_channel                (r_irq_channel                ),
-
   // Configuration: Power Management
   .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
   .cfg_to_turnoff                    (cfg_to_turnoff               ),
@@ -419,7 +373,7 @@ artemis_pcie_interface #(
 
   // Configuration: System/Status
   .cfg_pcie_link_state               (cfg_pcie_link_state          ),
-  .cfg_trn_pending_stb               (r_cfg_trn_pending            ),
+//  .cfg_trn_pending_stb               (r_cfg_trn_pending            ),
   .cfg_bus_number                    (cfg_bus_number               ),
   .cfg_device_number                 (cfg_device_number            ),
   .cfg_function_number               (cfg_function_number          ),
@@ -438,31 +392,6 @@ artemis_pcie_interface #(
   .gtp_reset_done                    (gtp_reset_done               ),
   .pll_lock_detect                   (pll_lock_detect              ),
   .rx_elec_idle                      (rx_elec_idle                 ),
-
-  .i_cmd_in_rd_stb                   (w_cmd_in_rd_stb              ),
-  .o_cmd_in_rd_ready                 (w_cmd_in_rd_ready            ),
-  .i_cmd_in_rd_activate              (w_cmd_in_rd_activate         ),
-  .o_cmd_in_rd_count                 (w_cmd_in_rd_size             ),
-  .o_cmd_in_rd_data                  (w_cmd_in_rd_data             ),
-
-  .o_cmd_out_wr_ready                (w_cmd_out_wr_ready           ),
-  .i_cmd_out_wr_activate             (w_cmd_out_wr_activate        ),
-  .o_cmd_out_wr_size                 (w_cmd_out_wr_size            ),
-  .i_cmd_out_wr_stb                  (w_cmd_out_wr_stb             ),
-  .i_cmd_out_wr_data                 (w_cmd_out_wr_data            ),
-
-  .i_data_in_rd_stb                  (w_data_in_rd_stb             ),
-  .o_data_in_rd_ready                (w_data_in_rd_ready           ),
-  .i_data_in_rd_activate             (w_data_in_rd_activate        ),
-  .o_data_in_rd_count                (w_data_in_rd_size            ),
-  .o_data_in_rd_data                 (w_data_in_rd_data            ),
-
-  .o_data_out_wr_ready               (w_data_out_wr_ready          ),
-  .i_data_out_wr_activate            (w_data_out_wr_activate       ),
-  .o_data_out_wr_size                (w_data_out_wr_size           ),
-  .i_data_out_wr_stb                 (w_data_out_wr_stb            ),
-  .i_data_out_wr_data                (w_data_out_wr_data           ),
-
   .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
   .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
   .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
@@ -471,8 +400,6 @@ artemis_pcie_interface #(
   //Debug Info
   .o_bar_hit                         (w_bar_hit                    ),
   .o_receive_axi_ready               (w_receive_axi_ready          )
-
-
 );
 
 adapter_dpb_ppfifo #(
@@ -495,17 +422,17 @@ adapter_dpb_ppfifo #(
 
   .ppfifo_clk                         (clk                    ),
 
-  .i_write_ready                      (w_cmd_out_wr_ready     ),
-  .o_write_activate                   (w_cmd_out_wr_activate  ),
-  .i_write_size                       (w_cmd_out_wr_size      ),
-  .o_write_stb                        (w_cmd_out_wr_stb       ),
-  .o_write_data                       (w_cmd_out_wr_data      ),
+  .i_write_ready                      (w_fifo_egress_wr_ready     ),
+  .o_write_activate                   (w_fifo_egress_wr_activate  ),
+  .i_write_size                       (w_fifo_egress_wr_size      ),
+  .o_write_stb                        (w_fifo_egress_wr_stb       ),
+  .o_write_data                       (w_fifo_egress_wr_data      ),
 
-  .i_read_ready                       (w_cmd_in_rd_ready      ),
-  .o_read_activate                    (w_cmd_in_rd_activate   ),
-  .i_read_size                        (w_cmd_in_rd_size       ),
-  .i_read_data                        (w_cmd_in_rd_data       ),
-  .o_read_stb                         (w_cmd_in_rd_stb        )
+  .i_read_ready                       (w_fifo_ingress_rd_ready      ),
+  .o_read_activate                    (w_fifo_ingress_rd_activate   ),
+  .i_read_size                        (w_fifo_ingress_rd_size       ),
+  .i_read_data                        (w_fifo_ingress_rd_data       ),
+  .o_read_stb                         (w_fifo_ingress_rd_stb        )
 );
 
 cross_clock_strobe clk_stb (
@@ -516,26 +443,6 @@ cross_clock_strobe clk_stb (
   .out_clk                            (clk_62p5               ),
   .out_stb                            (w_1sec_stb_65mhz       )
 );
-
-cross_clock_strobe read_bar_stb (
-  .rst                                (rst                    ),
-  .in_clk                             (clk                    ),
-  .in_stb                             (r_read_bar_addr_stb_a  ),
-
-  .out_clk                            (clk_62p5               ),
-  .out_stb                            (w_read_bar_addr_stb    )
-);
-
-cross_clock_strobe irq_strobber (
-  .rst                                (rst                    ),
-  .in_clk                             (clk                    ),
-  .in_stb                             (r_irq_stb              ),
-
-  .out_clk                            (clk_62p5               ),
-  .out_stb                            (w_irq_stb              )
-
-);
-
 
 //Asynchronous Logic
 assign  fc_sel                 = 3'h0;
@@ -609,13 +516,6 @@ always @ (posedge clk_62p5) begin
     else begin
       cfg_turnoff_ok    <=  0;
     end
-
-
-    /*
-    if (w_reset_strobes) begin
-      r_unrecognized_bar           <= 0;
-    end
-    */
   end
 end
 
@@ -629,8 +529,7 @@ always @ (posedge clk) begin
   r_1sec_stb_100mhz             <=  0;
 
   //THis might need to be moved into the 62.5MHz clock
-  r_cfg_trn_pending             <=  0;
-  r_read_bar_addr_stb_a         <=  0;
+  //r_cfg_trn_pending             <=  0;
   r_irq_stb                     <=  0;
 
   if (rst) begin
@@ -650,7 +549,6 @@ always @ (posedge clk) begin
     r_tx_pre_emphasis           <=  3'b00;
 
     r_bar_hit_temp              <=  0;
-    r_irq_channel               <=  0;
   end
   else begin
     if ((r_bar_hit_temp == 0) && (w_bar_hit != 0)) begin
@@ -676,7 +574,7 @@ always @ (posedge clk) begin
               //r_reset_dbg_regs      <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
               //r_enable_ext_reset    <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
               //r_manual_pcie_reset   <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
-              r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
+              //r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
               r_irq_stb             <=  i_wbs_dat[`CTRL_BIT_SEND_IRQ];
 
             end
@@ -694,9 +592,6 @@ always @ (posedge clk) begin
                 r_lcl_mem_we                          <=  1;
                 r_lcl_mem_din                         <=  i_wbs_dat;
               end
-            end
-            IRQ_CHANNEL_SELECT: begin
-              r_irq_channel       <=  i_wbs_dat[7:0];
             end
           endcase
           o_wbs_ack <= 1;
@@ -812,9 +707,6 @@ always @ (posedge clk) begin
             end
             BAR_ADDR5: begin
               o_wbs_dat                         <=  w_bar_addr5;
-            end
-            IRQ_CHANNEL_SELECT: begin
-              o_wbs_dat                         <=  {24'h0, r_irq_channel};
             end
             default: begin
               if (w_lcl_mem_en) begin

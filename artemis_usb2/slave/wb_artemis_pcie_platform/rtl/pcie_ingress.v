@@ -356,26 +356,26 @@ always @ (posedge clk) begin
         end
         else begin
           case (w_reg_addr)
-            `STATUS_BUF_ADDR: begin
+            `HDR_STATUS_BUF_ADDR: begin
               o_status_addr           <=  i_axi_ingress_data;
             end
-            `BUFFER_READY: begin
-              o_update_buf            <=  i_axi_ingress_data[`BUFFER_READY_RANGE];
+            `HDR_BUFFER_READY: begin
+              o_update_buf            <=  i_axi_ingress_data[`HDR_BUFFER_READY_RANGE];
               o_update_buf_stb        <=  1;
             end
-            `WRITE_BUF_A_ADDR: begin
+            `HDR_WRITE_BUF_A_ADDR: begin
               o_write_a_addr          <=  i_axi_ingress_data;
             end
-            `WRITE_BUF_B_ADDR: begin
+            `HDR_WRITE_BUF_B_ADDR: begin
               o_write_b_addr          <=  i_axi_ingress_data;
             end
-            `READ_BUF_A_ADDR: begin
+            `HDR_READ_BUF_A_ADDR: begin
               o_read_a_addr           <=  i_axi_ingress_data;
             end
-            `READ_BUF_B_ADDR: begin
+            `HDR_READ_BUF_B_ADDR: begin
               o_read_b_addr           <=  i_axi_ingress_data;
             end
-            `BUFFER_SIZE: begin
+            `HDR_BUFFER_SIZE: begin
               o_buffer_size           <=  i_axi_ingress_data;
             end
             default: begin

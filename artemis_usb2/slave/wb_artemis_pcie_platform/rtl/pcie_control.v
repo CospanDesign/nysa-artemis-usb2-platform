@@ -79,7 +79,7 @@ module pcie_control (
 
   //Egress FIFO for control data
   output  reg               o_egress_cntrl_fifo_select,
-  output  reg               o_interrupt_msi_value,
+  output  reg [7:0]         o_interrupt_msi_value,
   output  reg               o_interrupt_stb,
 
   output                    o_egress_fifo_rdy,
@@ -112,7 +112,7 @@ reg   [31:0]                r_fifo_data;
 
 reg   [4:0]                 r_fifo_count;
 
-wire  [31:0]                register_map  [0:`CONFIG_REGISTER_COUNT];
+wire  [31:0]                register_map  [`CONFIG_REGISTER_COUNT:0];
 
 reg   [1:0]                 r_buffer_ready;
 reg                         r_send_data_en;
@@ -122,6 +122,14 @@ reg   [13:0]                r_tlp_flags;
 reg   [31:0]                r_tlp_address;
 reg   [15:0]                r_tlp_requester_id;
 reg   [7:0]                 r_tlp_tag;
+
+
+//Configuration State Machine
+reg   [3:0]                 cfg_state;
+wire                        r_cfg_ready;
+reg                         r_send_int_stb;
+reg                         r_send_cfg_en;
+
 
 //submodules
 ppfifo #(
@@ -147,14 +155,14 @@ ppfifo #(
 );
 
 //asynchronous logic
-assign  register_map[`STATUS_BUF_ADDR]    = i_status_addr;
-assign  register_map[`BUFFER_READY]       = {29'h00, r_buffer_ready};
-assign  register_map[`WRITE_BUF_A_ADDR]   = i_write_a_addr;
-assign  register_map[`WRITE_BUF_B_ADDR]   = i_write_b_addr;
-assign  register_map[`READ_BUF_A_ADDR]    = i_read_a_addr;
-assign  register_map[`READ_BUF_B_ADDR]    = i_read_b_addr;
-assign  register_map[`BUFFER_SIZE]        = i_buffer_size;
-assign  register_map[`PING_VALUE]         = i_ping_value;
+assign  register_map[`HDR_STATUS_BUF_ADDR]  = i_status_addr;
+assign  register_map[`HDR_BUFFER_READY]     = {29'h00, r_buffer_ready};
+assign  register_map[`HDR_WRITE_BUF_A_ADDR] = i_write_a_addr;
+assign  register_map[`HDR_WRITE_BUF_B_ADDR] = i_write_b_addr;
+assign  register_map[`HDR_READ_BUF_A_ADDR]  = i_read_a_addr;
+assign  register_map[`HDR_READ_BUF_B_ADDR]  = i_read_b_addr;
+assign  register_map[`HDR_BUFFER_SIZE]      = i_buffer_size;
+assign  register_map[`HDR_PING_VALUE]       = i_ping_value;
 
 assign  o_sys_rst                         = i_cmd_rst_stb;
 
@@ -206,12 +214,6 @@ always @ (posedge clk) begin
     end
   end
 end
-
-//Configuration State Machine
-reg [3:0]     cfg_state;
-wire          r_cfg_ready;
-reg           r_send_int_stb;
-reg           r_send_cfg_en;
 
 //This state machine has one purpose, to write the configuration data and send an interrupt
 always @ (posedge clk) begin

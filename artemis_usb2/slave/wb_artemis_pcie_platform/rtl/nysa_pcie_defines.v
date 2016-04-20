@@ -1,14 +1,14 @@
 `ifndef __NYSA_PCIE_DEFINES__
 `define __NYSA_PCIE_DEFINES__
 
-`define STATUS_BUF_ADDR       32'h00000000
-`define BUFFER_READY          32'h00000001
-`define WRITE_BUF_A_ADDR      32'h00000002
-`define WRITE_BUF_B_ADDR      32'h00000003
-`define READ_BUF_A_ADDR       32'h00000004
-`define READ_BUF_B_ADDR       32'h00000005
-`define BUFFER_SIZE           32'h00000006
-`define PING_VALUE            32'h00000007
+`define HDR_STATUS_BUF_ADDR       0
+`define HDR_BUFFER_READY          1
+`define HDR_WRITE_BUF_A_ADDR      2
+`define HDR_WRITE_BUF_B_ADDR      3
+`define HDR_READ_BUF_A_ADDR       4
+`define HDR_READ_BUF_B_ADDR       5
+`define HDR_BUFFER_SIZE           6
+`define HDR_PING_VALUE            7
 
 //The total number of items in the configuration registers
 `define CONFIG_REGISTER_COUNT 8
@@ -48,6 +48,6 @@
 
 
 //Buffer Ready Range
-`define BUFFER_READY_RANGE  1:0
+`define HDR_BUFFER_READY_RANGE  1:0
 
 `endif //__NYSA_PCIE_DEFINES__

@@ -337,8 +337,8 @@ assign  cfg_trn_pending       =  1'b0;
 assign  tx_cfg_gnt            =  1'b1;
 assign  rx_np_ok              =  1'b1;
 
-//pcie_axi_bridge pcie_interface
-sim_pcie_axi_bridge pcie_interface
+pcie_axi_bridge pcie_interface
+//sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface
@@ -720,7 +720,7 @@ assign  dma_in_axi_valid  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tvalid: 1'b0;
 
 assign  c_out_axi_ready   = o_bar_hit[CONTROL_SELECT] ? s_axis_tx_tready: 1'b0;
 assign  d_out_axi_ready   = o_bar_hit[DATA_SELECT]    ? s_axis_tx_tready: 1'b0;
-assign  dma_in_axi_ready  = o_bar_hit[DMA_SELECT]     ? m_axis_rx_tready: 1'b0;
+assign  dma_out_axi_ready = o_bar_hit[DMA_SELECT]     ? s_axis_tx_tready: 1'b0;
 
 //Many to one
 assign  m_axis_rx_tready  = o_bar_hit[CONTROL_SELECT] ? c_in_axi_ready  :

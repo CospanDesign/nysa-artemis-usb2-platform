@@ -189,34 +189,30 @@ int xpcie_release(struct inode *inode, struct file *filp)
  ****************************************************************************/
 ssize_t xpcie_write(struct file *filp, const char *buf, size_t count,
                        loff_t *f_pos){
-	int ret = SUCCESS;
+        int ret = SUCCESS;
   u32 value;
+  u32 address;
   u8 kernel_buf[512];
-  u32 addr = 0;
+  //u32 addr = 0;
   copy_from_user(kernel_buf, buf, count);
+  if (count < 8){
+    printk("%s: xpcie_write: ERROR: Length of incomming data (%zX) is less than 8\n", DRIVER_NAME, count);
+    return -1;
+  }
 
-  value = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2] << 8) | (kernel_buf[3]);
+  address = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2] << 8) | (kernel_buf[3]);
+  value = (kernel_buf[4] << 24) | (kernel_buf[5] << 16) | (kernel_buf[6] << 8) | (kernel_buf[7]);
+
   //value = (buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + (buf[3]);
-	printk("%s: xpcie_write: Attempt to write 0x%08X to %zX with offset %zX...\n", DRIVER_NAME, value, (size_t) BAR_VIRT_ADDR, (size_t) *f_pos);
-
-	//memcpy(BAR_VIRT_ADDR, &buf[0], count);
-	//memcpy(BAR_VIRT_ADDR, &kernel_buf[0], count);
-	//memcpy(BAR_VIRT_ADDR, &buf[0], count);
-
-  //Data is written down a byte at a time
-  //memcpy(BAR_VIRT_ADDR, kernel_buf, count);
-
-  //*** When I use this the data is written down in the correct order!
-	//memcpy(BAR_VIRT_ADDR, &buf[0], 4);
+    printk("%s: xpcie_write: Attempt to write 0x%08X to %zX with offset %zX...\n", DRIVER_NAME, value, (size_t) BAR_VIRT_ADDR, (size_t) address);
 
   //**** When I use this the data is written down in reverse order
-  //iowrite32(value, BAR_VIRT_ADDR + addr);
-  writel(cpu_to_be32(value), BAR_VIRT_ADDR + addr);
+  
+  iowrite32(cpu_to_be32(value), BAR_VIRT_ADDR + address);
+  //writel(cpu_to_be32(value), BAR_VIRT_ADDR + address);
 
-  //xpcie_write_mem(buf, count);
-
-	printk("%s: xpcie_write: %zu bytes have been written to %zX...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
-	return (ret);
+  printk("%s: xpcie_write: %zu bytes have been written to %zX...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
+  return (ret);
 }
 
 /***************************************************************************
@@ -247,10 +243,10 @@ ssize_t xpcie_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 {
   unsigned int i = 0;
   for (i = 0; i < count + 3; i = i + 4){
-	  memcpy(&buf[i], (BAR_VIRT_ADDR + i), 4);
+          memcpy(&buf[i], (BAR_VIRT_ADDR + i), 4);
   }
-	printk("%s: xpcie_read: %zu bytes have been read from %zX ...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
-	return (0);
+        printk("%s: xpcie_read: %zu bytes have been read from %zX ...\n", DRIVER_NAME, count, (size_t) BAR_VIRT_ADDR);
+        return (0);
 }
 
 struct file_operations xpcie_intf = {
@@ -519,7 +515,7 @@ static void xpcie_exit(void)
 
     // Unregister Device Driver
     if (STAT_FLAGS & HAVE_KREG) {
-	    unregister_chrdev(MAJOR, DRIVER_NAME);
+            unregister_chrdev(MAJOR, DRIVER_NAME);
     }
 
     STAT_FLAGS = 0;

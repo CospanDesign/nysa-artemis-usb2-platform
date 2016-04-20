@@ -18,7 +18,8 @@ install:
 	@echo "Install the file node"
 	mknod /dev/${NODE} c 240 1
 	chown root /dev/${NODE}
-	chmod 0644 /dev/${NODE}
+	chmod 0666 /dev/${NODE}
+	chgrp plugdev /dev/${NODE}
 	ls -al /dev/${NODE}
 
 remove:

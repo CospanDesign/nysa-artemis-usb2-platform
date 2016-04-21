@@ -1,0 +1,286 @@
+/*
+ * nysa_pcie
+ *
+ * Copyright (c) 2016 <your company name>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* This code has is influenced heavily from the following sources:
+ *  Adrian Byszuk
+ *  URL: https://github.com/abyszuk/fpga_pcie_driver
+ *
+ *  Eugene ?? http://stackoverflow.com/users/689077/eugene
+ *  URL: https://github.com/euspectre/kedr/blob/master/sources/examples/sample_target/cfake.c
+ *  URL: https://github.com/euspectre/kedr/blob/master/sources/examples/sample_target/cfake.h
+ */
+
+#include <linux/types.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/pci.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/fs.h>
+#include <linux/sysfs.h>
+#include <linux/cdev.h>
+#include <asm/uaccess.h>   /* copy_to_user */
+
+
+#include "nysa_pcie.h"
+#include "pcie_ctr.h"
+
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Dave McCoy (dave.mccoy@cospandesign.com)");
+MODULE_DESCRIPTION("Nysa PCIE Interface");
+
+//-----------------------------------------------------------------------------
+// Parameters
+//-----------------------------------------------------------------------------
+
+DEFINE_PCI_DEVICE_TABLE(nysa_pcie_ids) = {
+  { PCI_DEVICE(PCI_VENDOR_XILINX, PCI_DEVICE_XILINX_PCIE_RAM) },  // PCI-E Xilinx RAM Device
+  {0,0,0,0},
+};
+
+static dev_t pci_driver_chrdev_num;
+static int major_num;
+static atomic_t device_count;
+
+struct cdev cdevs[MAX_DEVICES];
+
+//-----------------------------------------------------------------------------
+// Prototypes
+//-----------------------------------------------------------------------------
+static int nysa_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id);
+static void nysa_pcie_remove(struct pci_dev *pdev);
+
+
+//-----------------------------------------------------------------------------
+// PCIE Specific defines
+//-----------------------------------------------------------------------------
+
+MODULE_DEVICE_TABLE(pci, nysa_pcie_ids);
+
+//PCIE Spcecific Structure
+static struct pci_driver pcidriver = {
+  .name     = MODULE_NAME,
+  .id_table = nysa_pcie_ids,
+  .probe    = nysa_pcie_probe,
+  .remove   = nysa_pcie_remove,
+};
+
+//-----------------------------------------------------------------------------
+// File Operations
+//-----------------------------------------------------------------------------
+
+int nysa_pcie_open(struct inode *inode, struct file *filp)
+{
+  filp->private_data = get_nysa_pcie_dev(iminor(inode));
+  mod_info("Opened!");
+  return SUCCESS;
+}
+
+int nysa_pcie_release(struct inode *inode, struct file *filp)
+{
+  nysa_pcie_dev_t *dev;
+  dev = filp->private_data;
+  return SUCCESS;
+}
+
+ssize_t nysa_pcie_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos)
+{
+  int retval = SUCCESS;
+  u32 value;
+  u32 address;
+  u32 device_address;
+  nysa_pcie_dev_t *dev;
+  u8 kernel_buf[12];
+
+  dev = filp->private_data;
+
+  if (count > 12){
+    mod_info("Copy only the first 12-bytes\n");
+    copy_from_user(kernel_buf, buf, 12);
+  }
+  else
+    copy_from_user(kernel_buf, buf, count);
+
+  address         = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2]  << 8) | (kernel_buf[3]);
+  value           = (kernel_buf[4] << 24) | (kernel_buf[5] << 16) | (kernel_buf[6]  << 8) | (kernel_buf[7]);
+  device_address  = (kernel_buf[8] << 24) | (kernel_buf[9] << 16) | (kernel_buf[10] << 8) | (kernel_buf[11]);
+
+  //Need to determine if this is a register write or a command, if it is a command see if it takes an address
+  if (address < CMD_OFFSET)
+  {
+    //Register Bank
+    //Write directly down to the register
+  }
+  else
+  {
+    //Command Bank
+    //Write down the address first
+    //Write down to the correct command address to initiate data transactions
+  }
+
+  //Check to see if this is a command or just a register
+  return retval;
+}
+
+ssize_t nysa_pcie_read(struct file *filp, char * buf, size_t count, loff_t *f_pos)
+{
+  return 0;
+}
+
+struct file_operations nysa_pcie_fops = {
+  owner:    THIS_MODULE,
+  read:     nysa_pcie_read,
+  write:    nysa_pcie_write,
+  open:     nysa_pcie_open,
+  release:  nysa_pcie_release
+};
+
+//-----------------------------------------------------------------------------
+// Device Detect/Remove
+//-----------------------------------------------------------------------------
+static int nysa_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+  int retval = 0;
+  int minor = 0;
+  dev_t devno;
+  mod_info("Found PCI Device: %04X:%04X %s\n", id->vendor, id->device, dev_name(&pdev->dev));
+
+  //Increment the Device ID
+  minor = atomic_inc_return(&device_count) - 1;
+  devno = MKDEV(major_num, minor);
+
+  if (minor >= MAX_DEVICES)
+  {
+    mod_info("Maximum Number of Devices Reached! Increase MAX_DEVICES.\n");
+    goto probe_fail;
+  }
+
+  //----------------------------
+  // Configure PCIE
+  //----------------------------
+  if ((retval = construct_pcie_device(pdev, devno)) != 0)
+  {
+    mod_info("Failed to create device.\n");
+    goto probe_decrement_minor;
+  }
+
+  //----------------------------
+  // Configure Character Devices
+  //----------------------------
+  cdev_init(&cdevs[minor], &nysa_pcie_fops);
+  if ((retval = cdev_add(&cdevs[minor], devno, 1)) != 0){
+    mod_info("Error %d while trying to add cdev for minor: %d\n", retval, minor);
+    goto probe_destroy_pcie_device;
+  }
+  set_nysa_pcie_private(minor, (void *) &cdevs[minor]);
+  return SUCCESS;
+
+//Handle Fails
+probe_destroy_pcie_device:
+  destroy_pcie_device(pdev);
+probe_decrement_minor:
+  atomic_dec(&device_count);
+probe_fail:
+  return retval;
+}
+
+static void nysa_pcie_remove(struct pci_dev *pdev)
+{
+  //----------------------------
+  // Destroy Character Device
+  //----------------------------
+  nysa_pcie_dev_t *dev;
+  int index = 0;
+  struct cdev *cdv = NULL;
+
+  dev = pci_get_drvdata(pdev);
+  index = get_nysa_pcie_dev_index(dev);
+  cdv = (struct cdev *)get_nysa_pcie_private(index);
+  cdev_del(cdv);
+
+  //----------------------------
+  // Destroy PCIE Controller
+  //----------------------------
+
+  destroy_pcie_device(pdev);
+}
+
+//-----------------------------------------------------------------------------
+// Module Init/Exit
+//-----------------------------------------------------------------------------
+
+static int nysa_pcie_init(void)
+{
+  int i = 0;
+  int retval = SUCCESS;
+  atomic_set(&device_count, 0);
+
+  //Request a set of character device numbers
+  mod_info("Registering Driver\n");
+  if ((retval = alloc_chrdev_region(&pci_driver_chrdev_num, MINOR_NUM_START, MAX_DEVICES, MODULE_NAME)) != 0)
+  {
+    mod_info("Failed to create chrdev region");
+    goto init_fail;
+  }
+  major_num = MAJOR(pci_driver_chrdev_num);
+
+  //Create a reference to all the pci devices we will be interfacing with
+  if ((retval = construct_pcie_ctr(MAX_DEVICES)) != 0)
+  {
+    goto unregister_chrdev_region;
+  }
+
+  //Register the PCI IDs with the kernel
+  if ((retval = pci_register_driver(&pcidriver)) != 0)
+  {
+    mod_info("Failed to register PCI Driver\n");
+    goto register_fail;
+  }
+
+  //Initialize each of the possible character devices  
+  for (i = 0; i < MAX_DEVICES; i++)
+  {
+    cdevs[i].owner = THIS_MODULE;
+  }
+
+  mod_info("Driver Initialized, waiting for probe...\n");
+  return SUCCESS;
+
+//Handle Fail
+
+register_fail:
+  destroy_pcie_ctr();
+unregister_chrdev_region:
+  unregister_chrdev_region(pci_driver_chrdev_num, MAX_DEVICES);
+init_fail:
+  return retval;
+}
+
+static void nysa_pcie_exit(void)
+{
+  mod_info("Cleanup Module\n");
+
+  //Tell the kernel we are not listenning for PCI devices
+  pci_unregister_driver(&pcidriver);
+  destroy_pcie_ctr();
+  unregister_chrdev_region(pci_driver_chrdev_num, MAX_DEVICES);
+  atomic_set(&device_count, 0);
+  return;
+}
+
+module_init(nysa_pcie_init);
+module_exit(nysa_pcie_exit);
+
+

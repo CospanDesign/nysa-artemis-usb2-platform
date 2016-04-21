@@ -1,0 +1,4 @@
+# Permissions for the FPGA device
+
+KERNEL=="nysa_pcie", OWNER="root", GROUP="plugdev", MODE="660"
+

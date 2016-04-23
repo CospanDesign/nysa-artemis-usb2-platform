@@ -53,6 +53,14 @@ BAR_ADDR3                       =   22
 BAR_ADDR4                       =   23
 BAR_ADDR5                       =   24
 IRQ_CHANNEL_SELECT              =   25
+CFG_READ_EXEC                   =   26
+CFG_SM_STATE                    =   27
+INGRESS_COUNT                   =   28
+INGRESS_STATE                   =   29
+INGRESS_RI_COUNT                =   30
+INGRESS_CI_COUNT                =   31
+INGRESS_ADDR                    =   32
+
 
 BAR_ADDR_BASE                   =   19
 
@@ -442,5 +450,28 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_interrupt_channel(self):
         return self.read_register(IRQ_CHANNEL_SELECT)
+
+    def get_config_state(self):
+        return self.read_register(CFG_SM_STATE)
+
+    def get_config_state_read_count(self):
+        return self.read_register(CFG_READ_EXEC)
+
+    def get_ingress_state(self):
+        return self.read_register(INGRESS_STATE)
+
+    def get_ingress_count(self):
+        return self.read_register(INGRESS_COUNT)
+
+    def get_ingress_ri_count(self):
+        return self.read_register(INGRESS_RI_COUNT)
+
+    def get_ingress_ci_count(self):
+        return self.read_register(INGRESS_CI_COUNT)
+
+    def get_ingress_addr(self):
+        return self.read_register(INGRESS_ADDR)
+
+
 
 

@@ -197,6 +197,7 @@ always @ (posedge clk) begin
         o_axi_egress_valid  <=  0;
         o_axi_egress_last   <=  0;
         o_fifo_act          <=  0;
+        o_finished          <=  1;
         if (!i_enable) begin
           o_finished        <=  0;
           state             <=  IDLE;

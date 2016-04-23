@@ -69,6 +69,7 @@ def test_write_pcie_register(dut):
     rd_buf_a_addr = 0xAAAAAAAA
     rd_buf_b_addr = 0xBBBBBBBB
     buf_size      = 0x00000800
+    dev_addr      = 0xCCCCCCCC
 
     c.set_status_buf_addr(status_addr)
     c.set_buffer_ready_status(buffer_ready)
@@ -77,6 +78,7 @@ def test_write_pcie_register(dut):
     c.set_read_buf_a_addr(rd_buf_a_addr)
     c.set_read_buf_b_addr(rd_buf_b_addr)
     c.set_buffer_size(buf_size)
+    c.set_dev_addr(dev_addr)
 
     yield (nysa.wait_clocks(300))
 
@@ -94,9 +96,10 @@ def test_write_pcie_register(dut):
         cocotb.log.error("Rd buf B Address: 0x%08X != 0x%08X" % (rd_buf_b_addr, dut.s1.api.ingress.o_read_b_addr.value))
     if dut.s1.api.ingress.o_buffer_size.value != buf_size:
         cocotb.log.error("Buffer Size: 0x%08X != 0x%08X" % (buf_size, dut.s1.api.ingress.o_buffer_size.value))
+    if dut.s1.api.ingress.o_dev_addr.value != dev_addr:
+        cocotb.log.error("Device Address: 0x%08X != 0x%08X" % (dev_addr, dut.s1.api.ingress.o_dev_addr.value))
 
     yield (nysa.wait_clocks(100))
-
 
 @cocotb.test(skip = False)
 def test_pcie_command(dut):

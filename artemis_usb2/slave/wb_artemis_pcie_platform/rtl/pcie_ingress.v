@@ -52,6 +52,7 @@ module pcie_ingress (
   output  reg [31:0]        o_ping_value,
   output  reg               o_update_buf_stb,
   output  reg [1:0]         o_update_buf,
+  output  reg [31:0]        o_dev_addr,
 
 
   //Bar Hit
@@ -82,7 +83,13 @@ module pcie_ingress (
   input       [31:0]        i_buf_offset,
   output  reg               o_buf_we,
   output  reg [31:0]        o_buf_addr,
-  output  reg [31:0]        o_buf_data
+  output  reg [31:0]        o_buf_data,
+
+  output      [3:0]         o_state,
+  output  reg [7:0]         o_ingress_count,
+  output  reg [7:0]         o_ingress_ri_count,
+  output  reg [7:0]         o_ingress_ci_count,
+  output  reg [31:0]        o_ingress_addr
 );
 
 //local parameters
@@ -149,10 +156,11 @@ wire  [31:0]                w_hdr1;
 wire  [31:0]                w_hdr2;
 wire  [31:0]                w_hdr3;
 
-assign  w_hdr0        =    r_hdr[0];
-assign  w_hdr1        =    r_hdr[1];
-assign  w_hdr2        =    r_hdr[2];
-assign  w_hdr3        =    r_hdr[3];
+assign  w_hdr0        =     r_hdr[0];
+assign  w_hdr1        =     r_hdr[1];
+assign  w_hdr2        =     r_hdr[2];
+assign  w_hdr3        =     r_hdr[3];
+assign  o_state       =     state;
 
 //submodules
 //asynchronous logic
@@ -196,10 +204,12 @@ always @ (*) begin
 end
 
 assign  w_pkt_data_size       = r_hdr[0][`PCIE_DWORD_PKT_CNT_RANGE];
-assign  w_pkt_addr            = r_hdr[2] >> 2;
+//assign  w_pkt_addr            = r_hdr[2] >> 2;
+assign  w_pkt_addr            = {r_hdr[2][31:2], 2'b00};
 assign  w_cmplt_lower_addr    = r_hdr[3][`CMPLT_LOWER_ADDR_RANGE];
 
-assign  w_reg_addr            = (i_control_addr_base >= 0) ? (w_pkt_addr - i_control_addr_base): 32'h00;
+//assign  w_reg_addr            = (w_pkt_addr >> 2);
+assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
 assign  w_cmd_en              = (w_reg_addr > `CMD_OFFSET);
 assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
 
@@ -231,6 +241,7 @@ always @ (posedge clk) begin
     o_update_buf              <=  0;
     o_ping_value              <=  0;
     o_buffer_size             <=  0;
+    o_dev_addr                <=  0;
 
     //Command Registers
     o_cmd_data_count          <=  0;
@@ -249,6 +260,10 @@ always @ (posedge clk) begin
     o_axi_ingress_ready       <=  0;
     o_enable_config_read      <=  0;
     r_config_space_done       <=  0;
+    o_ingress_count           <=  0;
+    o_ingress_ri_count        <=  0;
+    o_ingress_ci_count        <=  0;
+    o_ingress_addr            <=  0;
 
     for (i = 0; i < 4; i = i + 1) begin
       r_hdr[i]                <=  0;
@@ -267,14 +282,15 @@ always @ (posedge clk) begin
           end
           else begin
             //This is a config register or a new command
-            state                       <=  READY;
+            state                     <=  READY;
           end
         end
       end
       READY: begin
+        o_ingress_count               <=  o_ingress_count + 1;
         o_axi_ingress_ready           <=  1;
-        r_hdr[r_hdr_index]            <=  i_axi_ingress_data;
-        r_hdr_index                   <=  r_hdr_index + 1;
+        //r_hdr[r_hdr_index]            <=  i_axi_ingress_data;
+        //r_hdr_index                   <=  r_hdr_index + 1;
         state                         <=  READ_HDR;
       end
       READ_HDR: begin
@@ -295,6 +311,7 @@ always @ (posedge clk) begin
         end
       end
       WRITE_REG_CMD: begin
+        o_ingress_addr                        <=  w_reg_addr;
         if (w_cmd_en) begin
           o_update_buf                        <=  2'b11;
           o_update_buf_stb                    <=  1;
@@ -350,9 +367,11 @@ always @ (posedge clk) begin
             default: begin
               o_device_select                 <=  `SELECT_CONTROL;
               o_cmd_unknown                   <=  1;
+              o_ingress_ci_count              <=  o_ingress_ci_count + 1;
             end
           endcase
-          state                               <=  READ_ADDR;
+          //state                               <=  READ_ADDR;
+          state                               <=  FLUSH;
         end
         else begin
           case (w_reg_addr)
@@ -378,7 +397,11 @@ always @ (posedge clk) begin
             `HDR_BUFFER_SIZE: begin
               o_buffer_size           <=  i_axi_ingress_data;
             end
+            `HDR_DEV_ADDR: begin
+              o_dev_addr              <=  i_axi_ingress_data;
+            end
             default: begin
+              o_ingress_ri_count      <=  o_ingress_ri_count + 1;
             end
           endcase
           o_reg_write_stb             <=  1;

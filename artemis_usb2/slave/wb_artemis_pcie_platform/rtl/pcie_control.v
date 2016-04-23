@@ -41,6 +41,7 @@ module pcie_control (
   input       [31:0]        i_read_b_addr,
   input       [31:0]        i_status_addr,
   input       [31:0]        i_buffer_size,
+  input       [31:0]        i_dev_addr,
   input       [31:0]        i_ping_value,
   input       [1:0]         i_update_buf,
   input                     i_update_buf_stb,
@@ -88,7 +89,9 @@ module pcie_control (
   input                     i_egress_fifo_stb,
   output      [31:0]        o_egress_fifo_data,
 
-  output                    o_sys_rst
+  output                    o_sys_rst,
+  output  reg [7:0]         o_cfg_read_exec,
+  output      [3:0]         o_cfg_sm_state
 
 );
 //local parameters
@@ -163,6 +166,7 @@ assign  register_map[`HDR_READ_BUF_A_ADDR]  = i_read_a_addr;
 assign  register_map[`HDR_READ_BUF_B_ADDR]  = i_read_b_addr;
 assign  register_map[`HDR_BUFFER_SIZE]      = i_buffer_size;
 assign  register_map[`HDR_PING_VALUE]       = i_ping_value;
+assign  register_map[`HDR_DEV_ADDR]         = i_dev_addr;
 
 assign  o_sys_rst                         = i_cmd_rst_stb;
 
@@ -182,6 +186,7 @@ assign  o_egress_tag                      = (r_send_cfg_en) ? 8'h0:
 
 assign  r_cfg_ready                       = (cfg_state != IDLE);
 assign  r_data_sm_idle                    = ((state == IDLE) || (state == PROCESS));
+assign  o_cfg_sm_state                    = cfg_state;
 
 
 //synchronous logic
@@ -196,6 +201,7 @@ always @ (posedge clk) begin
     r_tlp_address       <=  0;
     r_tlp_requester_id  <=  0;
     r_tlp_tag           <=  0;
+    r_send_data_en      <=  0;
 
   end
   else begin
@@ -229,6 +235,7 @@ always @ (posedge clk) begin
     r_fifo_count                        <=  0;
     r_send_cfg_en                       <=  0;
     o_interrupt_msi_value               <=  `NYSA_INTERRUPT_CONFIG;
+    o_cfg_read_exec                     <=  0;
   end
   else begin
     case (cfg_state)
@@ -269,6 +276,7 @@ always @ (posedge clk) begin
         else begin
           cfg_state                     <=  SEND_CONFIG;
           r_fifo_act                    <=  0;
+          o_cfg_read_exec               <=  o_cfg_read_exec + 1;
         end
       end
       SEND_CONFIG: begin

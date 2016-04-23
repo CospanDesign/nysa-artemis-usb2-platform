@@ -168,13 +168,23 @@ class Test (unittest.TestCase):
         self.driver.set_interrupt_channel(0x01)
         self.s.Info("Sending interrupt...")
         self.driver.send_irq()
+
+        self.s.Info("Ingress State:             0x%04X" % self.driver.get_ingress_state())
+        self.s.Info("Ingress Count:             %d" % self.driver.get_ingress_count())
+
+        self.s.Info("Ingress RI Count:          %d" % self.driver.get_ingress_ri_count())
+        self.s.Info("Ingress CI Count:          %d" % self.driver.get_ingress_ci_count())
+        self.s.Info("Ingress Address:           0x%08X" % self.driver.get_ingress_addr())
+
+        self.s.Info("Config Read Count:         %d" % self.driver.get_config_state_read_count())
+        self.s.Info("Config State:              0x%04X" % self.driver.get_config_state())
         print ""
 
         self.driver.get_config_data()
         for i in range (6):
             self.s.Info("Bus Address:           0x%08X" % self.driver.get_bar_address(i))
 
-            
+
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
         self.driver.reset_debug_flags()

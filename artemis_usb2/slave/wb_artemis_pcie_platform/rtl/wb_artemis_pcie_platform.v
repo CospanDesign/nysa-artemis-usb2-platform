@@ -188,6 +188,13 @@ localparam    BAR_ADDR3           = 22;
 localparam    BAR_ADDR4           = 23;
 localparam    BAR_ADDR5           = 24;
 localparam    IRQ_CHANNEL_SELECT  = 25;
+localparam    CFG_READ_EXEC       = 26;
+localparam    CFG_SM_STATE        = 27;
+localparam    INGRESS_COUNT       = 28;
+localparam    INGRESS_STATE       = 29;
+localparam    INGRESS_RI_COUNT    = 30;
+localparam    INGRESS_CI_COUNT    = 31;
+localparam    INGRESS_ADDR        = 32;
 
 
 //Local Registers/Wires
@@ -308,6 +315,13 @@ wire [31:0]                       w_bar_addr3;
 wire [31:0]                       w_bar_addr4;
 wire [31:0]                       w_bar_addr5;
 
+wire [7:0]                        w_cfg_read_exec;
+wire [3:0]                        w_cfg_sm_state;
+wire [7:0]                        w_ingress_count;
+wire [3:0]                        w_ingress_state;
+wire [7:0]                        w_ingress_ri_count;
+wire [7:0]                        w_ingress_ci_count;
+wire [31:0]                       w_ingress_addr;
 
 
 //Submodules
@@ -399,49 +413,58 @@ artemis_pcie_controller #(
 
   //Debug Info
   .o_bar_hit                         (w_bar_hit                    ),
-  .o_receive_axi_ready               (w_receive_axi_ready          )
+  .o_receive_axi_ready               (w_receive_axi_ready          ),
+
+  .o_cfg_read_exec                   (w_cfg_read_exec              ),
+  .o_cfg_sm_state                    (w_cfg_sm_state               ),
+
+  .o_ingress_count                   (w_ingress_count              ),
+  .o_ingress_state                   (w_ingress_state              ),
+  .o_ingress_ri_count                (w_ingress_ri_count           ),
+  .o_ingress_ci_count                (w_ingress_ci_count           ),
+  .o_ingress_addr                    (w_ingress_addr               )
 );
 
 adapter_dpb_ppfifo #(
-  .MEM_DEPTH                          (CONTROL_FIFO_DEPTH     ),
-  .DATA_WIDTH                         (32                     )
+  .MEM_DEPTH                          (CONTROL_FIFO_DEPTH          ),
+  .DATA_WIDTH                         (32                          )
 )dpb_bridge (
-  .clk                                (clk                    ),
-  .rst                                (rst                    ),
-  .i_ppfifo_2_mem_en                  (r_ppfifo_2_mem_en      ),
-  .i_mem_2_ppfifo_stb                 (r_mem_2_ppfifo_stb     ),
-  .i_cancel_write_stb                 (r_cancel_write_stb     ),
-  .o_num_reads                        (w_num_reads            ),
-  .o_idle                             (w_idle                 ),
+  .clk                                (clk                         ),
+  .rst                                (rst                         ),
+  .i_ppfifo_2_mem_en                  (r_ppfifo_2_mem_en           ),
+  .i_mem_2_ppfifo_stb                 (r_mem_2_ppfifo_stb          ),
+  .i_cancel_write_stb                 (r_cancel_write_stb          ),
+  .o_num_reads                        (w_num_reads                 ),
+  .o_idle                             (w_idle                      ),
 
-  .i_bram_we                          (r_lcl_mem_we           ),
-  .i_bram_addr                        (w_lcl_mem_addr         ),
-  .i_bram_din                         (r_lcl_mem_din          ),
-  .o_bram_dout                        (w_lcl_mem_dout         ),
-  .o_bram_valid                       (w_lcl_mem_valid        ),
+  .i_bram_we                          (r_lcl_mem_we                ),
+  .i_bram_addr                        (w_lcl_mem_addr              ),
+  .i_bram_din                         (r_lcl_mem_din               ),
+  .o_bram_dout                        (w_lcl_mem_dout              ),
+  .o_bram_valid                       (w_lcl_mem_valid             ),
 
-  .ppfifo_clk                         (clk                    ),
+  .ppfifo_clk                         (clk                         ),
 
-  .i_write_ready                      (w_fifo_egress_wr_ready     ),
-  .o_write_activate                   (w_fifo_egress_wr_activate  ),
-  .i_write_size                       (w_fifo_egress_wr_size      ),
-  .o_write_stb                        (w_fifo_egress_wr_stb       ),
-  .o_write_data                       (w_fifo_egress_wr_data      ),
+  .i_write_ready                      (w_fifo_egress_wr_ready      ),
+  .o_write_activate                   (w_fifo_egress_wr_activate   ),
+  .i_write_size                       (w_fifo_egress_wr_size       ),
+  .o_write_stb                        (w_fifo_egress_wr_stb        ),
+  .o_write_data                       (w_fifo_egress_wr_data       ),
 
-  .i_read_ready                       (w_fifo_ingress_rd_ready      ),
-  .o_read_activate                    (w_fifo_ingress_rd_activate   ),
-  .i_read_size                        (w_fifo_ingress_rd_size       ),
-  .i_read_data                        (w_fifo_ingress_rd_data       ),
-  .o_read_stb                         (w_fifo_ingress_rd_stb        )
+  .i_read_ready                       (w_fifo_ingress_rd_ready     ),
+  .o_read_activate                    (w_fifo_ingress_rd_activate  ),
+  .i_read_size                        (w_fifo_ingress_rd_size      ),
+  .i_read_data                        (w_fifo_ingress_rd_data      ),
+  .o_read_stb                         (w_fifo_ingress_rd_stb       )
 );
 
 cross_clock_strobe clk_stb (
-  .rst                                (rst                    ),
-  .in_clk                             (clk                    ),
-  .in_stb                             (r_1sec_stb_100mhz      ),
+  .rst                                (rst                         ),
+  .in_clk                             (clk                         ),
+  .in_stb                             (r_1sec_stb_100mhz           ),
 
-  .out_clk                            (clk_62p5               ),
-  .out_stb                            (w_1sec_stb_65mhz       )
+  .out_clk                            (clk_62p5                    ),
+  .out_stb                            (w_1sec_stb_65mhz            )
 );
 
 //Asynchronous Logic
@@ -707,6 +730,27 @@ always @ (posedge clk) begin
             end
             BAR_ADDR5: begin
               o_wbs_dat                         <=  w_bar_addr5;
+            end
+            CFG_READ_EXEC: begin
+              o_wbs_dat                         <=  {24'h00, w_cfg_read_exec};
+            end
+            CFG_SM_STATE: begin
+              o_wbs_dat                         <=  {28'h00, w_cfg_sm_state};
+            end
+            INGRESS_COUNT: begin
+              o_wbs_dat                         <=  {24'h00, w_ingress_count};
+            end
+            INGRESS_STATE: begin
+              o_wbs_dat                         <=  {28'h00, w_ingress_state};
+            end
+            INGRESS_RI_COUNT: begin
+              o_wbs_dat                         <=  {24'h00, w_ingress_ri_count};
+            end
+            INGRESS_CI_COUNT: begin
+              o_wbs_dat                         <=  {24'h00, w_ingress_ci_count};
+            end
+            INGRESS_ADDR: begin
+              o_wbs_dat                         <=  w_ingress_addr;
             end
             default: begin
               if (w_lcl_mem_en) begin

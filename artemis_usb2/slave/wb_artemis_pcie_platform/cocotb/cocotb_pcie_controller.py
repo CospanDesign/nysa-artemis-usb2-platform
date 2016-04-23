@@ -42,6 +42,7 @@ REG_READ_BUF_A_ADDR       = 0x04
 REG_READ_BUF_B_ADDR       = 0x05
 REG_BUFFER_SIZE           = 0x06
 REG_PING_VALUE            = 0x07
+REG_ADDR_VALUE            = 0x08
 
 #Commands
 CMD_COMMAND_RESET         = 0x0080
@@ -99,6 +100,7 @@ class CocotbPCIE (object):
         self.set_read_buf_a_addr(READ_BUFFER_A_ADDRESS)
         self.set_read_buf_b_addr(READ_BUFFER_B_ADDRESS)
         self.set_buffer_size(BUFFER_SIZE)
+        self.set_dev_addr(0x00)
 
     @cocotb.coroutine
     def _acquire_lock(self):
@@ -133,8 +135,9 @@ class CocotbPCIE (object):
 
     def write_register(self, address, data):
         #Convert Word address to byte address
-        address += self.base_address
-        address = address << 2
+        address = self.base_address + (address << 2)
+        print "Address: 0x%08X" % address
+        #address = address << 2
         #if self.debug: cocotb.log.info("Entered Write Register")
         self.tm.set_value("type", "mwr")
         self.tm.set_value("address", address)
@@ -170,10 +173,15 @@ class CocotbPCIE (object):
     def set_buffer_size(self, buf_size):
         self.write_register(REG_BUFFER_SIZE, buf_size)
 
+    def set_dev_addr(self, address):
+        self.write_register(REG_ADDR_VALUE, address)
+
     def write_command(self, command, count = 0, address = 0):
         #Convert Word address to byte address
-        command += self.base_address
-        command = command << 2
+        #command += self.base_address
+        #command = command << 2
+        command = self.base_address + (command << 2)
+        print "Command: 0x%08X" % command
         self.tm.set_value("type", "mwr")
         self.tm.set_value("address", command)
         self.tm.set_value("dword_count", 2)

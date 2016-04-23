@@ -115,7 +115,16 @@ module artemis_pcie_controller #(
   input       [2:0]         tx_pre_emphasis,
   output      [4:0]         cfg_ltssm_state,
   output      [6:0]         o_bar_hit,
-  output                    o_receive_axi_ready
+  output                    o_receive_axi_ready,
+
+  //Debug
+  output      [7:0]         o_cfg_read_exec,
+  output      [3:0]         o_cfg_sm_state,
+  output      [7:0]         o_ingress_count,
+  output      [3:0]         o_ingress_state,
+  output      [7:0]         o_ingress_ri_count,
+  output      [7:0]         o_ingress_ci_count,
+  output      [31:0]        o_ingress_addr
 );
 
 //local parameters
@@ -194,6 +203,7 @@ wire          [31:0]        w_read_b_addr;
 wire          [31:0]        w_status_addr;
 wire          [31:0]        w_buffer_size;
 wire          [31:0]        w_ping_value;
+wire          [31:0]        w_dev_addr;
 wire          [1:0]         w_update_buf;
 wire                        w_update_buf_stb;
 
@@ -513,6 +523,7 @@ pcie_control controller(
   .i_status_addr              (w_status_addr              ),
   .i_buffer_size              (w_buffer_size              ),
   .i_ping_value               (w_ping_value               ),
+  .i_dev_addr                 (w_dev_addr                 ),
   .i_update_buf               (w_update_buf               ),
   .i_update_buf_stb           (w_update_buf_stb           ),
 
@@ -550,7 +561,10 @@ pcie_control controller(
   .i_egress_fifo_stb          (w_ctr_fifo_stb             ),
   .o_egress_fifo_data         (w_ctr_fifo_data            ),
 
-  .o_sys_rst                  (o_sys_rst                  )
+  .o_sys_rst                  (o_sys_rst                  ),
+
+  .o_cfg_read_exec            (o_cfg_read_exec            ),
+  .o_cfg_sm_state             (o_cfg_sm_state             )
 );
 
 pcie_ingress ingress(
@@ -575,6 +589,7 @@ pcie_ingress ingress(
   .o_status_addr              (w_status_addr              ),
   .o_buffer_size              (w_buffer_size              ),
   .o_ping_value               (w_ping_value               ),
+  .o_dev_addr                 (w_dev_addr                 ),
   .o_update_buf               (w_update_buf               ),
   .o_update_buf_stb           (w_update_buf_stb           ),
 
@@ -604,7 +619,12 @@ pcie_ingress ingress(
   .i_buf_offset               (tmp_buf_offset             ),
   .o_buf_we                   (tmp_buf_we                 ),
   .o_buf_addr                 (tmp_buf_addr               ),
-  .o_buf_data                 (tmp_buf_data               )
+  .o_buf_data                 (tmp_buf_data               ),
+  .o_state                    (o_ingress_state            ),
+  .o_ingress_count            (o_ingress_count            ),
+  .o_ingress_ri_count         (o_ingress_ri_count         ),
+  .o_ingress_ci_count         (o_ingress_ci_count         ),
+  .o_ingress_addr             (o_ingress_addr             )
 );
 
 pcie_egress egress(

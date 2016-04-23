@@ -9,9 +9,10 @@
 `define HDR_READ_BUF_B_ADDR       5
 `define HDR_BUFFER_SIZE           6
 `define HDR_PING_VALUE            7
+`define HDR_DEV_ADDR              8
 
 //The total number of items in the configuration registers
-`define CONFIG_REGISTER_COUNT 8
+`define CONFIG_REGISTER_COUNT 9
 
 `define CMD_OFFSET            32'h00000080
 

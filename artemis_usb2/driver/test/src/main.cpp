@@ -20,10 +20,19 @@ int fn = -1;
 
 #define ITEM_COUNT 12
 
+
+#define READ_BUFF_SIZE 0x01000 * 4
+
 int main(){
+  unsigned char buf[READ_BUFF_SIZE];
+
   PCIE *pcie = new PCIE(devname);
   pcie->enable_debug(true);
   //pcie->write_register(0x00, 0x01);
   pcie->write_command(0x08A, 0x01, 0x00);
+
+  //Read a small block of data
+  pcie->read_periph_data(0x00, buf, 0x010);
+
 }
 

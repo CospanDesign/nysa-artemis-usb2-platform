@@ -1,13 +1,34 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include "pcie_controller.h"
-
-
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+
+#include "pcie_controller.h"
+
+#define HDR_STATUS_BUF_ADDR   0x000
+#define HDR_BUFFER_READY      0x001
+#define HDR_WRITE_BUF_A_ADDR  0x002
+#define HDR_WRITE_BUF_B_ADDR  0x003
+#define HDR_READ_BUF_A_ADDR   0x004
+#define HDR_READ_BUF_B_ADDR   0x005
+#define HDR_BUFFER_SIZE       0x006
+#define HDR_PING_VALUE        0x007
+#define HDR_DEV_ADDR          0x008
+
+
+#define COMMAND_RESET         0x080
+#define PERIPHERAL_WRITE      0x081
+#define PERIPHERAL_WRITE_FIFO 0x082
+#define PERIPHERAL_READ       0x083
+#define PERIPHERAL_READ_FIFO  0x084
+#define MEMORY_WRITE          0x085
+#define MEMORY_READ           0x086
+#define DMA_WRITE             0x087
+#define DMA_READ              0x088
+#define PING                  0x089
+#define READ_CONFIG           0x08A
 
 //Constructor
 PCIE::PCIE (char * filename)
@@ -80,4 +101,10 @@ void PCIE::write_command(unsigned int address, unsigned int value, unsigned int 
       printf ("[%d]\t\t-> 0x%08X\n", i, write_word);
     }
   }
+}
+
+ssize_t PCIE::read_periph_data(unsigned int address, unsigned char *buf, unsigned int count)
+{
+	write_command(PERIPHERAL_READ, count, address);
+	return read(fn, buf, count);	
 }

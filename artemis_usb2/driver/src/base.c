@@ -138,6 +138,19 @@ ssize_t nysa_pcie_write(struct file *filp, const char *buf, size_t count, loff_t
 
 ssize_t nysa_pcie_read(struct file *filp, char * buf, size_t count, loff_t *f_pos)
 {
+  dev = filp->private_data;
+
+  //Wait for the core to be finished copying everything over
+  if (completion_done(&dev->complete))
+  {
+    mod_info_dbg("Completion Already Finished\n");
+  }
+  else
+  {
+    mod_info_dbg("Need to wait for completion...\n");
+    wait_for_completion(&dev->complete);
+    mod_info_dbg("Completion Finished...\n");
+  }
   return 0;
 }
 

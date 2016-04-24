@@ -12,16 +12,13 @@
 typedef struct
 {
   bool              initialized;
-  unsigned int     buffer_size;
-  unsigned int     bar_addr;
-  unsigned int     bar_len;
-  void *            virt_addr;
-  unsigned int      index;
-  struct pci_dev    *pdev;
+  unsigned int      buffer_size;
+  unsigned int      bar_addr;         //BAR 0 Physical Address
+  unsigned int      bar_len;          //Length of BAR 0
+  void *            virt_addr;        //Virtual Address of BAR0 Memory
+  struct mutex      mutex;
 
-  struct mutex       mutex;
-  struct cdev       cdev;
-
+  //Data Fields
   unsigned char *   status_buffer;
   dma_addr_t        status_dma_addr;
 
@@ -31,8 +28,15 @@ typedef struct
   unsigned char *   read_buffer[READ_BUFFER_COUNT];
   dma_addr_t        read_dma_addr[READ_BUFFER_COUNT];
 
+  //Driver Fields
+  unsigned int      index;            //Where this driver is in the list of minor numbers
+  struct pci_dev    *pdev;            //PCI Driver
   void *            private_data;
-	int								test;
+  struct cdev       cdev;
+  struct completion complete;
+
+  //Sys Fs Fields
+	int								test;             //XXX: Just for demo
   unsigned int      config_space[CONFIG_REGISTER_COUNT];
 } nysa_pcie_dev_t;
 

@@ -251,14 +251,15 @@ irqreturn_t msi_isr(int irq, void *data)
   memcpy(dev->config_space, dev->status_buffer, (CONFIG_REGISTER_COUNT * 4));
   dma_sync_single_for_device(&pdev->dev, dev->status_dma_addr, NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
 
+  /*
   mod_info_dbg("Configuration Data\n");
   for (i = 0; i < CONFIG_REGISTER_COUNT; i++)
   {
     dev->config_space[i] = be32_to_cpu(dev->config_space[i]);
     mod_info("0x%08X\n", dev->config_space[i]);
   }
+  */
 
- 
   switch (irq)
   {
     case NYSA_RESET:
@@ -474,11 +475,10 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
     mod_info_dbg("Error %d while trying to create %s%d\n", retval, MODULE_NAME, index);
     goto fail_reset_device;
   }
+  init_completion(&dev->complete);
   dev->pdev = pdev;
-
   pci_set_drvdata(pdev, dev);
   dev->initialized = true;
-
   return SUCCESS;
 
 //Handle Failures

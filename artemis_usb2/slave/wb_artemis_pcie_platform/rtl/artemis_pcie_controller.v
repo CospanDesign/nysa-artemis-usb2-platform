@@ -29,9 +29,11 @@ SOFTWARE.
  */
 `include "project_defines.v"
 
+
+//XXX: MAXIMUM PACKET SIZE CANNOT BE OVER THE 'MPS' SETTING FROM THE HOST
+
 module artemis_pcie_controller #(
-  parameter CONTROL_FIFO_DEPTH        = 7,
-  parameter DATA_FIFO_DEPTH           = 9,
+  parameter DATA_FIFO_DEPTH           = 7,    //512 bytes or 128 32-bit values
   parameter SERIAL_NUMBER             = 64'h000000000000C594
 )(
   input                     clk,
@@ -50,7 +52,7 @@ module artemis_pcie_controller #(
 
   // Transaction (TRN) Interface
   output                    user_lnk_up,
- (* KEEP = "TRUE" *) output                    clk_62p5,
+ (* KEEP = "TRUE" *) output clk_62p5,
 
   // Flow Control
   input       [2:0]         fc_sel,
@@ -60,6 +62,54 @@ module artemis_pcie_controller #(
   output      [11:0]        fc_pd,
   output      [7:0]         fc_cplh,
   output      [11:0]        fc_cpld,
+
+  // Conifguration: Interrupt
+  output      [31:0]        o_bar_addr0,
+  output      [31:0]        o_bar_addr1,
+  output      [31:0]        o_bar_addr2,
+  output      [31:0]        o_bar_addr3,
+  output      [31:0]        o_bar_addr4,
+  output      [31:0]        o_bar_addr5,
+
+
+  // Configuration: Power Management
+  input                     cfg_turnoff_ok,
+  output                    cfg_to_turnoff,
+  input                     cfg_pm_wake,
+
+  // System Interface
+  output                    pcie_reset,
+  output                    received_hot_reset,
+  output                    gtp_reset_done,
+  output                    gtp_pll_lock_detect,
+  output                    pll_lock_detect,
+
+  //GTP PHY Configurations
+  output                    rx_elec_idle,
+  input       [1:0]         rx_equalizer_ctrl,
+  input       [3:0]         tx_diff_ctrl,
+  input       [2:0]         tx_pre_emphasis,
+
+  output      [4:0]         cfg_ltssm_state,
+
+
+  //Extra Info
+  output      [6:0]         o_bar_hit,
+  output                    o_receive_axi_ready,
+
+  output      [2:0]         cfg_pcie_link_state,
+  output      [7:0]         cfg_bus_number,
+  output      [4:0]         cfg_device_number,
+  output      [2:0]         cfg_function_number,
+
+
+
+  output      [15:0]        cfg_status,
+  output      [15:0]        cfg_command,
+  output      [15:0]        cfg_dstatus,
+  output      [15:0]        cfg_dcommand,
+  output      [15:0]        cfg_lstatus,
+  output      [15:0]        cfg_lcommand,
 
   // Configuration: Error
   input                     cfg_err_ur,
@@ -72,50 +122,6 @@ module artemis_pcie_controller #(
   input       [47:0]        cfg_err_tlp_cpl_header,
   output                    cfg_err_cpl_rdy,
 
-  // Configuration: Power Management
-  input                     cfg_turnoff_ok,
-  output                    cfg_to_turnoff,
-  input                     cfg_pm_wake,
-
-  // Configuration: System/Status
-  output      [2:0]         cfg_pcie_link_state,
-//  input                     cfg_trn_pending_stb,
-  output      [7:0]         cfg_bus_number,
-  output      [4:0]         cfg_device_number,
-  output      [2:0]         cfg_function_number,
-
-  output      [15:0]        cfg_status,
-  output      [15:0]        cfg_command,
-  output      [15:0]        cfg_dstatus,
-  output      [15:0]        cfg_dcommand,
-  output      [15:0]        cfg_lstatus,
-  output      [15:0]        cfg_lcommand,
-
-  // Conifguration: Interrupt
-  output      [31:0]        o_bar_addr0,
-  output      [31:0]        o_bar_addr1,
-  output      [31:0]        o_bar_addr2,
-  output      [31:0]        o_bar_addr3,
-  output      [31:0]        o_bar_addr4,
-  output      [31:0]        o_bar_addr5,
-
-  // System Interface
-  output                    pcie_reset,
-  output                    pll_lock_detect,
-  output                    gtp_pll_lock_detect,
-  output                    gtp_reset_done,
-  output                    rx_elec_idle,
-  output                    received_hot_reset,
-
-//  output      [6:0]         rx_bar_hit,
-  output                    rx_rcv_data_valid,
-
-  input       [1:0]         rx_equalizer_ctrl,
-  input       [3:0]         tx_diff_ctrl,
-  input       [2:0]         tx_pre_emphasis,
-  output      [4:0]         cfg_ltssm_state,
-  output      [6:0]         o_bar_hit,
-  output                    o_receive_axi_ready,
 
   //Debug
   output      [7:0]         o_cfg_read_exec,
@@ -124,22 +130,42 @@ module artemis_pcie_controller #(
   output      [3:0]         o_ingress_state,
   output      [7:0]         o_ingress_ri_count,
   output      [7:0]         o_ingress_ci_count,
-  output      [31:0]        o_ingress_addr
+  output      [31:0]        o_ingress_addr,
+
+
+  //User Interfaces
+  output                    o_per_fifo_sel,
+  output                    o_mem_fifo_sel,
+  output                    o_dma_fifo_sel,
+
+  output      [31:0]        o_data_size,
+  output      [31:0]        o_data_address,
+  output                    o_data_fifo_flg,
+  output                    o_data_read_flg,
+  output                    o_data_write_flg,
+
+
+  //Ingress FIFO
+  input                     i_data_clk,
+  output                    o_ingress_fifo_rdy,
+  input                     i_ingress_fifo_act,
+  output      [23:0]        o_ingress_fifo_size,
+  input                     i_ingress_fifo_stb,
+  output      [31:0]        o_ingress_fifo_data,
+
+  //Egress FIFO
+  input       [1:0]         o_egress_fifo_rdy,
+  output      [1:0]         i_egress_fifo_act,
+  output      [23:0]        o_egress_fifo_size,
+  input                     i_egress_fifo_stb,
+  input       [31:0]        i_egress_fifo_data
+
 );
 
 //local parameters
-localparam      CONTROL_FIFO_SIZE     = (2 ** CONTROL_FIFO_DEPTH);
-localparam      DATA_FIFO_SIZE        = (2 ** DATA_FIFO_DEPTH);
+localparam      DATA_FIFO_SIZE    = (2 ** DATA_FIFO_DEPTH);
 
-
-localparam      CONTROL_SELECT   = 0;
-localparam      DATA_SELECT      = 1;
-localparam      DMA_SELECT       = 2;
 //registes/wires
-
-
-//(* KEEP = "TRUE" *) wire    clk_62p5;
-
 
 //Control Signals
 wire  [1:0]                 c_in_wr_ready;
@@ -209,7 +235,6 @@ wire                        w_update_buf_stb;
 
 //XXX: Control SM Signals
 wire          [31:0]        w_control_addr_base;
-wire          [3:0]         w_dev_sel;
 wire          [31:0]        w_cmd_data_count;
 wire          [31:0]        w_cmd_data_address;
 
@@ -271,18 +296,21 @@ wire                        w_finished_config_read;
 
 wire                        w_reg_write_stb;
 
-wire                        w_cmd_flg_sel_periph;
-wire                        w_cmd_flg_sel_memory;
-wire                        w_cmd_flg_sel_dma;
-
+//Command Strobe Signals
 wire                        w_cmd_rst_stb;
 wire                        w_cmd_wr_stb;
 wire                        w_cmd_rd_stb;
 wire                        w_cmd_ping_stb;
 wire                        w_cmd_rd_cfg_stb;
-wire                        w_cmd_unknown;
-wire                        w_cmd_flg_fifo;
+wire                        w_cmd_unknown_stb;
 
+//Command Flag Signals
+wire                        w_cmd_flg_fifo_stb;
+wire                        w_cmd_flg_sel_per_stb;
+wire                        w_cmd_flg_sel_mem_stb;
+wire                        w_cmd_flg_sel_dma_stb;
+
+//Egress FIFO Signals
 wire                        w_egress_enable;
 wire                        w_egress_finished;
 wire  [7:0]                 w_egress_tlp_command;
@@ -298,9 +326,7 @@ wire  [7:0]                 w_egress_tag;
  ****************************************************************************/
 
 wire                        w_ctr_fifo_sel;
-wire                        w_e_per_fifo_sel;
-wire                        w_e_mem_fifo_sel;
-wire                        w_e_dma_fifo_sel;
+wire                        w_dat_fifo_sel;
 
 wire                        w_egress_fifo_rdy;
 wire                        w_egress_fifo_act;
@@ -308,11 +334,11 @@ wire  [23:0]                w_egress_fifo_size;
 wire  [31:0]                w_egress_fifo_data;
 wire                        w_egress_fifo_stb;
 
-wire                        w_ctr_fifo_rdy;
-wire                        w_ctr_fifo_act;
-wire  [23:0]                w_ctr_fifo_size;
-wire  [31:0]                w_ctr_fifo_data;
-wire                        w_ctr_fifo_stb;
+wire                        w_e_ctr_fifo_rdy;
+wire                        w_e_ctr_fifo_act;
+wire  [23:0]                w_e_ctr_fifo_size;
+wire  [31:0]                w_e_ctr_fifo_data;
+wire                        w_e_ctr_fifo_stb;
 
 wire                        w_e_per_fifo_rdy;
 wire                        w_e_per_fifo_act;
@@ -333,8 +359,6 @@ wire  [31:0]                w_e_dma_fifo_data;
 wire                        w_e_dma_fifo_stb;
 
 
-wire                        tmp_e_mem_fifo_sel;
-wire                        tmp_e_dma_fifo_sel;
 wire                        tmp_pcie_fc_ready;
 
 
@@ -343,20 +367,26 @@ wire  [31:0]                tmp_buf_addr;
 wire                        tmp_buf_we;
 wire  [31:0]                tmp_buf_data;
 
+wire  [1:0]                 w_i_data_fifo_rdy;
+wire  [1:0]                 w_o_data_fifo_act;
+wire  [23:0]                w_o_data_fifo_size;
+wire                        w_i_data_fifo_stb;
+wire  [31:0]                w_i_data_fifo_data;
 
 
+wire                        w_e_data_fifo_rdy;
+wire                        w_e_data_fifo_act;
+wire  [23:0]                w_e_data_fifo_size;
+wire                        w_e_data_fifo_stb;
+wire  [31:0]                w_e_data_fifo_data;
 
 
 
 /****************************************************************************
  * Interrupt State Machine Signals
  ****************************************************************************/
-
-
-
-
-pcie_axi_bridge pcie_interface
-//sim_pcie_axi_bridge pcie_interface
+//pcie_axi_bridge pcie_interface
+sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface
@@ -440,7 +470,7 @@ pcie_axi_bridge pcie_interface
 
   // Configuration: System/Status
   .cfg_pcie_link_state               (cfg_pcie_link_state     ),
-  .cfg_trn_pending                   (cfg_trn_pending         ),
+  .cfg_trn_pending                   (cfg_trn_pending         ),  //XXX: Do I need to use cfg_trn_pending??
   .cfg_dsn                           (SERIAL_NUMBER           ),
   .cfg_bus_number                    (cfg_bus_number          ),
   .cfg_device_number                 (cfg_device_number       ),
@@ -526,6 +556,12 @@ pcie_control controller(
   .clk                        (clk_62p5                   ),
   .rst                        (pcie_reset                 ),
 
+  //Configuration Values
+  .i_pcie_bus_num             (cfg_bus_number             ),
+  .i_pcie_dev_num             (cfg_device_number          ),
+  .i_pcie_fun_num             (cfg_function_number        ),
+
+  //Ingress Machine Interface
   .i_write_a_addr             (w_write_a_addr             ),
   .i_write_b_addr             (w_write_b_addr             ),
   .i_read_a_addr              (w_read_a_addr              ),
@@ -538,29 +574,41 @@ pcie_control controller(
   .i_update_buf_stb           (w_update_buf_stb           ),
 
   .i_reg_write_stb            (w_reg_write_stb            ),
-  .i_device_select            (w_device_select            ),
-
-  .i_cmd_flg_sel_periph       (w_cmd_flg_sel_periph       ),
-  .i_cmd_flg_sel_memory       (w_cmd_flg_sel_memory       ),
-  .i_cmd_flg_sel_dma          (w_cmd_flg_sel_dma          ),
+  //.i_device_select            (w_device_select            ),
 
   .i_cmd_rst_stb              (w_cmd_rst_stb              ),
   .i_cmd_wr_stb               (w_cmd_wr_stb               ),
   .i_cmd_rd_stb               (w_cmd_rd_stb               ),
   .i_cmd_ping_stb             (w_cmd_ping_stb             ),
   .i_cmd_rd_cfg_stb           (w_cmd_rd_cfg_stb           ),
-  .i_cmd_unknown              (w_cmd_unknown              ),
-  .i_cmd_flg_fifo             (w_cmd_flg_fifo             ),
+  .i_cmd_unknown              (w_cmd_unknown_stb          ),
+  .i_cmd_flg_fifo             (w_cmd_flg_fifo_stb         ),
+  .i_cmd_flg_sel_periph       (w_cmd_flg_sel_per_stb      ),
+  .i_cmd_flg_sel_memory       (w_cmd_flg_sel_mem_stb      ),
+  .i_cmd_flg_sel_dma          (w_cmd_flg_sel_dma_stb      ),
 
   .i_cmd_data_count           (w_cmd_data_count           ),
   .i_cmd_data_address         (w_cmd_data_address         ),
 
   .i_pcie_fc_ready            (tmp_pcie_fc_ready          ),
 
+  .o_ctr_sel                  (w_ctr_fifo_sel             ),
+
+  //User Interface
+  .o_per_sel                  (o_per_fifo_sel             ),
+  .o_mem_sel                  (o_mem_fifo_sel             ),
+  .o_dma_sel                  (o_dma_fifo_sel             ),
+
+  .o_data_size                (o_data_size                ),
+  .o_data_address             (o_data_address             ),
+  .o_data_fifo_flg            (o_data_fifo_flg            ),
+  .o_data_read_flg            (o_data_read_flg            ),
+  .o_data_write_flg           (o_data_write_flg           ),
+
+
   //Peripheral/Memory/DMA Egress FIFO Interface
-  .i_e_per_fifo_rdy             (w_e_per_fifo_rdy             ),
-  .i_e_mem_fifo_rdy             (w_e_mem_fifo_rdy             ),
-  .i_e_dma_fifo_rdy             (w_e_dma_fifo_rdy             ),
+  .i_e_fifo_rdy               (w_egress_fifo_rdy          ),
+  .i_e_fifo_size              (w_egress_fifo_size         ),
 
   //Egress Controller Interface
   .o_egress_enable            (w_egress_enable            ),
@@ -571,15 +619,14 @@ pcie_control controller(
   .o_egress_tlp_requester_id  (w_egress_tlp_requester_id  ),
   .o_egress_tag               (w_egress_tag               ),
 
-  .o_egress_cntrl_fifo_select (w_ctr_fifo_sel             ),
   .o_interrupt_msi_value      (w_interrupt_msi_value      ),
   .o_interrupt_stb            (w_interrupt_stb            ),
 
-  .o_egress_fifo_rdy          (w_ctr_fifo_rdy             ),
-  .i_egress_fifo_act          (w_ctr_fifo_act             ),
-  .o_egress_fifo_size         (w_ctr_fifo_size            ),
-  .i_egress_fifo_stb          (w_ctr_fifo_stb             ),
-  .o_egress_fifo_data         (w_ctr_fifo_data            ),
+  .o_egress_fifo_rdy          (w_e_ctr_fifo_rdy           ),
+  .i_egress_fifo_act          (w_e_ctr_fifo_act           ),
+  .o_egress_fifo_size         (w_e_ctr_fifo_size          ),
+  .i_egress_fifo_stb          (w_e_ctr_fifo_stb           ),
+  .o_egress_fifo_data         (w_e_ctr_fifo_data          ),
 
   //System Interface
   .o_sys_rst                  (o_sys_rst                  ),
@@ -588,6 +635,64 @@ pcie_control controller(
   .o_cfg_read_exec            (o_cfg_read_exec            ),
   .o_cfg_sm_state             (o_cfg_sm_state             )
 );
+
+
+//XXX: Need to think about resets
+
+/****************************************************************************
+ * Single IN/OUT FIFO Solution (This Can Change in the future):
+ *  Instead of dedicating unique FIFOs for each bus, I can just doe one
+ *  FIFO. This will reduce the size of the core at the cost of
+ *  a certain amount of time it will take to fill up the FIFOs
+ ****************************************************************************/
+
+//INGRESS FIFO
+ppfifo #(
+  .DATA_WIDTH       (32                  ),
+  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH     ) //16 32-bit values for the control
+) i_data_fifo(
+  .reset            (pcie_reset || rst   ),
+  //Write Side
+  .write_clock      (clk_62p5            ),
+  .write_ready      (w_i_data_fifo_rdy   ),
+  .write_activate   (w_o_data_fifo_act   ),
+  .write_fifo_size  (w_o_data_fifo_size  ),
+  .write_strobe     (w_i_data_fifo_stb   ),
+  .write_data       (w_i_data_fifo_data  ),
+
+  //Read Side
+  .read_clock       (i_data_clk           ),
+  .read_ready       (o_ingress_fifo_rdy   ),
+  .read_activate    (i_ingress_fifo_act   ),
+  .read_count       (o_ingress_fifo_size  ),
+  .read_strobe      (i_ingress_fifo_stb   ),
+  .read_data        (o_ingress_fifo_data  )
+);
+
+//EGRESS FIFOs
+ppfifo #(
+  .DATA_WIDTH       (32                  ),
+  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH     ) //16 32-bit values for the control
+) e_data_fifo(
+  .reset            (pcie_reset || rst   ),
+  //Write Side
+  .write_clock      (i_data_clk          ),
+  .write_ready      (o_egress_fifo_rdy   ),
+  .write_activate   (i_egress_fifo_act   ),
+  .write_fifo_size  (o_egress_fifo_size  ),
+  .write_strobe     (i_egress_fifo_stb   ),
+  .write_data       (i_egress_fifo_data  ),
+
+  //Read Side
+  .read_clock       (clk_62p5           ),
+  .read_ready       (w_e_data_fifo_rdy   ),
+  .read_activate    (w_e_data_fifo_act   ),
+  .read_count       (w_e_data_fifo_size  ),
+  .read_strobe      (w_e_data_fifo_stb   ),
+  .read_data        (w_e_data_fifo_data  )
+);
+
+
 
 pcie_ingress ingress(
   .clk                        (clk_62p5                   ),
@@ -616,18 +721,19 @@ pcie_ingress ingress(
   .o_update_buf_stb           (w_update_buf_stb           ),
 
   //Command Interface
-  .o_device_select            (w_device_select            ),
+  //.o_device_select            (w_device_select            ),
 
   .o_cmd_rst_stb              (w_cmd_rst_stb              ),  //Strobe when a reset command is detected
   .o_cmd_wr_stb               (w_cmd_wr_stb               ),  //Strobes when a write request is detected
   .o_cmd_rd_stb               (w_cmd_rd_stb               ),  //Strobes when a read request is detected
   .o_cmd_ping_stb             (w_cmd_ping_stb             ),  //Strobes when a ping request is detected
   .o_cmd_rd_cfg_stb           (w_cmd_rd_cfg_stb           ),  //Strobes when a read configuration id detected
-  .o_cmd_unknown              (w_cmd_unknown              ),
-  .o_cmd_flg_fifo             (w_cmd_flg_fifo             ),  //Flag indicating that transfer shouldn't auto increment addr
-  .o_cmd_flg_sel_periph       (w_cmd_flg_sel_periph       ),
-  .o_cmd_flg_sel_memory       (w_cmd_flg_sel_memory       ),
-  .o_cmd_flg_sel_dma          (w_cmd_flg_sel_dma          ),
+  .o_cmd_unknown_stb          (w_cmd_unknown_stb          ),
+
+  .o_cmd_flg_fifo_stb         (w_cmd_flg_fifo_stb         ),  //Flag indicating that transfer shouldn't auto increment addr
+  .o_cmd_flg_sel_per_stb      (w_cmd_flg_sel_per_stb      ),
+  .o_cmd_flg_sel_mem_stb      (w_cmd_flg_sel_mem_stb      ),
+  .o_cmd_flg_sel_dma_stb      (w_cmd_flg_sel_dma_stb      ),
 
   //Input Configuration Registers from either PCIE_A1 or controller
   .i_bar_hit                  (o_bar_hit                  ),
@@ -680,79 +786,45 @@ pcie_egress egress(
 /****************************************************************************
  * FIFO Multiplexer
  ****************************************************************************/
-assign  w_egress_fifo_rdy     = (w_ctr_fifo_sel)        ? w_ctr_fifo_rdy:
-                                (w_e_per_fifo_sel)      ? w_e_per_fifo_rdy:
-                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_rdy:
-                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_rdy:
-                                1'b0;                   
-                                                        
-assign  w_egress_fifo_size    = (w_ctr_fifo_sel)        ? w_ctr_fifo_size:
-                                (w_e_per_fifo_sel)      ? w_e_per_fifo_size:
-                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_size:
-                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_size:
-                                24'h0;                  
-                                                        
-assign  w_egress_fifo_data    = (w_ctr_fifo_sel)        ? w_ctr_fifo_data:
-                                (w_e_per_fifo_sel)      ? w_e_per_fifo_data:
-                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_data:
-                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_data:
-                                32'h00;                 
-                                                        
-assign  w_ctr_fifo_act        = (w_ctr_fifo_sel)        ? w_egress_fifo_act:
-                                    1'b0;               
-assign  w_ctr_fifo_stb        = (w_ctr_fifo_sel)        ? w_egress_fifo_stb:
-                                    1'b0;
+assign  w_egress_fifo_rdy     = (w_ctr_fifo_sel)      ? w_e_ctr_fifo_rdy:
+                                (w_dat_fifo_sel)      ? w_e_data_fifo_rdy:
+                                1'b0;
 
-assign  w_e_per_fifo_act        = (w_e_per_fifo_sel)    ? w_egress_fifo_act:
-                                    1'b0;
-assign  w_e_per_fifo_stb        = (w_e_per_fifo_sel)    ? w_egress_fifo_stb:
-                                    1'b0;
+assign  w_egress_fifo_size    = (w_ctr_fifo_sel)      ? w_e_ctr_fifo_size:
+                                (w_dat_fifo_sel)      ? w_e_data_fifo_size:
+                                24'h0;
 
-assign  w_e_mem_fifo_act        = (w_e_mem_fifo_sel)    ? w_egress_fifo_act:
-                                    1'b0;
-assign  w_e_mem_fifo_stb        = (w_e_mem_fifo_sel)    ? w_egress_fifo_stb:
-                                    1'b0;
+assign  w_egress_fifo_data    = (w_ctr_fifo_sel)      ? w_e_ctr_fifo_data:
+                                (w_dat_fifo_sel)      ? w_e_data_fifo_data:
+                                32'h00;
 
-assign  w_e_dma_fifo_act        = (w_e_dma_fifo_sel)    ? w_egress_fifo_act:
-                                    1'b0;
-assign  w_e_dma_fifo_stb        = (w_e_dma_fifo_sel)    ? w_egress_fifo_stb:
-                                    1'b0;
+assign  w_e_ctr_fifo_act      = (w_ctr_fifo_sel)      ? w_egress_fifo_act:
+                                  1'b0;
+assign  w_e_ctr_fifo_stb      = (w_ctr_fifo_sel)      ? w_egress_fifo_stb:
+                                  1'b0;
 
+assign  w_e_data_fifo_act     = (w_dat_fifo_sel)      ? w_egress_fifo_act:
+                                 1'b0;
+assign  w_e_data_fifo_stb     = (w_dat_fifo_sel)      ? w_egress_fifo_stb:
+                                 1'b0;
 
-
+assign  w_dat_fifo_sel        = (o_per_fifo_sel || o_mem_fifo_sel || o_dma_fifo_sel);
 /****************************************************************************
  * Temporary Debug Signals
  ****************************************************************************/
-
-assign  w_e_per_fifo_rdy  = 1'b0;
-assign  w_e_per_fifo_size = 24'h0;
-assign  w_e_per_fifo_data = 32'h00;
-
-assign  w_e_mem_fifo_rdy  = 1'b0;
-assign  w_e_mem_fifo_size = 24'h0;
-assign  w_e_mem_fifo_data = 32'h00;
-
-assign  w_e_dma_fifo_rdy  = 1'b0;
-assign  w_e_dma_fifo_size = 24'h0;
-assign  w_e_dma_fifo_data = 32'h00;
 
 //This used to go to the wishbone slave device
 assign  o_receive_axi_ready = 0;
 
 //Need to create a flow controller
 assign  tmp_pcie_fc_ready = 1;
+
 assign  tmp_buf_offset  = 32'h0;
 
 
-
-assign  tmp_e_per_fifo_sel  = 1'b0;
-assign  tmp_e_mem_fifo_sel  = 1'b0;
-assign  tmp_e_dma_fifo_sel  = 1'b0;
-
-assign  w_e_per_fifo_sel  = tmp_e_per_fifo_sel;
-assign  w_e_mem_fifo_sel  = tmp_e_mem_fifo_sel;
-assign  w_e_dma_fifo_sel  = tmp_e_dma_fifo_sel;
-
+assign  w_i_data_fifo_act    = 0;
+assign  w_i_data_fifo_stb    = 0;
+assign  w_i_data_fifo_data   = 0;
 
 
 

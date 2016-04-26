@@ -91,9 +91,9 @@ assign  w_hdr[0][`PCIE_DWORD_PKT_CNT_RANGE] = w_pkt_data_count;
 assign  w_pkt_data_count  = (i_command == `PCIE_MRD_32B) ? 32'h0 : i_fifo_size;
 
 //2nd Dword
-assign  w_hdr[1]    =  (i_command == `PCIE_MRD_32B) ? {i_requester_id, i_tag, 8'h00} :
-                          (i_fifo_size == 1)      ?   32'h0000000F :          //==  1 DWORD
-                                                      32'h000000FF;           // >  1 DWORD
+assign  w_hdr[1]    = (i_command == `PCIE_MRD_32B) ? {i_requester_id, i_tag, 8'h00} :
+                         (i_fifo_size == 1)        ?    32'h0000000F :          //==  1 DWORD
+                                                        32'h000000FF;           // >  1 DWORD
 assign  w_hdr[2]    = i_address;
 assign  w_hdr_size  = (w_hdr[0][29]) ?  3'h4 : 3'h3;  //Index Size is dependent on 64-bit vs 32-bit address space
 

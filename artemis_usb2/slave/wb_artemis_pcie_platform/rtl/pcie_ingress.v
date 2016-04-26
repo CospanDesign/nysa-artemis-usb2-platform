@@ -69,12 +69,12 @@ module pcie_ingress (
   output  reg               o_cmd_rd_stb,
   output  reg               o_cmd_ping_stb,
   output  reg               o_cmd_rd_cfg_stb,
-  output  reg               o_cmd_unknown,
+  output  reg               o_cmd_unknown_stb,
 
-  output  reg               o_cmd_flg_fifo,
-  output  reg               o_cmd_flg_sel_periph;
-  output  reg               o_cmd_flg_sel_memory;
-  output  reg               o_cmd_flg_sel_dma;
+  output  reg               o_cmd_flg_fifo_stb,
+  output  reg               o_cmd_flg_sel_per_stb,
+  output  reg               o_cmd_flg_sel_mem_stb,
+  output  reg               o_cmd_flg_sel_dma_stb,
 
   //Command Interface
   output  reg [31:0]        o_cmd_data_count,
@@ -205,11 +205,9 @@ always @ (*) begin
 end
 
 assign  w_pkt_data_size       = r_hdr[0][`PCIE_DWORD_PKT_CNT_RANGE];
-//assign  w_pkt_addr            = r_hdr[2] >> 2;
 assign  w_pkt_addr            = {r_hdr[2][31:2], 2'b00};
 assign  w_cmplt_lower_addr    = r_hdr[3][`CMPLT_LOWER_ADDR_RANGE];
 
-//assign  w_reg_addr            = (w_pkt_addr >> 2);
 assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
 assign  w_cmd_en              = (w_reg_addr > `CMD_OFFSET);
 assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
@@ -225,11 +223,11 @@ always @ (posedge clk) begin
   o_cmd_rd_stb                <=  0;
   o_cmd_ping_stb              <=  0;
   o_cmd_rd_cfg_stb            <=  0;
-  o_cmd_unknown               <=  0;
-  o_cmd_flg_fifo              <=  0;
-  o_cmd_flg_sel_periph        <=  0;
-  o_cmd_flg_sel_memory        <=  0;
-  o_cmd_flg_sel_dma           <=  0;
+  o_cmd_unknown_stb           <=  0;
+  o_cmd_flg_fifo_stb          <=  0;
+  o_cmd_flg_sel_per_stb       <=  0;
+  o_cmd_flg_sel_mem_stb       <=  0;
+  o_cmd_flg_sel_dma_stb       <=  0;
 
 
   o_update_buf_stb            <=  0;
@@ -319,46 +317,46 @@ always @ (posedge clk) begin
           o_update_buf                        <=  2'b00;
           o_update_buf_stb                    <=  1;
           o_cmd_data_count                    <=  i_axi_ingress_data;
-          o_cmd_flg_sel_periph                <=  0;
-          o_cmd_flg_sel_memory                <=  0;
-          o_cmd_flg_sel_dma                   <=  0;
+          o_cmd_flg_sel_per_stb               <=  0;
+          o_cmd_flg_sel_mem_stb               <=  0;
+          o_cmd_flg_sel_dma_stb               <=  0;
 
           case (w_reg_addr)
             `COMMAND_RESET: begin
               r_config_space_done             <=  0;
             end
             `PERIPHERAL_WRITE: begin
-              o_cmd_flg_sel_periph            <=  1;
+              o_cmd_flg_sel_per_stb           <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `PERIPHERAL_WRITE_FIFO: begin
-              o_cmd_flg_sel_periph            <=  1;
+              o_cmd_flg_sel_per_stb           <=  1;
               o_cmd_wr_stb                    <=  1;
-              o_cmd_flg_fifo                  <=  1;
+              o_cmd_flg_fifo_stb              <=  1;
             end
             `PERIPHERAL_READ: begin
-              o_cmd_flg_sel_periph            <=  1;
+              o_cmd_flg_sel_per_stb           <=  1;
               o_cmd_rd_stb                    <=  1;
             end
             `PERIPHERAL_READ_FIFO: begin
-              o_cmd_flg_sel_periph            <=  1;
+              o_cmd_flg_sel_per_stb           <=  1;
               o_cmd_rd_stb                    <=  1;
-              o_cmd_flg_fifo                  <=  1;
+              o_cmd_flg_fifo_stb              <=  1;
             end
             `MEMORY_WRITE: begin
-              o_cmd_flg_sel_memory            <=  1;
+              o_cmd_flg_sel_mem_stb           <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `MEMORY_READ: begin
-              o_cmd_flg_sel_memory            <=  1;
+              o_cmd_flg_sel_mem_stb           <=  1;
               o_cmd_rd_stb                    <=  1;
             end
             `DMA_WRITE: begin
-              o_cmd_flg_sel_dma               <=  1;
+              o_cmd_flg_sel_dma_stb           <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `DMA_READ: begin
-              o_cmd_flg_sel_dma               <=  1;
+              o_cmd_flg_sel_dma_stb           <=  1;
               o_cmd_rd_stb                    <=  1;
             end
             `PING: begin
@@ -369,7 +367,7 @@ always @ (posedge clk) begin
               o_cmd_rd_cfg_stb                <=  1;
             end
             default: begin
-              o_cmd_unknown                   <=  1;
+              o_cmd_unknown_stb               <=  1;
               o_ingress_ci_count              <=  o_ingress_ci_count + 1;
             end
           endcase

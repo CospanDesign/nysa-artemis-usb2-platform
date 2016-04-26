@@ -116,6 +116,14 @@ SOFTWARE.
 `define DBG_UR_UNSUP_MSG              18
 
 
+`define USR_IF_BIT_PER_BUS_SEL        0
+`define USR_IF_BIT_MEM_BUS_SEL        1
+`define USR_IF_BIT_DMA_BUS_SEL        2
+`define USR_IF_BIT_WR_FLAG            3
+`define USR_IF_BIT_RD_FLAG            4
+`define USR_IF_BIT_FIFO_FLAG          5
+
+
 `define LOCAL_BUFFER_OFFSET         24'h000100
 
 
@@ -160,7 +168,7 @@ module wb_artemis_pcie_platform #(
 );
 
 //Local Parameters
-localparam    CONTROL_BUFFER_SIZE = 2 ** CONTROL_FIFO_DEPTH;
+localparam    DATA_BUFFER_SIZE = 2 ** DATA_FIFO_DEPTH;
 
 localparam    CONTROL             = 0;
 localparam    STATUS              = 1;
@@ -173,12 +181,20 @@ localparam    RX_EQUALIZER_CTRL   = 7;
 localparam    LTSSM_STATE         = 8;
 localparam    TX_PRE_EMPH         = 9;
 localparam    DBG_DATA            = 10;
+
+/*
 localparam    CONFIG_COMMAND      = 11;
 localparam    CONFIG_STATUS       = 12;
 localparam    CONFIG_DCOMMAND     = 13;
 localparam    CONFIG_DSTATUS      = 14;
 localparam    CONFIG_LCOMMAND     = 15;
 localparam    CONFIG_LSTATUS      = 16;
+*/
+
+localparam    USR_IF_FLAGS        = 11;
+localparam    USR_IF_SIZE         = 12;
+localparam    USR_IF_ADDRESS      = 13;
+
 localparam    DBG_FLAGS           = 17;
 localparam    BAR_SELECT          = 18;
 localparam    BAR_ADDR0           = 19;
@@ -272,7 +288,7 @@ wire                              gtp_reset_done;
 
 //User Memory Interface
 reg                               r_lcl_mem_we;
-wire  [CONTROL_FIFO_DEPTH -1: 0]  w_lcl_mem_addr;
+wire  [DATA_FIFO_DEPTH -1: 0]     w_lcl_mem_addr;
 reg   [31:0]                      r_lcl_mem_din;
 wire  [31:0]                      w_lcl_mem_dout;
 wire                              w_lcl_mem_valid;
@@ -324,10 +340,23 @@ wire [7:0]                        w_ingress_ci_count;
 wire [31:0]                       w_ingress_addr;
 
 
+
+
+
+wire [31:0]                       w_data_size;
+wire [31:0]                       w_data_address;
+
+wire                              w_per_fifo_sel;
+wire                              w_mem_fifo_sel;
+wire                              w_dma_fifo_sel;
+wire                              w_data_fifo_flg;
+wire                              w_data_read_flg;
+wire                              w_data_write_flg;
+
+
 //Submodules
 //artemis_pcie_interface #(
 artemis_pcie_controller #(
-  .CONTROL_FIFO_DEPTH                (CONTROL_FIFO_DEPTH           ),
   .DATA_FIFO_DEPTH                   (DATA_FIFO_DEPTH              ),
   .SERIAL_NUMBER                     (64'h000000000000C594         )
 )api (
@@ -337,14 +366,43 @@ artemis_pcie_controller #(
 
   .gtp_clk_p                         (i_clk_100mhz_gtp_p           ),
   .gtp_clk_n                         (i_clk_100mhz_gtp_n           ),
+
   .pci_exp_txp                       (o_pcie_phy_tx_p              ),
   .pci_exp_txn                       (o_pcie_phy_tx_n              ),
   .pci_exp_rxp                       (i_pcie_phy_rx_p              ),
   .pci_exp_rxn                       (i_pcie_phy_rx_n              ),
 
+
   // Transaction (TRN) Interface
   .user_lnk_up                       (user_lnk_up                  ),
   .clk_62p5                          (clk_62p5                     ),
+
+
+  //User Interfaces
+  .o_per_fifo_sel                    (w_per_fifo_sel               ),
+  .o_mem_fifo_sel                    (w_mem_fifo_sel               ),
+  .o_dma_fifo_sel                    (w_dma_fifo_sel               ),
+
+  .o_data_size                       (w_data_size                  ),
+  .o_data_address                    (w_data_address               ),
+  .o_data_fifo_flg                   (w_data_fifo_flg              ),
+  .o_data_read_flg                   (w_data_read_flg              ),
+  .o_data_write_flg                  (w_data_write_flg             ),
+
+
+  //Ingress FIFO
+  .i_data_clk                        (clk                          ),
+  .o_ingress_fifo_rdy                (w_fifo_ingress_rd_ready      ),
+  .i_ingress_fifo_act                (w_fifo_ingress_rd_activate   ),
+  .o_ingress_fifo_size               (w_fifo_ingress_rd_size       ),
+  .i_ingress_fifo_stb                (w_fifo_ingress_rd_stb        ),
+  .o_ingress_fifo_data               (w_fifo_ingress_rd_data       ),
+
+  .o_egress_fifo_rdy                 (w_fifo_egress_wr_ready       ),
+  .i_egress_fifo_act                 (w_fifo_egress_wr_activate    ),
+  .o_egress_fifo_size                (w_fifo_egress_wr_size        ),
+  .i_egress_fifo_stb                 (w_fifo_egress_wr_stb         ),
+  .i_egress_fifo_data                (w_fifo_egress_wr_data        ),
 
   // Flow Control
   .fc_sel                            (fc_sel                       ),
@@ -363,11 +421,44 @@ artemis_pcie_controller #(
   .o_bar_addr5                       (w_bar_addr5                  ),
 
 
-  // Host (CFG) Interface
-  //.cfg_do                            (cfg_do                       ),
-  //.cfg_rd_wr_done                    (cfg_rd_wr_done               ),
-  //.cfg_dwaddr                        (cfg_dwaddr                   ),
-  //.cfg_rd_en                         (cfg_rd_en                    ),
+  // Configuration: Power Management
+  .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
+  .cfg_to_turnoff                    (cfg_to_turnoff               ),
+  .cfg_pm_wake                       (cfg_pm_wake                  ),
+
+  // System Interface
+  .pcie_reset                        (pcie_reset                   ),
+  .received_hot_reset                (received_hot_reset           ),
+  .gtp_pll_lock_detect               (gtp_pll_lock_detect          ),
+  .gtp_reset_done                    (gtp_reset_done               ),
+  .pll_lock_detect                   (pll_lock_detect              ),
+
+  .rx_elec_idle                      (rx_elec_idle                 ),
+  .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
+
+  .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
+  .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
+
+  .cfg_ltssm_state                   (cfg_ltssm_state              ),
+
+  .o_bar_hit                         (w_bar_hit                    ),
+  .o_receive_axi_ready               (w_receive_axi_ready          ),
+
+  //Extra Info
+  .o_cfg_read_exec                   (w_cfg_read_exec              ),
+  .o_cfg_sm_state                    (w_cfg_sm_state               ),
+
+  .cfg_pcie_link_state               (cfg_pcie_link_state          ),
+  .cfg_bus_number                    (cfg_bus_number               ),
+  .cfg_device_number                 (cfg_device_number            ),
+  .cfg_function_number               (cfg_function_number          ),
+
+  .cfg_status                        (cfg_status                   ),
+  .cfg_command                       (cfg_command                  ),
+  .cfg_dstatus                       (cfg_dstatus                  ),
+  .cfg_dcommand                      (cfg_dcommand                 ),
+  .cfg_lstatus                       (cfg_lstatus                  ),
+  .cfg_lcommand                      (cfg_lcommand                 ),
 
   // Configuration: Error
   .cfg_err_ur                        (cfg_err_ur                   ),
@@ -380,44 +471,8 @@ artemis_pcie_controller #(
   .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
 
-  // Configuration: Power Management
-  .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
-  .cfg_to_turnoff                    (cfg_to_turnoff               ),
-  .cfg_pm_wake                       (cfg_pm_wake                  ),
-
-  // Configuration: System/Status
-  .cfg_pcie_link_state               (cfg_pcie_link_state          ),
-//  .cfg_trn_pending_stb               (r_cfg_trn_pending            ),
-  .cfg_bus_number                    (cfg_bus_number               ),
-  .cfg_device_number                 (cfg_device_number            ),
-  .cfg_function_number               (cfg_function_number          ),
-
-  .cfg_status                        (cfg_status                   ),
-  .cfg_command                       (cfg_command                  ),
-  .cfg_dstatus                       (cfg_dstatus                  ),
-  .cfg_dcommand                      (cfg_dcommand                 ),
-  .cfg_lstatus                       (cfg_lstatus                  ),
-  .cfg_lcommand                      (cfg_lcommand                 ),
-
-  // System Interface
-  .pcie_reset                        (pcie_reset                   ),
-  .received_hot_reset                (received_hot_reset           ),
-  .gtp_pll_lock_detect               (gtp_pll_lock_detect          ),
-  .gtp_reset_done                    (gtp_reset_done               ),
-  .pll_lock_detect                   (pll_lock_detect              ),
-  .rx_elec_idle                      (rx_elec_idle                 ),
-  .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
-  .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
-  .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
-  .cfg_ltssm_state                   (cfg_ltssm_state              ),
 
   //Debug Info
-  .o_bar_hit                         (w_bar_hit                    ),
-  .o_receive_axi_ready               (w_receive_axi_ready          ),
-
-  .o_cfg_read_exec                   (w_cfg_read_exec              ),
-  .o_cfg_sm_state                    (w_cfg_sm_state               ),
-
   .o_ingress_count                   (w_ingress_count              ),
   .o_ingress_state                   (w_ingress_state              ),
   .o_ingress_ri_count                (w_ingress_ri_count           ),
@@ -426,7 +481,7 @@ artemis_pcie_controller #(
 );
 
 adapter_dpb_ppfifo #(
-  .MEM_DEPTH                          (CONTROL_FIFO_DEPTH          ),
+  .MEM_DEPTH                          (DATA_FIFO_DEPTH             ),
   .DATA_WIDTH                         (32                          )
 )dpb_bridge (
   .clk                                (clk                         ),
@@ -501,7 +556,7 @@ assign  o_pcie_wake_n           = 1;
 
 
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
-                                   (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
+                                   (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + DATA_BUFFER_SIZE)));
 
 assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
 //assign  !i_pcie_reset_n          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
@@ -519,10 +574,8 @@ always @ (posedge clk_62p5) begin
   if (!i_pcie_reset_n) begin
     r_clock_1_sec                <= 0;
     r_clock_count                <= 0;
-
     cfg_turnoff_ok               <= 0;
     trn_pending                  <= 0;
-
 
   end
   else begin
@@ -650,7 +703,7 @@ always @ (posedge clk) begin
               o_wbs_dat <= w_num_reads;
             end
             LOCAL_BUFFER_SIZE: begin
-              o_wbs_dat <= CONTROL_BUFFER_SIZE;
+              o_wbs_dat <= DATA_BUFFER_SIZE;
             end
             PCIE_CLOCK_CNT: begin
               o_wbs_dat <=  r_clock_1_sec;
@@ -681,6 +734,25 @@ always @ (posedge clk) begin
               //o_wbs_dat[`DBG_NON_FATAL   ] <=  dbg_non_fatal;
               //o_wbs_dat[`DBG_UNSUPPORTED ] <=  dbg_unsupported;
             end
+            USR_IF_FLAGS: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat[`USR_IF_BIT_PER_BUS_SEL ]  <=  w_per_fifo_sel;
+              o_wbs_dat[`USR_IF_BIT_MEM_BUS_SEL ]  <=  w_mem_fifo_sel;
+              o_wbs_dat[`USR_IF_BIT_DMA_BUS_SEL ]  <=  w_dma_fifo_sel; 
+              o_wbs_dat[`USR_IF_BIT_WR_FLAG     ]  <=  w_data_write_flg;
+              o_wbs_dat[`USR_IF_BIT_RD_FLAG     ]  <=  w_data_read_flg;
+              o_wbs_dat[`USR_IF_BIT_FIFO_FLAG   ]  <=  w_data_fifo_flg;
+            end
+            USR_IF_SIZE: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat       <=  w_data_size;
+            end
+            USR_IF_ADDRESS: begin
+              o_wbs_dat       <=  0;
+              o_wbs_dat       <=  w_data_address;
+            end
+
+/*
             CONFIG_COMMAND: begin
               o_wbs_dat       <=  0;
               o_wbs_dat                       <=  {16'h0000, cfg_command};
@@ -705,6 +777,7 @@ always @ (posedge clk) begin
               o_wbs_dat       <=  0;
               o_wbs_dat                       <=  {16'h0000, cfg_lcommand};
             end
+*/
             DBG_FLAGS: begin
               o_wbs_dat       <=  0;
             end

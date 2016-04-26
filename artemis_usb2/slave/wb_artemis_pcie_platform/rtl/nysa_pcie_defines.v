@@ -53,7 +53,7 @@
 `define STATUS_BIT_INTERRUPT      12
 `define STATUS_BIT_RESET          13
 `define STATUS_BIT_DONE           14
-`define STATUS_CMD_ERR            15
+`define STATUS_BIT_CMD_ERR        15
 `define STATUS_UNUSED             31:16
                                   
 `define COMM_STATUS_SIZE          2

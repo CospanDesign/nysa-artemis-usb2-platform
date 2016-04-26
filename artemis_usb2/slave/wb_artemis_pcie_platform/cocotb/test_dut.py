@@ -101,7 +101,7 @@ def test_write_pcie_register(dut):
 
     yield (nysa.wait_clocks(100))
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_pcie_command(dut):
     """
     Description:
@@ -137,7 +137,7 @@ def test_pcie_command(dut):
     yield c.read_config_regs(wait_for_ready = False)
     yield (nysa.wait_clocks(500))
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_pcie_config_read_wait_for_ready(dut):
     """
     Description:

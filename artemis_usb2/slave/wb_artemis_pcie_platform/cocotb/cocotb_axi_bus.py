@@ -48,9 +48,9 @@ class AXIStreamMaster(BusDriver):
         #Wait for the slave to assert tready
         while True:
             yield ReadOnly()
+            yield RisingEdge(self.clock)
             if self.bus.tready.value:
                 break
-            yield RisingEdge(self.clock)
 
         #every clock cycle update the data
         for i in range (4, len(data), 4):

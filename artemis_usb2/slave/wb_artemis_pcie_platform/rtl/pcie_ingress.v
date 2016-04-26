@@ -54,7 +54,6 @@ module pcie_ingress (
   output  reg [1:0]         o_update_buf,
   output  reg [31:0]        o_dev_addr,
 
-
   //Bar Hit
   input       [6:0]         i_bar_hit,
   input       [31:0]        i_control_addr_base,
@@ -65,15 +64,17 @@ module pcie_ingress (
   output  reg               o_reg_write_stb,
 
   //Commands
-  output  reg [3:0]         o_device_select,
-
   output  reg               o_cmd_rst_stb,
   output  reg               o_cmd_wr_stb,
   output  reg               o_cmd_rd_stb,
   output  reg               o_cmd_ping_stb,
   output  reg               o_cmd_rd_cfg_stb,
   output  reg               o_cmd_unknown,
+
   output  reg               o_cmd_flg_fifo,
+  output  reg               o_cmd_flg_sel_periph;
+  output  reg               o_cmd_flg_sel_memory;
+  output  reg               o_cmd_flg_sel_dma;
 
   //Command Interface
   output  reg [31:0]        o_cmd_data_count,
@@ -226,6 +227,10 @@ always @ (posedge clk) begin
   o_cmd_rd_cfg_stb            <=  0;
   o_cmd_unknown               <=  0;
   o_cmd_flg_fifo              <=  0;
+  o_cmd_flg_sel_periph        <=  0;
+  o_cmd_flg_sel_memory        <=  0;
+  o_cmd_flg_sel_dma           <=  0;
+
 
   o_update_buf_stb            <=  0;
 
@@ -246,8 +251,6 @@ always @ (posedge clk) begin
     //Command Registers
     o_cmd_data_count          <=  0;
     o_cmd_data_address        <=  0;
-
-    o_device_select           <=  `SELECT_CONTROL;
 
     //Counts
     r_data_count              <=  0;
@@ -313,59 +316,59 @@ always @ (posedge clk) begin
       WRITE_REG_CMD: begin
         o_ingress_addr                        <=  w_reg_addr;
         if (w_cmd_en) begin
-          o_update_buf                        <=  2'b11;
+          o_update_buf                        <=  2'b00;
           o_update_buf_stb                    <=  1;
           o_cmd_data_count                    <=  i_axi_ingress_data;
+          o_cmd_flg_sel_periph                <=  0;
+          o_cmd_flg_sel_memory                <=  0;
+          o_cmd_flg_sel_dma                   <=  0;
+
           case (w_reg_addr)
             `COMMAND_RESET: begin
               r_config_space_done             <=  0;
-              o_device_select                 <=  `SELECT_CONTROL;
             end
             `PERIPHERAL_WRITE: begin
-              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_flg_sel_periph            <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `PERIPHERAL_WRITE_FIFO: begin
-              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_flg_sel_periph            <=  1;
               o_cmd_wr_stb                    <=  1;
               o_cmd_flg_fifo                  <=  1;
             end
             `PERIPHERAL_READ: begin
+              o_cmd_flg_sel_periph            <=  1;
               o_cmd_rd_stb                    <=  1;
-              o_device_select                 <=  `SELECT_PERIPH;
             end
             `PERIPHERAL_READ_FIFO: begin
-              o_device_select                 <=  `SELECT_PERIPH;
+              o_cmd_flg_sel_periph            <=  1;
               o_cmd_rd_stb                    <=  1;
               o_cmd_flg_fifo                  <=  1;
             end
             `MEMORY_WRITE: begin
-              o_device_select                 <=  `SELECT_MEM;
+              o_cmd_flg_sel_memory            <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `MEMORY_READ: begin
-              o_device_select                 <=  `SELECT_MEM;
+              o_cmd_flg_sel_memory            <=  1;
               o_cmd_rd_stb                    <=  1;
             end
             `DMA_WRITE: begin
-              o_device_select                 <=  `SELECT_DMA;
+              o_cmd_flg_sel_dma               <=  1;
               o_cmd_wr_stb                    <=  1;
             end
             `DMA_READ: begin
-              o_device_select                 <=  `SELECT_DMA;
+              o_cmd_flg_sel_dma               <=  1;
               o_cmd_rd_stb                    <=  1;
             end
             `PING: begin
-              o_device_select                 <=  `SELECT_CONTROL;
               o_cmd_ping_stb                  <=  1;
               o_ping_value                    <=  i_axi_ingress_data;
             end
             `READ_CONFIG: begin
-              o_device_select                 <=  `SELECT_CONTROL;
               o_cmd_rd_cfg_stb                <=  1;
             end
             default: begin
-              o_device_select                 <=  `SELECT_CONTROL;
               o_cmd_unknown                   <=  1;
               o_ingress_ci_count              <=  o_ingress_ci_count + 1;
             end

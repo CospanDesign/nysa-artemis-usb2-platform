@@ -270,7 +270,10 @@ wire                        w_enable_config_read;
 wire                        w_finished_config_read;
 
 wire                        w_reg_write_stb;
-wire  [3:0]                 w_device_select;
+
+wire                        w_cmd_flg_sel_periph;
+wire                        w_cmd_flg_sel_memory;
+wire                        w_cmd_flg_sel_dma;
 
 wire                        w_cmd_rst_stb;
 wire                        w_cmd_wr_stb;
@@ -295,8 +298,9 @@ wire  [7:0]                 w_egress_tag;
  ****************************************************************************/
 
 wire                        w_ctr_fifo_sel;
-wire                        w_mem_fifo_sel;
-wire                        w_dma_fifo_sel;
+wire                        w_e_per_fifo_sel;
+wire                        w_e_mem_fifo_sel;
+wire                        w_e_dma_fifo_sel;
 
 wire                        w_egress_fifo_rdy;
 wire                        w_egress_fifo_act;
@@ -310,21 +314,27 @@ wire  [23:0]                w_ctr_fifo_size;
 wire  [31:0]                w_ctr_fifo_data;
 wire                        w_ctr_fifo_stb;
 
-wire                        w_mem_fifo_rdy;
-wire                        w_mem_fifo_act;
-wire  [23:0]                w_mem_fifo_size;
-wire  [31:0]                w_mem_fifo_data;
-wire                        w_mem_fifo_stb;
+wire                        w_e_per_fifo_rdy;
+wire                        w_e_per_fifo_act;
+wire  [23:0]                w_e_per_fifo_size;
+wire  [31:0]                w_e_per_fifo_data;
+wire                        w_e_per_fifo_stb;
 
-wire                        w_dma_fifo_rdy;
-wire                        w_dma_fifo_act;
-wire  [23:0]                w_dma_fifo_size;
-wire  [31:0]                w_dma_fifo_data;
-wire                        w_dma_fifo_stb;
+wire                        w_e_mem_fifo_rdy;
+wire                        w_e_mem_fifo_act;
+wire  [23:0]                w_e_mem_fifo_size;
+wire  [31:0]                w_e_mem_fifo_data;
+wire                        w_e_mem_fifo_stb;
+
+wire                        w_e_dma_fifo_rdy;
+wire                        w_e_dma_fifo_act;
+wire  [23:0]                w_e_dma_fifo_size;
+wire  [31:0]                w_e_dma_fifo_data;
+wire                        w_e_dma_fifo_stb;
 
 
-wire                        tmp_mem_fifo_sel;
-wire                        tmp_dma_fifo_sel;
+wire                        tmp_e_mem_fifo_sel;
+wire                        tmp_e_dma_fifo_sel;
 wire                        tmp_pcie_fc_ready;
 
 
@@ -530,6 +540,10 @@ pcie_control controller(
   .i_reg_write_stb            (w_reg_write_stb            ),
   .i_device_select            (w_device_select            ),
 
+  .i_cmd_flg_sel_periph       (w_cmd_flg_sel_periph       ),
+  .i_cmd_flg_sel_memory       (w_cmd_flg_sel_memory       ),
+  .i_cmd_flg_sel_dma          (w_cmd_flg_sel_dma          ),
+
   .i_cmd_rst_stb              (w_cmd_rst_stb              ),
   .i_cmd_wr_stb               (w_cmd_wr_stb               ),
   .i_cmd_rd_stb               (w_cmd_rd_stb               ),
@@ -543,6 +557,12 @@ pcie_control controller(
 
   .i_pcie_fc_ready            (tmp_pcie_fc_ready          ),
 
+  //Peripheral/Memory/DMA Egress FIFO Interface
+  .i_e_per_fifo_rdy             (w_e_per_fifo_rdy             ),
+  .i_e_mem_fifo_rdy             (w_e_mem_fifo_rdy             ),
+  .i_e_dma_fifo_rdy             (w_e_dma_fifo_rdy             ),
+
+  //Egress Controller Interface
   .o_egress_enable            (w_egress_enable            ),
   .i_egress_finished          (w_egress_finished          ),
   .o_egress_tlp_command       (w_egress_tlp_command       ),
@@ -561,8 +581,10 @@ pcie_control controller(
   .i_egress_fifo_stb          (w_ctr_fifo_stb             ),
   .o_egress_fifo_data         (w_ctr_fifo_data            ),
 
+  //System Interface
   .o_sys_rst                  (o_sys_rst                  ),
 
+  //Configuration Reader Interface
   .o_cfg_read_exec            (o_cfg_read_exec            ),
   .o_cfg_sm_state             (o_cfg_sm_state             )
 );
@@ -603,6 +625,9 @@ pcie_ingress ingress(
   .o_cmd_rd_cfg_stb           (w_cmd_rd_cfg_stb           ),  //Strobes when a read configuration id detected
   .o_cmd_unknown              (w_cmd_unknown              ),
   .o_cmd_flg_fifo             (w_cmd_flg_fifo             ),  //Flag indicating that transfer shouldn't auto increment addr
+  .o_cmd_flg_sel_periph       (w_cmd_flg_sel_periph       ),
+  .o_cmd_flg_sel_memory       (w_cmd_flg_sel_memory       ),
+  .o_cmd_flg_sel_dma          (w_cmd_flg_sel_dma          ),
 
   //Input Configuration Registers from either PCIE_A1 or controller
   .i_bar_hit                  (o_bar_hit                  ),
@@ -655,34 +680,42 @@ pcie_egress egress(
 /****************************************************************************
  * FIFO Multiplexer
  ****************************************************************************/
-assign  w_egress_fifo_rdy     = (w_ctr_fifo_sel)  ? w_ctr_fifo_rdy:
-                                (w_mem_fifo_sel)  ? w_mem_fifo_rdy:
-                                (w_dma_fifo_sel)  ? w_dma_fifo_rdy:
-                                1'b0;
-
-assign  w_egress_fifo_size    = (w_ctr_fifo_sel)  ? w_ctr_fifo_size:
-                                (w_mem_fifo_sel)  ? w_mem_fifo_size:
-                                (w_dma_fifo_sel)  ? w_dma_fifo_size:
-                                24'h0;
-
-assign  w_egress_fifo_data    = (w_ctr_fifo_sel)  ? w_ctr_fifo_data:
-                                (w_mem_fifo_sel)  ? w_mem_fifo_data:
-                                (w_dma_fifo_sel)  ? w_dma_fifo_data:
-                                32'h00;
-
-assign  w_ctr_fifo_act        = (w_ctr_fifo_sel)  ? w_egress_fifo_act:
-                                    1'b0;
-assign  w_ctr_fifo_stb        = (w_ctr_fifo_sel)  ? w_egress_fifo_stb:
-                                    1'b0;
-
-assign  w_mem_fifo_act        = (w_mem_fifo_sel)  ? w_egress_fifo_act:
-                                    1'b0;
-assign  w_mem_fifo_stb        = (w_mem_fifo_sel)  ? w_egress_fifo_stb:
+assign  w_egress_fifo_rdy     = (w_ctr_fifo_sel)        ? w_ctr_fifo_rdy:
+                                (w_e_per_fifo_sel)      ? w_e_per_fifo_rdy:
+                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_rdy:
+                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_rdy:
+                                1'b0;                   
+                                                        
+assign  w_egress_fifo_size    = (w_ctr_fifo_sel)        ? w_ctr_fifo_size:
+                                (w_e_per_fifo_sel)      ? w_e_per_fifo_size:
+                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_size:
+                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_size:
+                                24'h0;                  
+                                                        
+assign  w_egress_fifo_data    = (w_ctr_fifo_sel)        ? w_ctr_fifo_data:
+                                (w_e_per_fifo_sel)      ? w_e_per_fifo_data:
+                                (w_e_mem_fifo_sel)      ? w_e_mem_fifo_data:
+                                (w_e_dma_fifo_sel)      ? w_e_dma_fifo_data:
+                                32'h00;                 
+                                                        
+assign  w_ctr_fifo_act        = (w_ctr_fifo_sel)        ? w_egress_fifo_act:
+                                    1'b0;               
+assign  w_ctr_fifo_stb        = (w_ctr_fifo_sel)        ? w_egress_fifo_stb:
                                     1'b0;
 
-assign  w_dma_fifo_act        = (w_dma_fifo_sel)  ? w_egress_fifo_act:
+assign  w_e_per_fifo_act        = (w_e_per_fifo_sel)    ? w_egress_fifo_act:
                                     1'b0;
-assign  w_dma_fifo_stb        = (w_dma_fifo_sel)  ? w_egress_fifo_stb:
+assign  w_e_per_fifo_stb        = (w_e_per_fifo_sel)    ? w_egress_fifo_stb:
+                                    1'b0;
+
+assign  w_e_mem_fifo_act        = (w_e_mem_fifo_sel)    ? w_egress_fifo_act:
+                                    1'b0;
+assign  w_e_mem_fifo_stb        = (w_e_mem_fifo_sel)    ? w_egress_fifo_stb:
+                                    1'b0;
+
+assign  w_e_dma_fifo_act        = (w_e_dma_fifo_sel)    ? w_egress_fifo_act:
+                                    1'b0;
+assign  w_e_dma_fifo_stb        = (w_e_dma_fifo_sel)    ? w_egress_fifo_stb:
                                     1'b0;
 
 
@@ -691,17 +724,20 @@ assign  w_dma_fifo_stb        = (w_dma_fifo_sel)  ? w_egress_fifo_stb:
  * Temporary Debug Signals
  ****************************************************************************/
 
-assign  w_mem_fifo_rdy  = 1'b0;
-assign  w_mem_fifo_size = 24'h0;
-assign  w_mem_fifo_data = 32'h00;
+assign  w_e_per_fifo_rdy  = 1'b0;
+assign  w_e_per_fifo_size = 24'h0;
+assign  w_e_per_fifo_data = 32'h00;
 
-assign  w_dma_fifo_rdy  = 1'b0;
-assign  w_dma_fifo_size = 24'h0;
-assign  w_dma_fifo_data = 32'h00;
+assign  w_e_mem_fifo_rdy  = 1'b0;
+assign  w_e_mem_fifo_size = 24'h0;
+assign  w_e_mem_fifo_data = 32'h00;
+
+assign  w_e_dma_fifo_rdy  = 1'b0;
+assign  w_e_dma_fifo_size = 24'h0;
+assign  w_e_dma_fifo_data = 32'h00;
 
 //This used to go to the wishbone slave device
 assign  o_receive_axi_ready = 0;
-
 
 //Need to create a flow controller
 assign  tmp_pcie_fc_ready = 1;
@@ -709,13 +745,13 @@ assign  tmp_buf_offset  = 32'h0;
 
 
 
+assign  tmp_e_per_fifo_sel  = 1'b0;
+assign  tmp_e_mem_fifo_sel  = 1'b0;
+assign  tmp_e_dma_fifo_sel  = 1'b0;
 
-
-assign  tmp_mem_fifo_sel  = 1'b0;
-assign  tmp_dma_fifo_sel  = 1'b0;
-
-assign  w_mem_fifo_sel  = tmp_mem_fifo_sel;
-assign  w_dma_fifo_sel  = tmp_dma_fifo_sel;
+assign  w_e_per_fifo_sel  = tmp_e_per_fifo_sel;
+assign  w_e_mem_fifo_sel  = tmp_e_mem_fifo_sel;
+assign  w_e_dma_fifo_sel  = tmp_e_dma_fifo_sel;
 
 
 

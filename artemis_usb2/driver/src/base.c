@@ -138,20 +138,10 @@ ssize_t nysa_pcie_write(struct file *filp, const char *buf, size_t count, loff_t
 
 ssize_t nysa_pcie_read(struct file *filp, char * buf, size_t count, loff_t *f_pos)
 {
+  
+  nysa_pcie_dev_t *dev;
   dev = filp->private_data;
-
-  //Wait for the core to be finished copying everything over
-  if (completion_done(&dev->complete))
-  {
-    mod_info_dbg("Completion Already Finished\n");
-  }
-  else
-  {
-    mod_info_dbg("Need to wait for completion...\n");
-    wait_for_completion(&dev->complete);
-    mod_info_dbg("Completion Finished...\n");
-  }
-  return 0;
+  return nysa_pcie_read_data(dev, buf, count);
 }
 
 struct file_operations nysa_pcie_fops = {
@@ -195,7 +185,8 @@ static int nysa_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
   // Configure Character Devices
   //----------------------------
   cdev_init(&cdevs[minor], &nysa_pcie_fops);
-  if ((retval = cdev_add(&cdevs[minor], devno, 1)) != 0){
+  if ((retval = cdev_add(&cdevs[minor], devno, 1)) != 0)
+  {
     mod_info_dbg("Error %d while trying to add cdev for minor: %d\n", retval, minor);
     goto probe_destroy_pcie_device;
   }
@@ -291,9 +282,6 @@ init_fail:
 
 static void __exit nysa_pcie_exit(void)
 {
-	//int major = 0;
-
-	//major = MAJOR(pci_driver_chrdev_num);
   mod_info_dbg("Cleanup Module\n");
 
   //Tell the kernel we are not listenning for PCI devices

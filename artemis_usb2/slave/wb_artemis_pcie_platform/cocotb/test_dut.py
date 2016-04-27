@@ -30,7 +30,7 @@ from tlp_manager import TLPManager
 def setup_dut(dut):
     cocotb.fork(Clock(dut.clk, CLK_PERIOD).start())
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_write_pcie_register(dut):
     """
     Description:
@@ -173,5 +173,82 @@ def test_pcie_config_read_wait_for_ready(dut):
     yield c.read_config_regs(wait_for_ready = True)
     #yield c.read_config_regs(wait_for_ready = False)
     yield (nysa.wait_clocks(500))
+
+
+
+@cocotb.test(skip = False)
+def test_pcie_read_command(dut):
+    """
+    Description:
+        Write down a command and read the results
+
+    Test ID: 3
+
+    Expected Results:
+        A command is observed within the write state machine.
+        The control SM processes the command and sends config data to the host
+        The host reads the config data back
+    """
+
+    dut.test_id = 3
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+    #c = CocotbPCIE(dut, debug = True)
+
+    data = Array('B')
+    for i in range(128 * 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    yield (nysa.wait_clocks(50))
+    yield cocotb.external(driver.write_local_buffer)(data)
+    yield (nysa.wait_clocks(400))
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+    yield (nysa.wait_clocks(600))
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+    yield (nysa.wait_clocks(400))
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+
+    COUNT = 0x0300
+    ADDRESS = 0x00
+
+    dcount = 0
+    yield (nysa.wait_clocks(100))
+    yield c.read_pcie_data_command(count = COUNT, address = ADDRESS)
+    yield (nysa.wait_clocks(100))
+    c.set_buffer_ready_status(0x03)
+
+    #Read first block of data
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+
+    #Read first block of data
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+
+    #Read Status
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+
+    #Read Final Status
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+    yield (nysa.wait_clocks(400))
 
 

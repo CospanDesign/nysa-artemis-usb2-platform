@@ -7,6 +7,9 @@
     <testcase classname="test_dut" name="test_pcie_config_read_wait_for_ready" time="0.0">
       <skipped />
     </testcase>
-    <testcase classname="test_dut" name="test_write_pcie_register" time="0.23687291145324707" />
+    <testcase classname="test_dut" name="test_write_pcie_register" time="0.0">
+      <skipped />
+    </testcase>
+    <testcase classname="test_dut" name="test_pcie_read_command" time="1.6639320850372314" />
   </testsuite>
 </testsuites>

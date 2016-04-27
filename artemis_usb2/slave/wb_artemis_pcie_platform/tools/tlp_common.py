@@ -14,7 +14,7 @@ def print_raw_packet(raw_packet, tab = 0):
     output_str = ""
     for i in range(0, len(raw_packet), 4):
         output_str += "\t" * tab
-        output_str += "Address[%02X]: %02X %02X %02X %02X\n" % (i, raw_packet[i], raw_packet[i + 1], raw_packet[i + 2], raw_packet[i + 3])
+        output_str += "Address[%02X] [%04X]: %02X %02X %02X %02X\n" % (i, i / 4, raw_packet[i], raw_packet[i + 1], raw_packet[i + 2], raw_packet[i + 3])
 
     return output_str
         

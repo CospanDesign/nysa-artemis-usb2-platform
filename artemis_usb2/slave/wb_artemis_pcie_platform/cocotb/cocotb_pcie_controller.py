@@ -133,6 +133,9 @@ class CocotbPCIE (object):
     def get_read_data(self):
         return self.axs.get_data()
 
+    def reset_data(self):
+        self.axs.reset_data()
+
     def write_register(self, address, data):
         #Convert Word address to byte address
         address = self.base_address + (address << 2)
@@ -205,5 +208,20 @@ class CocotbPCIE (object):
         self.tm.parse_raw(data)
         self.tm.pretty_print()
 
+    @cocotb.coroutine
+    def read_pcie_data_command(self, count, address):
+        self.write_command(CMD_PERIPHERAL_READ, count, address);
+        yield RisingEdge(self.dut.clk)
+
+        #self.tm.parse_raw(data)
+        #self.tm.pretty_print()
+
+    @cocotb.coroutine
+    def wait_for_data(self, wait_for_ready = False):
+        self.reset_data()
+        yield self.listen_for_comm(wait_for_ready)
+        data = self.get_read_data()
+        self.tm.parse_raw(data)
+        self.tm.pretty_print()
 
 

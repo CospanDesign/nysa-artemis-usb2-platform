@@ -354,6 +354,9 @@ wire                              w_data_read_flg;
 wire                              w_data_write_flg;
 
 
+wire                              w_usr_interrupt_stb;
+wire  [31:0]                      w_usr_interrupt_value;
+
 //Submodules
 //artemis_pcie_interface #(
 artemis_pcie_controller #(
@@ -382,6 +385,9 @@ artemis_pcie_controller #(
   .o_per_fifo_sel                    (w_per_fifo_sel               ),
   .o_mem_fifo_sel                    (w_mem_fifo_sel               ),
   .o_dma_fifo_sel                    (w_dma_fifo_sel               ),
+
+  .i_usr_interrupt_stb               (w_usr_interrupt_stb          ),
+  .i_usr_interrupt_value             (w_usr_interrupt_value        ),
 
   .o_data_size                       (w_data_size                  ),
   .o_data_address                    (w_data_address               ),
@@ -568,6 +574,9 @@ assign  o_debug_data            = { 26'h0,
                                     pcie_reset,
                                     user_lnk_up,
                                     cfg_ltssm_state};
+
+assign  w_usr_interrupt_stb     = 0;
+assign  w_usr_interrupt_value   = 0;
 //Synchronous Logic
 
 always @ (posedge clk_62p5) begin
@@ -738,7 +747,7 @@ always @ (posedge clk) begin
               o_wbs_dat       <=  0;
               o_wbs_dat[`USR_IF_BIT_PER_BUS_SEL ]  <=  w_per_fifo_sel;
               o_wbs_dat[`USR_IF_BIT_MEM_BUS_SEL ]  <=  w_mem_fifo_sel;
-              o_wbs_dat[`USR_IF_BIT_DMA_BUS_SEL ]  <=  w_dma_fifo_sel; 
+              o_wbs_dat[`USR_IF_BIT_DMA_BUS_SEL ]  <=  w_dma_fifo_sel;
               o_wbs_dat[`USR_IF_BIT_WR_FLAG     ]  <=  w_data_write_flg;
               o_wbs_dat[`USR_IF_BIT_RD_FLAG     ]  <=  w_data_read_flg;
               o_wbs_dat[`USR_IF_BIT_FIFO_FLAG   ]  <=  w_data_fifo_flg;

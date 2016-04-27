@@ -55,7 +55,7 @@ module pcie_control(
 
 
   //Nysa Interface
-  input       [31:0]        i_interrupt_sts,
+  input       [31:0]        i_interrupt_value,
   input                     i_interrupt_stb,
 
 
@@ -133,17 +133,20 @@ module pcie_control(
 localparam      IDLE                          = 4'h0;
 
 localparam      EGRESS_DATA_FLOW              = 4'h1;
-localparam      WAIT_FOR_FPGA_EGRESS_FIFO     = 4'h2;
-localparam      WAIT_FOR_HOST_EGRESS_BUFFER   = 4'h3;
+localparam      WAIT_FOR_HOST_EGRESS_BUFFER   = 4'h2;
+localparam      WAIT_FOR_FPGA_EGRESS_FIFO     = 4'h3;
 localparam      SEND_EGRESS_DATA              = 4'h4;
 localparam      INGRESS_DATA_FLOW             = 4'h5;
 localparam      WAIT_FOR_FPGA_INGRESS_FIFO    = 4'h6;
 localparam      WAIT_FOR_HOST_INGRESS_BUFFER  = 4'h7;
 localparam      WAIT_FOR_FLOW_CONTROL         = 4'h8;
 localparam      SEND_INGRESS_DATA             = 4'h9;
-localparam      SEND_CONFIG                   = 4'hA;
-localparam      SEND_CONFIG_SLEEP             = 4'hB;
-localparam      WAIT_FOR_CONFIG               = 4'hC;
+localparam      SEND_EGRESS_STATUS_SLEEP      = 4'hA;
+localparam      SEND_EGRESS_STATUS            = 4'hB;
+
+localparam      SEND_CONFIG                   = 4'hC;
+localparam      SEND_CONFIG_SLEEP             = 4'hD;
+localparam      WAIT_FOR_CONFIG               = 4'hE;
 
 
 localparam      PREPARE                       = 4'h1;
@@ -180,13 +183,14 @@ reg                         r_sts_done;
 
 
 reg   [31:0]                r_data_count;
+reg   [23:0]                r_block_count;
 
 wire                        w_control_sm_idle;
 wire                        w_config_sm_idle;
 
-reg   [1:0]                 r_buf_rdy;
-reg   [1:0]                 r_buf_sel;
+reg                         r_buf_sel;
 reg                         r_buf_next_sel;
+reg   [1:0]                 r_buf_rdy;
 reg   [1:0]                 r_buf_done;
 
 reg                         r_send_data_en;
@@ -208,6 +212,16 @@ reg                         r_send_cfg_en;
 //Convenience Signals
 wire                        w_valid_bus_select;
 wire                        w_e_fifo_rdy;
+
+wire  [31:0]                write_buf_map [0:1];
+assign  write_buf_map[0]  = i_write_a_addr;
+assign  write_buf_map[1]  = i_write_b_addr;
+
+
+wire  [31:0]                read_buf_map [0:1];
+assign  read_buf_map[0]   = i_read_a_addr;
+assign  read_buf_map[1]   = i_read_b_addr;
+
 
 //submodules
 ppfifo #(
@@ -244,7 +258,7 @@ assign  register_map [`HDR_PING_VALUE           ] = i_ping_value;
 assign  register_map [`HDR_DEV_ADDR             ] = i_dev_addr;
 assign  register_map [`STS_DEV_STATUS           ] = w_comm_status;
 assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done[1] , r_buf_done[0] };
-assign  register_map [`STS_INTERRUPT            ] = i_interrupt_sts;
+assign  register_map [`STS_INTERRUPT            ] = i_interrupt_value;
 
 
 //Status Register
@@ -297,15 +311,17 @@ assign  w_sts_flg_fifo_stall                = (state == WAIT_FOR_FPGA_EGRESS_FIF
                                               (state == WAIT_FOR_FPGA_INGRESS_FIFO);
 
 
-assign  w_control_sm_idle                   = (state == IDLE)               ||
-                                              (state == EGRESS_DATA_FLOW)   ||
-                                              (state == INGRESS_DATA_FLOW)  ||
-                                              (state == SEND_CONFIG)        ||
-                                              (state == SEND_CONFIG_SLEEP)  ||
-                                              (state == WAIT_FOR_CONFIG);
+assign  w_control_sm_idle                   = (state == IDLE)                     ||
+                                              (state == EGRESS_DATA_FLOW)         ||
+                                              (state == INGRESS_DATA_FLOW)        ||
+                                              (state == SEND_CONFIG)              ||
+                                              (state == SEND_CONFIG_SLEEP)        ||
+                                              (state == WAIT_FOR_CONFIG)          ||
+                                              (state == SEND_EGRESS_STATUS_SLEEP) ||
+                                              (state == SEND_EGRESS_STATUS);
 
-assign  w_config_sm_idle                    = (state == IDLE)               ||
-                                              (state == PREPARE);
+assign  w_config_sm_idle                    = (cfg_state == IDLE)           ||
+                                              (cfg_state == PREPARE);
 
 assign  w_valid_bus_select                  = (i_cmd_flg_sel_periph || i_cmd_flg_sel_memory || i_cmd_flg_sel_dma);
 assign  w_e_fifo_rdy                        = (o_per_sel)  ? i_e_per_fifo_rdy :
@@ -316,16 +332,16 @@ assign  w_e_fifo_rdy                        = (o_per_sel)  ? i_e_per_fifo_rdy :
 //synchronous logic
 always @ (posedge clk) begin
   r_send_cfg_stb        <=  0;
+  r_send_data_en        <=  0;
 
   if (rst || i_cmd_rst_stb) begin
     state               <=  IDLE;
-    r_buf_rdy      <=  0;
+    r_buf_rdy           <=  0;
     r_tlp_command       <=  0;
     r_tlp_flags         <=  0;
     r_tlp_address       <=  0;
     r_tlp_requester_id  <=  0;
     r_tlp_tag           <=  0;
-    r_send_data_en      <=  0;
 
     r_buf_done          <=  2'b00;
 
@@ -342,6 +358,7 @@ always @ (posedge clk) begin
     r_sts_cmd_err       <=  0;
 
     r_data_count        <=  0;
+    r_block_count       <=  0;
     o_data_size         <=  0;
     o_data_address      <=  0;
 
@@ -364,8 +381,9 @@ always @ (posedge clk) begin
         r_tlp_tag           <= 0;
 
         r_data_count        <= 0;
+        r_block_count       <= 0;
         r_buf_sel           <= 0;
-        r_buf_next_sel      <= 1;
+        r_buf_next_sel      <= 0;
 
         o_data_address      <= i_cmd_data_address;
         o_data_size         <= i_cmd_data_count;
@@ -408,62 +426,89 @@ always @ (posedge clk) begin
       end
       //Egress Flow
       EGRESS_DATA_FLOW: begin
+        r_tlp_command                   <=  `PCIE_MWR_32B;
+        r_tlp_flags                     <=  (`FLAG_NORMAL);
         if (r_data_count < o_data_size) begin
           //More data to send
-          state                         <=  WAIT_FOR_FPGA_EGRESS_FIFO;
+          state                         <=  WAIT_FOR_HOST_EGRESS_BUFFER;
         end
         else begin
           r_sts_done                    <=  1;
+          r_buf_done                    <=  0;
           state                         <=  SEND_CONFIG;
-        end
-      end
-      WAIT_FOR_FPGA_EGRESS_FIFO: begin
-        //Send data to the host
-        if (i_e_fifo_rdy) begin
-          state                         <=  WAIT_FOR_HOST_EGRESS_BUFFER;
         end
       end
       WAIT_FOR_HOST_EGRESS_BUFFER: begin
         if (w_config_sm_idle) begin
+          r_block_count                 <=  0;
           //Select the next buffer
           if (r_buf_rdy == 2'b11) begin
-            r_buf_sel[r_buf_next_sel]   <=  1;
+            r_buf_sel                   <=  r_buf_next_sel;
             r_buf_next_sel              <=  ~r_buf_next_sel; //Flip Flop the buffers
-            state                       <=  SEND_EGRESS_DATA;
+            state                       <=  WAIT_FOR_FPGA_EGRESS_FIFO;
           end
           else if (r_buf_rdy == 2'b01) begin
             r_buf_next_sel              <=  1;                //Next time if there is a choice send the other
-            r_buf_sel[0]                <=  1;
-            state                       <=  SEND_EGRESS_DATA;
+            r_buf_sel                   <=  0;
+            state                       <=  WAIT_FOR_FPGA_EGRESS_FIFO;
           end
           else if (r_buf_rdy == 2'b10) begin
             r_buf_next_sel              <=  0;                //Next time if there is a choice send the other
-            r_buf_sel[1]                <=  1;
-            state                       <=  SEND_EGRESS_DATA;
+            r_buf_sel                   <=  1;
+            state                       <=  WAIT_FOR_FPGA_EGRESS_FIFO;
           end
+        end
+      end
+      WAIT_FOR_FPGA_EGRESS_FIFO: begin
+        //Send data to the host
+        if ((r_data_count >= o_data_size) || (r_block_count >= i_buffer_size))begin
+          //De-assert the buffers
+          r_buf_rdy[r_buf_sel]          <=  0;
+          r_buf_done[r_buf_sel]         <=  1;
+          r_buf_sel                     <=  0;
+          //Let the host know that we updated the data and buffer status
+          r_send_cfg_stb                <=  1;
+          state                         <=  SEND_EGRESS_STATUS_SLEEP;
+        end
+        else if (i_e_fifo_rdy) begin
+          state                         <=  SEND_EGRESS_DATA;
         end
       end
       SEND_EGRESS_DATA: begin
         //After a block of data is sent to the host send a configuration packet to update the buffer
         //Go back ot the 'egress data flow to start on the next block or see if we are done
         r_send_data_en                  <=  1;
+        r_tlp_address                   <= read_buf_map[r_buf_sel] + r_block_count;
         if (i_egress_finished) begin
           //Add the amount we sent through the egress FIFO to our data count
           r_data_count                  <=  r_data_count + i_e_fifo_size;
-          //De-assert the buffers
-          r_buf_done                    <=  r_buf_sel;
-          r_buf_sel                     <=  0;
-          //Let the host know that we updated the data and buffer status
-          r_send_cfg_stb                <=  1;
-
+          r_block_count                 <=  r_block_count + i_e_fifo_size;
+          state                         <=  WAIT_FOR_FPGA_EGRESS_FIFO;
+        end
+      end
+      SEND_EGRESS_STATUS_SLEEP: begin
+        if (cfg_state != IDLE) begin
+          state                         <=  SEND_EGRESS_STATUS;
+        end
+      end
+      SEND_EGRESS_STATUS: begin
+        if (cfg_state == IDLE) begin
           state                         <=  EGRESS_DATA_FLOW;
         end
       end
 
 
 
+
+
+
+
+
+
       //Ingress Flow
       INGRESS_DATA_FLOW: begin
+        r_tlp_command                   <=  `PCIE_MRD_32B;
+        r_tlp_flags                     <=  (`FLAG_NORMAL);
         if (r_data_count < o_data_size) begin
           //More data to send
         end

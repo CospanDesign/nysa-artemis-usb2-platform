@@ -75,6 +75,9 @@ class AXIStreamSlave(BusDriver):
         self.read_data_busy = Lock("%s_wbusy" % name)
         self.data = Array('B')
 
+    def reset_data(self):
+        self.data = Array('B')
+
     def get_data(self):
         return self.data
 
@@ -104,6 +107,8 @@ class AXIStreamSlave(BusDriver):
             while self.bus.tvalid.value:
                 yield RisingEdge(self.clock)
                 self.data.extend(self.word_to_array(self.bus.tdata.value))
+                if self.bus.tlast.value:
+                    break
 
 
         else:
@@ -120,6 +125,8 @@ class AXIStreamSlave(BusDriver):
             while self.bus.tvalid.value:
                 yield RisingEdge(self.clock)
                 self.data.extend(self.word_to_array(self.bus.tdata.value))
+                if self.bus.tlast.value:
+                    break
 
 
         cocotb.log.debug("Finished read")

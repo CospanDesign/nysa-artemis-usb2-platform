@@ -144,6 +144,9 @@ module artemis_pcie_controller #(
   output                    o_data_read_flg,
   output                    o_data_write_flg,
 
+  input                     i_usr_interrupt_stb,
+  input       [31:0]        i_usr_interrupt_value,
+
 
   //Ingress FIFO
   input                     i_data_clk,
@@ -598,6 +601,9 @@ pcie_control controller(
   .o_per_sel                  (o_per_fifo_sel             ),
   .o_mem_sel                  (o_mem_fifo_sel             ),
   .o_dma_sel                  (o_dma_fifo_sel             ),
+
+  .i_interrupt_stb            (i_usr_interrupt_stb        ),
+  .i_interrupt_value          (i_usr_interrupt_value      ),
 
   .o_data_size                (o_data_size                ),
   .o_data_address             (o_data_address             ),

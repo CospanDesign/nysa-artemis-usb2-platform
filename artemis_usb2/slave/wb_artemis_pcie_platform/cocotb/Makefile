@@ -8,7 +8,8 @@ PYTHONPATH := ./model:$(PYTHONPATH)
 export PYTHONPATH
 export PYTHONHOME=$(shell python -c "from distutils.sysconfig import get_config_var; print(get_config_var('prefix'))")
 
-EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION
+EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION -Wall
+#EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION
 
 #Dependencies
 VERILOG_SOURCES = $(NYSA)/verilog/wishbone/master/wishbone_master.v

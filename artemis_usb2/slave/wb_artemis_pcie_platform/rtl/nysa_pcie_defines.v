@@ -12,13 +12,14 @@
 `define HDR_DEV_ADDR              8
 `define STS_DEV_STATUS            9
 `define STS_BUF_RDY               10
-`define STS_INTERRUPT             11
+`define STS_BUF_POS               11
+`define STS_INTERRUPT             12
 
 //The total number of items in the configuration registers
-`define CONFIG_REGISTER_COUNT     12
-                                  
+`define CONFIG_REGISTER_COUNT     13
+
 `define CMD_OFFSET                32'h00000080
-                                  
+
 `define COMMAND_RESET             32'h00000080
 `define PERIPHERAL_WRITE          32'h00000081
 `define PERIPHERAL_WRITE_FIFO     32'h00000082
@@ -30,8 +31,8 @@
 `define DMA_READ                  32'h00000088
 `define PING                      32'h00000089
 `define READ_CONFIG               32'h0000008A
-                                  
-//Device Select                   
+
+//Device Select
 `define SELECT_CONTROL            4'h0
 `define SELECT_PERIPH             4'h1
 `define SELECT_MEM                4'h2
@@ -55,14 +56,14 @@
 `define STATUS_BIT_DONE           14
 `define STATUS_BIT_CMD_ERR        15
 `define STATUS_UNUSED             31:16
-                                  
+
 `define COMM_STATUS_SIZE          2
-                                  
-//Interrupt                       
+
+//Interrupt
 `define NYSA_INTERRUPT_CONFIG     1
-                                  
-                                  
-//Buffer Ready Range              
+
+
+//Buffer Ready Range
 `define HDR_BUFFER_READY_RANGE    1:0
 
 `endif //__NYSA_PCIE_DEFINES__

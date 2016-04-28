@@ -82,13 +82,14 @@ wire  [31:0]                w_hdr3;
 //Submodules
 //Asynchronous Logic
 
-assign  o_axi_egress_keep           = 4'hF;
+assign  o_axi_egress_keep                   = 4'hF;
 
 //1st Dword
+assign  w_pkt_data_count                    = (i_command == `PCIE_MRD_32B) ? 32'h0 : i_fifo_size;
+
 assign  w_hdr[0][`PCIE_TYPE_RANGE]          = i_command;
 assign  w_hdr[0][`PCIE_FLAGS_RANGE]         = i_flags;
 assign  w_hdr[0][`PCIE_DWORD_PKT_CNT_RANGE] = w_pkt_data_count;
-assign  w_pkt_data_count  = (i_command == `PCIE_MRD_32B) ? 32'h0 : i_fifo_size;
 
 //2nd Dword
 assign  w_hdr[1]    = (i_command == `PCIE_MRD_32B) ? {i_requester_id, i_tag, 8'h00} :
@@ -159,7 +160,6 @@ always @ (posedge clk) begin
         o_axi_egress_valid      <=  1;
       end
 /*
-
       WAIT_FOR_PCIE_CORE: begin
         o_axi_egress_valid  <=  1;
         if (i_axi_egress_ready) begin

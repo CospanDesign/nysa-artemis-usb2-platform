@@ -144,7 +144,7 @@ wire  [31:0]                w_pkt_addr;
 wire  [31:0]                w_buf_pkt_addr_base;
 
 wire  [31:0]                w_reg_addr;
-wire                        w_cme_en;
+wire                        w_cmd_en;
 
 reg   [31:0]                r_buf_cnt;
 wire  [6:0]                 w_cmplt_lower_addr;

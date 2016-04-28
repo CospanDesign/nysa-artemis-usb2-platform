@@ -90,30 +90,31 @@ SOFTWARE.
 `define STS_BIT_PCIE_EXT_RESET        30
 `define STS_BIT_AXI_RECEIVE_READY     31
 
-`define DBG_CORRECTABLE               0
-`define DBG_FATAL                     1
-`define DBG_NON_FATAL                 2
-`define DBG_UNSUPPORTED               3
 
-`define DBG_BAD_DLLP_STATUS           0
-`define DBG_BAD_TLP_LCRC              1
-`define DBG_BAD_TLP_SEQ_NUM           2
-`define DBG_BAD_TLP_STATUS            3
-`define DBG_DL_PROTOCOL_STATUS        4
-`define DBG_FC_PROTOCOL_ERR_STATUS    5
-`define DBG_MLFMD_LENGTH              6
-`define DBG_MLFMD_MPS                 7
-`define DBG_MLFMD_TCVC                8
-`define DBG_MLFMD_TLP_STATUS          9
-`define DBG_MLFMD_UNREC_TYPE          10
-`define DBG_POISTLPSTATUS             11
-`define DBG_RCVR_OVERFLOW_STATUS      12
-`define DBG_RPLY_ROLLOVER_STATUS      13
-`define DBG_RPLY_TIMEOUT_STATUS       14
-`define DBG_UR_NO_BAR_HIT             15
-`define DBG_UR_POIS_CFG_WR            16
-`define DBG_UR_STATUS                 17
-`define DBG_UR_UNSUP_MSG              18
+`define DBG_DTCT_CRCT                 0
+`define DBG_DTCT_FATL                 1
+`define DBG_DTCT_NFTL                 2
+`define DBG_DTCT_UNSP                 3
+`define DBG_DLLP_STS                  4
+`define DBG_BD_TLP_LCRC               5
+`define DBG_BD_TLP_SQNM               6
+`define DBG_BD_TLP_STS                7
+`define DBG_DL_PTCL_STS               8
+`define DBG_FC_PTCL_STS               9
+`define DBG_MLFM_LEN                  10
+`define DBG_MLFM_MPS                  11
+`define DBG_MLFM_TCVC                 12
+`define DBG_MLFM_TLP_STS              13
+`define DBG_MLFM_TLP_UNREC            14
+`define DBG_PLP_STS                   15
+`define DBG_RCVR_OVFL_STS             16
+`define DBG_RCVR_RLVR_STS             17
+`define DBG_RCVR_TMT_STS              18
+`define DBG_UR_NO_BAR                 19
+`define DBG_UR_POIS                   20
+`define DBG_UR_STS                    21
+`define DBG_UR_UNSUP_MSG              22
+
 
 
 `define USR_IF_BIT_PER_BUS_SEL        0
@@ -128,8 +129,7 @@ SOFTWARE.
 
 
 module wb_artemis_pcie_platform #(
-  parameter           CONTROL_FIFO_DEPTH = 9,
-  parameter           DATA_FIFO_DEPTH = 9
+  parameter           DATA_FIFO_DEPTH = 5
 ) (
   input               clk,
   input               rst,
@@ -206,11 +206,12 @@ localparam    BAR_ADDR5           = 24;
 localparam    IRQ_CHANNEL_SELECT  = 25;
 localparam    CFG_READ_EXEC       = 26;
 localparam    CFG_SM_STATE        = 27;
-localparam    INGRESS_COUNT       = 28;
-localparam    INGRESS_STATE       = 29;
-localparam    INGRESS_RI_COUNT    = 30;
-localparam    INGRESS_CI_COUNT    = 31;
-localparam    INGRESS_ADDR        = 32;
+localparam    CTR_SM_STATE        = 28;
+localparam    INGRESS_COUNT       = 29;
+localparam    INGRESS_STATE       = 30;
+localparam    INGRESS_RI_COUNT    = 31;
+localparam    INGRESS_CI_COUNT    = 32;
+localparam    INGRESS_ADDR        = 33;
 
 
 //Local Registers/Wires
@@ -333,15 +334,12 @@ wire [31:0]                       w_bar_addr5;
 
 wire [7:0]                        w_cfg_read_exec;
 wire [3:0]                        w_cfg_sm_state;
+wire [3:0]                        w_sm_state;
 wire [7:0]                        w_ingress_count;
 wire [3:0]                        w_ingress_state;
 wire [7:0]                        w_ingress_ri_count;
 wire [7:0]                        w_ingress_ci_count;
 wire [31:0]                       w_ingress_addr;
-
-
-
-
 
 wire [31:0]                       w_data_size;
 wire [31:0]                       w_data_address;
@@ -353,9 +351,37 @@ wire                              w_data_fifo_flg;
 wire                              w_data_read_flg;
 wire                              w_data_write_flg;
 
-
 wire                              w_usr_interrupt_stb;
 wire  [31:0]                      w_usr_interrupt_value;
+
+wire                              dbg_reg_detected_correctable;
+wire                              dbg_reg_detected_fatal;
+wire                              dbg_reg_detected_non_fatal;
+wire                              dbg_reg_detected_unsupported;
+
+wire                              dbg_bad_dllp_status;
+wire                              dbg_bad_tlp_lcrc;
+wire                              dbg_bad_tlp_seq_num;
+wire                              dbg_bad_tlp_status;
+wire                              dbg_dl_protocol_status;
+wire                              dbg_fc_protocol_err_status;
+wire                              dbg_mlfrmd_length;
+wire                              dbg_mlfrmd_mps;
+wire                              dbg_mlfrmd_tcvc;
+wire                              dbg_mlfrmd_tlp_status;
+wire                              dbg_mlfrmd_unrec_type;
+wire                              dbg_poistlpstatus;
+wire                              dbg_rcvr_overflow_status;
+wire                              dbg_rply_rollover_status;
+wire                              dbg_rply_timeout_status;
+wire                              dbg_ur_no_bar_hit;
+wire                              dbg_ur_pois_cfg_wr;
+wire                              dbg_ur_status;
+wire                              dbg_ur_unsup_msg;
+
+reg [31:0]                        r_dbg_reg;
+reg                               r_rst_dbg;
+
 
 //Submodules
 //artemis_pcie_interface #(
@@ -450,9 +476,36 @@ artemis_pcie_controller #(
   .o_bar_hit                         (w_bar_hit                    ),
   .o_receive_axi_ready               (w_receive_axi_ready          ),
 
+
+  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
+  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
+  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal   ),
+  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported ),
+
+  .dbg_bad_dllp_status               (dbg_bad_dllp_status          ),
+  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc             ),
+  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num          ),
+  .dbg_bad_tlp_status                (dbg_bad_tlp_status           ),
+  .dbg_dl_protocol_status            (dbg_dl_protocol_status       ),
+  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status   ),
+  .dbg_mlfrmd_length                 (dbg_mlfrmd_length            ),
+  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps               ),
+  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc              ),
+  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status        ),
+  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type        ),
+  .dbg_poistlpstatus                 (dbg_poistlpstatus            ),
+  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status     ),
+  .dbg_rply_rollover_status          (dbg_rply_rollover_status     ),
+  .dbg_rply_timeout_status           (dbg_rply_timeout_status      ),
+  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit            ),
+  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr           ),
+  .dbg_ur_status                     (dbg_ur_status                ),
+  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg             ),
+
   //Extra Info
   .o_cfg_read_exec                   (w_cfg_read_exec              ),
   .o_cfg_sm_state                    (w_cfg_sm_state               ),
+  .o_sm_state                        (w_sm_state                   ),
 
   .cfg_pcie_link_state               (cfg_pcie_link_state          ),
   .cfg_bus_number                    (cfg_bus_number               ),
@@ -476,7 +529,6 @@ artemis_pcie_controller #(
   .cfg_err_locked                    (cfg_err_locked               ),
   .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
-
 
   //Debug Info
   .o_ingress_count                   (w_ingress_count              ),
@@ -548,19 +600,8 @@ assign  cfg_err_tlp_cpl_header = 0;
 //assign  cfg_interrupt_di       = 0;
 
 //assign  cfg_turnoff_ok         = 0;
-assign  cfg_pm_wake            = 0;
-
-
-assign  w_data_in_rd_activate   = 0;
-assign  w_data_in_rd_stb        = 0;
-
-assign  w_data_out_wr_activate  = 0;
-assign  w_data_out_wr_stb       = 0;
-assign  w_data_out_wr_data      = 0;
-
+assign  cfg_pm_wake             = 0;
 assign  o_pcie_wake_n           = 1;
-
-
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
                                    (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + DATA_BUFFER_SIZE)));
 
@@ -585,7 +626,7 @@ always @ (posedge clk_62p5) begin
     r_clock_count                <= 0;
     cfg_turnoff_ok               <= 0;
     trn_pending                  <= 0;
-
+    r_dbg_reg                    <= 0;
   end
   else begin
     r_clock_count   <=  r_clock_count + 1;
@@ -599,7 +640,81 @@ always @ (posedge clk_62p5) begin
       cfg_turnoff_ok    <=  1;
     end
     else begin
-      cfg_turnoff_ok    <=  0;
+      cfg_turnoff_ok              <=  0;
+    end
+
+    if(dbg_reg_detected_correctable) begin
+        r_dbg_reg[`DBG_DTCT_CRCT]            <= 1;
+    end
+    if(dbg_reg_detected_fatal) begin
+        r_dbg_reg[`DBG_DTCT_FATL]            <= 1;
+    end
+    if(dbg_reg_detected_non_fatal) begin
+        r_dbg_reg[`DBG_DTCT_NFTL]            <= 1;
+    end
+    if(dbg_reg_detected_unsupported) begin
+        r_dbg_reg[`DBG_DTCT_UNSP]            <= 1;
+    end
+
+    if(dbg_bad_dllp_status) begin
+        r_dbg_reg[`DBG_DLLP_STS]             <= 1;
+    end
+    if(dbg_bad_tlp_lcrc) begin
+        r_dbg_reg[`DBG_BD_TLP_LCRC]          <= 1;
+    end
+    if(dbg_bad_tlp_seq_num) begin
+        r_dbg_reg[`DBG_BD_TLP_SQNM]          <= 1;
+    end
+    if(dbg_bad_tlp_status) begin
+        r_dbg_reg[`DBG_BD_TLP_STS]           <= 1;
+    end
+    if(dbg_dl_protocol_status) begin
+        r_dbg_reg[`DBG_DL_PTCL_STS]          <= 1;
+    end
+    if(dbg_fc_protocol_err_status) begin
+        r_dbg_reg[`DBG_FC_PTCL_STS]          <= 1;
+    end
+    if(dbg_mlfrmd_length) begin
+        r_dbg_reg[`DBG_MLFM_LEN]             <= 1;
+    end
+    if(dbg_mlfrmd_mps) begin
+        r_dbg_reg[`DBG_MLFM_MPS]             <= 1;
+    end
+    if(dbg_mlfrmd_tcvc) begin
+        r_dbg_reg[`DBG_MLFM_TCVC]            <= 1;
+    end
+    if(dbg_mlfrmd_tlp_status) begin
+        r_dbg_reg[`DBG_MLFM_TLP_STS]         <= 1;
+    end
+    if(dbg_mlfrmd_unrec_type) begin
+        r_dbg_reg[`DBG_MLFM_TLP_UNREC]       <= 1;
+    end
+    if(dbg_poistlpstatus) begin
+        r_dbg_reg[`DBG_PLP_STS]              <= 1;
+    end
+    if(dbg_rcvr_overflow_status) begin
+        r_dbg_reg[`DBG_RCVR_OVFL_STS]        <= 1;
+    end
+    if(dbg_rply_rollover_status) begin
+        r_dbg_reg[`DBG_RCVR_RLVR_STS]        <= 1;
+    end
+    if(dbg_rply_timeout_status) begin
+        r_dbg_reg[`DBG_RCVR_TMT_STS]         <= 1;
+    end
+    if(dbg_ur_no_bar_hit) begin
+        r_dbg_reg[`DBG_UR_NO_BAR]            <= 1;
+    end
+    if(dbg_ur_pois_cfg_wr) begin
+        r_dbg_reg[`DBG_UR_POIS]              <= 1;
+    end
+    if(dbg_ur_status) begin
+        r_dbg_reg[`DBG_UR_STS]               <= 1;
+    end
+    if(dbg_ur_unsup_msg) begin
+        r_dbg_reg[`DBG_UR_UNSUP_MSG]         <= 1;
+    end
+    if (r_rst_dbg) begin
+      r_dbg_reg                              <= 0;
     end
   end
 end
@@ -634,13 +749,20 @@ always @ (posedge clk) begin
     r_tx_pre_emphasis           <=  3'b00;
 
     r_bar_hit_temp              <=  0;
+    r_rst_dbg                   <=  0;
   end
   else begin
+    if (r_dbg_reg == 0) begin
+      r_rst_dbg                 <=  0;
+    end
     if ((r_bar_hit_temp == 0) && (w_bar_hit != 0)) begin
       r_bar_hit_temp           <= w_bar_hit;
     end
     //when the master acks our ack, then put our ack down
     if (o_wbs_ack && ~i_wbs_stb)begin
+      if (i_wbs_adr == DBG_FLAGS) begin
+        r_rst_dbg               <=  1;
+      end
       o_wbs_ack <= 0;
     end
 
@@ -788,7 +910,7 @@ always @ (posedge clk) begin
             end
 */
             DBG_FLAGS: begin
-              o_wbs_dat       <=  0;
+              o_wbs_dat                         <=  r_dbg_reg;
             end
             BAR_SELECT: begin
               //o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};
@@ -818,6 +940,9 @@ always @ (posedge clk) begin
             end
             CFG_SM_STATE: begin
               o_wbs_dat                         <=  {28'h00, w_cfg_sm_state};
+            end
+            CTR_SM_STATE: begin
+              o_wbs_dat                         <=  {28'h00, w_sm_state};
             end
             INGRESS_COUNT: begin
               o_wbs_dat                         <=  {24'h00, w_ingress_count};

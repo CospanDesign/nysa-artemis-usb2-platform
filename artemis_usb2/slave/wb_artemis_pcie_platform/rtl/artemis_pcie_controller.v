@@ -126,12 +126,37 @@ module artemis_pcie_controller #(
   //Debug
   output      [7:0]         o_cfg_read_exec,
   output      [3:0]         o_cfg_sm_state,
+  output      [3:0]         o_sm_state,
   output      [7:0]         o_ingress_count,
   output      [3:0]         o_ingress_state,
   output      [7:0]         o_ingress_ri_count,
   output      [7:0]         o_ingress_ci_count,
   output      [31:0]        o_ingress_addr,
 
+  output                    dbg_reg_detected_correctable,
+  output                    dbg_reg_detected_fatal,
+  output                    dbg_reg_detected_non_fatal,
+  output                    dbg_reg_detected_unsupported,
+
+  output                    dbg_bad_dllp_status,
+  output                    dbg_bad_tlp_lcrc,
+  output                    dbg_bad_tlp_seq_num,
+  output                    dbg_bad_tlp_status,
+  output                    dbg_dl_protocol_status,
+  output                    dbg_fc_protocol_err_status,
+  output                    dbg_mlfrmd_length,
+  output                    dbg_mlfrmd_mps,
+  output                    dbg_mlfrmd_tcvc,
+  output                    dbg_mlfrmd_tlp_status,
+  output                    dbg_mlfrmd_unrec_type,
+  output                    dbg_poistlpstatus,
+  output                    dbg_rcvr_overflow_status,
+  output                    dbg_rply_rollover_status,
+  output                    dbg_rply_timeout_status,
+  output                    dbg_ur_no_bar_hit,
+  output                    dbg_ur_pois_cfg_wr,
+  output                    dbg_ur_status,
+  output                    dbg_ur_unsup_msg,
 
   //User Interfaces
   output                    o_per_fifo_sel,
@@ -157,8 +182,8 @@ module artemis_pcie_controller #(
   output      [31:0]        o_ingress_fifo_data,
 
   //Egress FIFO
-  input       [1:0]         o_egress_fifo_rdy,
-  output      [1:0]         i_egress_fifo_act,
+  output      [1:0]         o_egress_fifo_rdy,
+  input       [1:0]         i_egress_fifo_act,
   output      [23:0]        o_egress_fifo_size,
   input                     i_egress_fifo_stb,
   input       [31:0]        i_egress_fifo_data
@@ -212,6 +237,8 @@ wire                        s_axis_tx_tlast;
 wire                        s_axis_tx_tvalid;
 
 wire                        cfg_trn_pending;
+
+wire                        cfg_interrupt_stb;
 
 reg                         cfg_interrupt;
 wire                        cfg_interrupt_rdy;
@@ -269,31 +296,6 @@ wire                        tx_cfg_gnt;
 wire                        rx_np_ok;
 wire  [6:0]                 w_bar_hit;
 
-wire                        dbg_reg_detected_correctable;
-wire                        dbg_reg_detected_fatal;
-wire                        dbg_reg_detected_non_fatal;
-wire                        dbg_reg_detected_unsupported;
-
-wire                        dbg_bad_dllp_status;
-wire                        dbg_bad_tlp_lcrc;
-wire                        dbg_bad_tlp_seq_num;
-wire                        dbg_bad_tlp_status;
-wire                        dbg_dl_protocol_status;
-wire                        dbg_fc_protocol_err_status;
-wire                        dbg_mlfrmd_length;
-wire                        dbg_mlfrmd_mps;
-wire                        dbg_mlfrmd_tcvc;
-wire                        dbg_mlfrmd_tlp_status;
-wire                        dbg_mlfrmd_unrec_type;
-wire                        dbg_poistlpstatus;
-wire                        dbg_rcvr_overflow_status;
-wire                        dbg_rply_rollover_status;
-wire                        dbg_rply_timeout_status;
-wire                        dbg_ur_no_bar_hit;
-wire                        dbg_ur_pois_cfg_wr;
-wire                        dbg_ur_status;
-wire                        dbg_ur_unsup_msg;
-
 wire                        w_enable_config_read;
 wire                        w_finished_config_read;
 
@@ -329,7 +331,6 @@ wire  [7:0]                 w_egress_tag;
  ****************************************************************************/
 
 wire                        w_ctr_fifo_sel;
-wire                        w_dat_fifo_sel;
 
 wire                        w_egress_fifo_rdy;
 wire                        w_egress_fifo_act;
@@ -383,7 +384,7 @@ wire  [23:0]                w_e_data_fifo_size;
 wire                        w_e_data_fifo_stb;
 wire  [31:0]                w_e_data_fifo_data;
 
-
+wire                        w_dat_fifo_sel;
 
 /****************************************************************************
  * Interrupt State Machine Signals
@@ -393,21 +394,21 @@ sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface
-  .pci_exp_txp                       (pci_exp_txp             ),
-  .pci_exp_txn                       (pci_exp_txn             ),
-  .pci_exp_rxp                       (pci_exp_rxp             ),
-  .pci_exp_rxn                       (pci_exp_rxn             ),
+  .pci_exp_txp                       (pci_exp_txp                   ),
+  .pci_exp_txn                       (pci_exp_txn                   ),
+  .pci_exp_rxp                       (pci_exp_rxp                   ),
+  .pci_exp_rxn                       (pci_exp_rxn                   ),
 
   // Transaction (TRN) Interface
-  .user_lnk_up                       (user_lnk_up             ),
+  .user_lnk_up                       (user_lnk_up                   ),
 
   // Tx
-  .s_axis_tx_tready                  (s_axis_tx_tready        ),
-  .s_axis_tx_tdata                   (s_axis_tx_tdata         ),
-  .s_axis_tx_tkeep                   (s_axis_tx_tkeep         ),
-  .s_axis_tx_tuser                   (s_axis_tx_tuser         ),
-  .s_axis_tx_tlast                   (s_axis_tx_tlast         ),
-  .s_axis_tx_tvalid                  (s_axis_tx_tvalid        ),
+  .s_axis_tx_tready                  (s_axis_tx_tready              ),
+  .s_axis_tx_tdata                   (s_axis_tx_tdata               ),
+  .s_axis_tx_tkeep                   (s_axis_tx_tkeep               ),
+  .s_axis_tx_tuser                   (s_axis_tx_tuser               ),
+  .s_axis_tx_tlast                   (s_axis_tx_tlast               ),
+  .s_axis_tx_tvalid                  (s_axis_tx_tvalid              ),
 
 /*
 //TODO
@@ -415,94 +416,94 @@ sim_pcie_axi_bridge pcie_interface
   output  reg         tx_err_drop,
   output  reg         tx_cfg_req,
 */
-  .tx_cfg_gnt                        (tx_cfg_gnt               ),
-  .user_enable_comm                  (user_enable_comm         ),
+  .tx_cfg_gnt                        (tx_cfg_gnt                    ),
+  .user_enable_comm                  (user_enable_comm              ),
 
   // Rx
-  .m_axis_rx_tdata                   (m_axis_rx_tdata         ),
-  .m_axis_rx_tkeep                   (m_axis_rx_tkeep         ),
-  .m_axis_rx_tlast                   (m_axis_rx_tlast         ),
-  .m_axis_rx_tvalid                  (m_axis_rx_tvalid        ),
-  .m_axis_rx_tready                  (m_axis_rx_tready        ),
-  .m_axis_rx_tuser                   (m_axis_rx_tuser         ),
+  .m_axis_rx_tdata                   (m_axis_rx_tdata               ),
+  .m_axis_rx_tkeep                   (m_axis_rx_tkeep               ),
+  .m_axis_rx_tlast                   (m_axis_rx_tlast               ),
+  .m_axis_rx_tvalid                  (m_axis_rx_tvalid              ),
+  .m_axis_rx_tready                  (m_axis_rx_tready              ),
+  .m_axis_rx_tuser                   (m_axis_rx_tuser               ),
 //  output  reg [21:0]  m_axis_rx_tuser,
 //  input               rx_np_ok,
-  .rx_np_ok                          (rx_np_ok                ),
+  .rx_np_ok                          (rx_np_ok                      ),
 
   // Flow Control
-  .fc_sel                            (fc_sel                  ),
-  .fc_nph                            (fc_nph                  ),
-  .fc_npd                            (fc_npd                  ),
-  .fc_ph                             (fc_ph                   ),
-  .fc_pd                             (fc_pd                   ),
-  .fc_cplh                           (fc_cplh                 ),
-  .fc_cpld                           (fc_cpld                 ),
+  .fc_sel                            (fc_sel                        ),
+  .fc_nph                            (fc_nph                        ),
+  .fc_npd                            (fc_npd                        ),
+  .fc_ph                             (fc_ph                         ),
+  .fc_pd                             (fc_pd                         ),
+  .fc_cplh                           (fc_cplh                       ),
+  .fc_cpld                           (fc_cpld                       ),
 
   // Host Interface
-  .cfg_do                            (cfg_do                  ),
-  .cfg_rd_wr_done                    (cfg_rd_wr_done          ),
-  .cfg_dwaddr                        (cfg_dwaddr              ),
-  .cfg_rd_en                         (cfg_rd_en               ),
+  .cfg_do                            (cfg_do                        ),
+  .cfg_rd_wr_done                    (cfg_rd_wr_done                ),
+  .cfg_dwaddr                        (cfg_dwaddr                    ),
+  .cfg_rd_en                         (cfg_rd_en                     ),
 
   // Configuration: Error
-  .cfg_err_ur                        (cfg_err_ur              ),
-  .cfg_err_cor                       (cfg_err_cor             ),
-  .cfg_err_ecrc                      (cfg_err_ecrc            ),
-  .cfg_err_cpl_timeout               (cfg_err_cpl_timeout     ),
-  .cfg_err_cpl_abort                 (cfg_err_cpl_abort       ),
-  .cfg_err_posted                    (cfg_err_posted          ),
-  .cfg_err_locked                    (cfg_err_locked          ),
-  .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header  ),
-  .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy         ),
+  .cfg_err_ur                        (cfg_err_ur                    ),
+  .cfg_err_cor                       (cfg_err_cor                   ),
+  .cfg_err_ecrc                      (cfg_err_ecrc                  ),
+  .cfg_err_cpl_timeout               (cfg_err_cpl_timeout           ),
+  .cfg_err_cpl_abort                 (cfg_err_cpl_abort             ),
+  .cfg_err_posted                    (cfg_err_posted                ),
+  .cfg_err_locked                    (cfg_err_locked                ),
+  .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header        ),
+  .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy               ),
 
   // Conifguration: Interrupt
-  .cfg_interrupt                     (cfg_interrupt           ),
-  .cfg_interrupt_rdy                 (cfg_interrupt_rdy       ),
-  .cfg_interrupt_assert              (cfg_interrupt_assert    ),
-  .cfg_interrupt_do                  (cfg_interrupt_do        ),
-  .cfg_interrupt_di                  (cfg_interrupt_di        ),
-  .cfg_interrupt_mmenable            (cfg_interrupt_mmenable  ),
-  .cfg_interrupt_msienable           (cfg_interrupt_msienable ),
+  .cfg_interrupt                     (cfg_interrupt                 ),
+  .cfg_interrupt_rdy                 (cfg_interrupt_rdy             ),
+  .cfg_interrupt_assert              (cfg_interrupt_assert          ),
+  .cfg_interrupt_do                  (cfg_interrupt_do              ),
+  .cfg_interrupt_di                  (cfg_interrupt_di              ),
+  .cfg_interrupt_mmenable            (cfg_interrupt_mmenable        ),
+  .cfg_interrupt_msienable           (cfg_interrupt_msienable       ),
 
   // Configuration: Power Management
-  .cfg_turnoff_ok                    (cfg_turnoff_ok          ),
-  .cfg_to_turnoff                    (cfg_to_turnoff          ),
-  .cfg_pm_wake                       (cfg_pm_wake             ),
+  .cfg_turnoff_ok                    (cfg_turnoff_ok                ),
+  .cfg_to_turnoff                    (cfg_to_turnoff                ),
+  .cfg_pm_wake                       (cfg_pm_wake                   ),
 
   //Core Controller
 
   // Configuration: System/Status
-  .cfg_pcie_link_state               (cfg_pcie_link_state     ),
-  .cfg_trn_pending                   (cfg_trn_pending         ),  //XXX: Do I need to use cfg_trn_pending??
-  .cfg_dsn                           (SERIAL_NUMBER           ),
-  .cfg_bus_number                    (cfg_bus_number          ),
-  .cfg_device_number                 (cfg_device_number       ),
-  .cfg_function_number               (cfg_function_number     ),
+  .cfg_pcie_link_state               (cfg_pcie_link_state           ),
+  .cfg_trn_pending                   (cfg_trn_pending               ),  //XXX: Do I need to use cfg_trn_pending??
+  .cfg_dsn                           (SERIAL_NUMBER                 ),
+  .cfg_bus_number                    (cfg_bus_number                ),
+  .cfg_device_number                 (cfg_device_number             ),
+  .cfg_function_number               (cfg_function_number           ),
 
-  .cfg_status                        (cfg_status              ),
-  .cfg_command                       (cfg_command             ),
-  .cfg_dstatus                       (cfg_dstatus             ),
-  .cfg_dcommand                      (cfg_dcommand            ),
-  .cfg_lstatus                       (cfg_lstatus             ),
-  .cfg_lcommand                      (cfg_lcommand            ),
+  .cfg_status                        (cfg_status                    ),
+  .cfg_command                       (cfg_command                   ),
+  .cfg_dstatus                       (cfg_dstatus                   ),
+  .cfg_dcommand                      (cfg_dcommand                  ),
+  .cfg_lstatus                       (cfg_lstatus                   ),
+  .cfg_lcommand                      (cfg_lcommand                  ),
 
   // System Interface
-  .sys_clk_p                         (gtp_clk_p               ),
-  .sys_clk_n                         (gtp_clk_n               ),
-  .sys_reset                         (rst                     ),
-  .user_clk_out                      (clk_62p5                ),
-  .user_reset_out                    (pcie_reset              ),
-  .received_hot_reset                (received_hot_reset      ),
+  .sys_clk_p                         (gtp_clk_p                     ),
+  .sys_clk_n                         (gtp_clk_n                     ),
+  .sys_reset                         (rst                           ),
+  .user_clk_out                      (clk_62p5                      ),
+  .user_reset_out                    (pcie_reset                    ),
+  .received_hot_reset                (received_hot_reset            ),
 
-  .pll_lock_detect                   (pll_lock_detect         ),
-  .gtp_pll_lock_detect               (gtp_pll_lock_detect     ),
-  .gtp_reset_done                    (gtp_reset_done          ),
-  .rx_elec_idle                      (rx_elec_idle            ),
+  .pll_lock_detect                   (pll_lock_detect               ),
+  .gtp_pll_lock_detect               (gtp_pll_lock_detect           ),
+  .gtp_reset_done                    (gtp_reset_done                ),
+  .rx_elec_idle                      (rx_elec_idle                  ),
 
-  .rx_equalizer_ctrl                 (rx_equalizer_ctrl       ),
-  .tx_diff_ctrl                      (tx_diff_ctrl            ),
-  .tx_pre_emphasis                   (tx_pre_emphasis         ),
-  .cfg_ltssm_state                   (cfg_ltssm_state         ),
+  .rx_equalizer_ctrl                 (rx_equalizer_ctrl             ),
+  .tx_diff_ctrl                      (tx_diff_ctrl                  ),
+  .tx_pre_emphasis                   (tx_pre_emphasis               ),
+  .cfg_ltssm_state                   (cfg_ltssm_state               ),
 
   .o_bar_hit                         (w_bar_hit                     ),
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable  ),
@@ -510,25 +511,25 @@ sim_pcie_axi_bridge pcie_interface
   .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal    ),
   .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported  ),
 
-  .dbg_bad_dllp_status               (dbg_bad_dllp_status        ),
-  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc           ),
-  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num        ),
-  .dbg_bad_tlp_status                (dbg_bad_tlp_status         ),
-  .dbg_dl_protocol_status            (dbg_dl_protocol_status     ),
-  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status ),
-  .dbg_mlfrmd_length                 (dbg_mlfrmd_length          ),
-  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps             ),
-  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc            ),
-  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status      ),
-  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type      ),
-  .dbg_poistlpstatus                 (dbg_poistlpstatus          ),
-  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status   ),
-  .dbg_rply_rollover_status          (dbg_rply_rollover_status   ),
-  .dbg_rply_timeout_status           (dbg_rply_timeout_status    ),
-  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit          ),
-  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr         ),
-  .dbg_ur_status                     (dbg_ur_status              ),
-  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg           )
+  .dbg_bad_dllp_status               (dbg_bad_dllp_status           ),
+  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc              ),
+  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num           ),
+  .dbg_bad_tlp_status                (dbg_bad_tlp_status            ),
+  .dbg_dl_protocol_status            (dbg_dl_protocol_status        ),
+  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status    ),
+  .dbg_mlfrmd_length                 (dbg_mlfrmd_length             ),
+  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps                ),
+  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc               ),
+  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status         ),
+  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type         ),
+  .dbg_poistlpstatus                 (dbg_poistlpstatus             ),
+  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status      ),
+  .dbg_rply_rollover_status          (dbg_rply_rollover_status      ),
+  .dbg_rply_timeout_status           (dbg_rply_timeout_status       ),
+  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit             ),
+  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr            ),
+  .dbg_ur_status                     (dbg_ur_status                 ),
+  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg              )
 );
 
 /****************************************************************************
@@ -602,6 +603,8 @@ pcie_control controller(
   .o_mem_sel                  (o_mem_fifo_sel             ),
   .o_dma_sel                  (o_dma_fifo_sel             ),
 
+  .o_data_fifo_sel            (w_dat_fifo_sel             ),
+
   .i_interrupt_stb            (i_usr_interrupt_stb        ),
   .i_interrupt_value          (i_usr_interrupt_value      ),
 
@@ -639,7 +642,8 @@ pcie_control controller(
 
   //Configuration Reader Interface
   .o_cfg_read_exec            (o_cfg_read_exec            ),
-  .o_cfg_sm_state             (o_cfg_sm_state             )
+  .o_cfg_sm_state             (o_cfg_sm_state             ),
+  .o_sm_state                 (o_sm_state                 )
 );
 
 
@@ -697,8 +701,6 @@ ppfifo #(
   .read_strobe      (w_e_data_fifo_stb   ),
   .read_data        (w_e_data_fifo_data  )
 );
-
-
 
 pcie_ingress ingress(
   .clk                        (clk_62p5                   ),
@@ -776,12 +778,14 @@ pcie_egress egress(
   .i_requester_id             (w_egress_tlp_requester_id  ),
   .i_tag                      (w_egress_tag               ),
 
+  //AXI Interface
   .i_axi_egress_ready         (s_axis_tx_tready           ),
   .o_axi_egress_data          (s_axis_tx_tdata            ),
   .o_axi_egress_keep          (s_axis_tx_tkeep            ),
   .o_axi_egress_last          (s_axis_tx_tlast            ),
   .o_axi_egress_valid         (s_axis_tx_tvalid           ),
 
+  //Data FIFO Interface
   .i_fifo_rdy                 (w_egress_fifo_rdy          ),
   .o_fifo_act                 (w_egress_fifo_act          ),
   .i_fifo_size                (w_egress_fifo_size         ),
@@ -814,26 +818,16 @@ assign  w_e_data_fifo_act     = (w_dat_fifo_sel)      ? w_egress_fifo_act:
 assign  w_e_data_fifo_stb     = (w_dat_fifo_sel)      ? w_egress_fifo_stb:
                                  1'b0;
 
-assign  w_dat_fifo_sel        = (o_per_fifo_sel || o_mem_fifo_sel || o_dma_fifo_sel);
+//assign  w_dat_fifo_sel        = (o_per_fifo_sel || o_mem_fifo_sel || o_dma_fifo_sel);
 /****************************************************************************
  * Temporary Debug Signals
  ****************************************************************************/
 
 //This used to go to the wishbone slave device
-assign  o_receive_axi_ready = 0;
-
 //Need to create a flow controller
-assign  tmp_pcie_fc_ready = 1;
-
-assign  tmp_buf_offset  = 32'h0;
-
-
-assign  w_i_data_fifo_act    = 0;
-assign  w_i_data_fifo_stb    = 0;
-assign  w_i_data_fifo_data   = 0;
-
-
-
+assign  o_receive_axi_ready   = 0;
+assign  tmp_pcie_fc_ready     = 1;
+assign  tmp_buf_offset        = 32'h0;
 
 /****************************************************************************
  * AXI Signals from the user to the PCIE_A1 Core

@@ -126,18 +126,6 @@ class Test (unittest.TestCase):
 
         self.s.Important("LTSSM State: %s" % self.driver.get_ltssm_state())
 
-        if self.driver.is_correctable_error():
-            self.s.Error("Correctable Error Detected")
-
-        if self.driver.is_fatal_error():
-            self.s.Error("Fatal Error Detected")
-
-        if self.driver.is_non_fatal_error():
-            self.s.Error("Non Fatal Error Detected")
-
-        if self.driver.is_unsupported_error():
-            self.s.Error("Unsupported Error Detected")
-
 
         self.s.Info("Link State: %s" % self.driver.get_link_state_string())
         self.s.Info("Get Bus Number:         0x%08X" % self.driver.get_bus_num())
@@ -168,26 +156,43 @@ class Test (unittest.TestCase):
         self.driver.set_interrupt_channel(0x01)
         self.s.Info("Sending interrupt...")
         self.driver.send_irq()
-
-        self.s.Info("Ingress State:             0x%04X" % self.driver.get_ingress_state())
-        self.s.Info("Ingress Count:             %d" % self.driver.get_ingress_count())
-
-        self.s.Info("Ingress RI Count:          %d" % self.driver.get_ingress_ri_count())
-        self.s.Info("Ingress CI Count:          %d" % self.driver.get_ingress_ci_count())
-        self.s.Info("Ingress Address:           0x%08X" % self.driver.get_ingress_addr())
-
-        self.s.Info("Config Read Count:         %d" % self.driver.get_config_state_read_count())
-        self.s.Info("Config State:              0x%04X" % self.driver.get_config_state())
+        print ""                             
+        self.s.Info("Ingress State:          0x%04X" % self.driver.get_ingress_state())
+        self.s.Info("Ingress Count:          %d" % self.driver.get_ingress_count())
+        print ""                             
+        self.s.Info("Ingress RI Count:       %d" % self.driver.get_ingress_ri_count())
+        self.s.Info("Ingress CI Count:       %d" % self.driver.get_ingress_ci_count())
+        self.s.Info("Ingress Address:        0x%08X" % self.driver.get_ingress_addr())
+        print ""                             
+        self.s.Info("Config Read Count:      %d" % self.driver.get_config_state_read_count())
+        self.s.Info("Config State:           0x%04X" % self.driver.get_config_state())
+        print ""                             
+        self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
         print ""
 
-        self.driver.get_config_data()
-        for i in range (6):
-            self.s.Info("Bus Address:           0x%08X" % self.driver.get_bar_address(i))
+        self.driver.get_config_data()        
+        buffer_size = self.driver.get_local_buffer_size()
 
+        for i in range (6):                  
+            self.s.Info("Bus Address:            0x%08X" % self.driver.get_bar_address(i))
+
+        data = Array('B')
+        for i in range(buffer_size * 4):
+            v = i * 4
+            data.append((v + 0) % 256)
+            data.append((v + 1) % 256)
+            data.append((v + 2) % 256)
+            data.append((v + 3) % 256)
+
+        self.driver.write_local_buffer(data)
 
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
-        self.driver.reset_debug_flags()
+        #self.driver.reset_debug_flags()
+        self.driver.send_block_from_local_buffer()
+        self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
+        print ""
+        self.driver.read_debug_flags()
 
 if __name__ == "__main__":
     unittest.main()

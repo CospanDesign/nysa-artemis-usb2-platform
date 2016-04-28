@@ -176,18 +176,21 @@ def test_pcie_config_read_wait_for_ready(dut):
 
 
 
-@cocotb.test(skip = False)
-def test_pcie_read_command(dut):
+@cocotb.test(skip = True)
+def test_pcie_small_read_command(dut):
     """
     Description:
-        Write down a command and read the results
+        Request a small read, this doesn't pass the Buffer Boundary
 
     Test ID: 3
 
     Expected Results:
-        A command is observed within the write state machine.
-        The control SM processes the command and sends config data to the host
-        The host reads the config data back
+        Set up the Core with all the appropriate registers
+        Populate the local buffer with an incrementing number pattern
+        Request 0x300 words of data, the core should
+            -Send 0x200 data
+            -Send 0x200 data (0x100) is valid
+            -Send Status Block with Done bit
     """
 
     dut.test_id = 3
@@ -245,10 +248,111 @@ def test_pcie_read_command(dut):
     #Read Status
     yield (nysa.wait_clocks(10))
     yield c.wait_for_data(wait_for_ready = False)
+    yield (nysa.wait_clocks(400))
 
-    #Read Final Status
+    ##Read Final Status
+    #yield (nysa.wait_clocks(10))
+    #yield c.wait_for_data(wait_for_ready = False)
+    #yield (nysa.wait_clocks(400))
+
+
+@cocotb.test(skip = False)
+def test_pcie_read_two_block_command(dut):
+    """
+    Description:
+        Perform a read that spans across two blocks
+
+    Test ID: 4
+
+    Expected Results:
+        Set up the Core with all the appropriate registers, this time,
+            change the block size to be much smaller so that it will be
+            forced to jump across a boundary
+        Populate the local buffer with an incrementing number pattern
+        Request 0x600 words of data, the core should
+            -Send 0x200 data
+            -Send 0x200 data, this is the last of the block
+            -Send Status Block indicating the block is done
+            -Send 0x200 data this is the last packet
+            -Send Status Block indicating the transfer is done
+
+    """
+
+    dut.test_id = 4
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    data = Array('B')
+    for i in range(128 * 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    yield (nysa.wait_clocks(50))
+    yield cocotb.external(driver.write_local_buffer)(data)
+    yield (nysa.wait_clocks(400))
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+    yield (nysa.wait_clocks(600))
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+    yield (nysa.wait_clocks(400))
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    cocotb.log.info("Reduce the block size to 0x400")
+    c.set_buffer_size(0x040)
+
+    cocotb.log.info("Request 0x600 words from the device")
+    COUNT = 0x0060
+    ADDRESS = 0x00
+
+    dcount = 0
+    yield (nysa.wait_clocks(100))
+    yield c.read_pcie_data_command(count = COUNT, address = ADDRESS)
+    yield (nysa.wait_clocks(100))
+    c.set_buffer_ready_status(0x03)
+
+    #Read first chunk of data  ( 0x00 - 0x01F )
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+
+    #Read second chunk of data ( 0x01F - 0x03F )
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+
+    #Read Status Indicating the end of a block
+    yield (nysa.wait_clocks(10))
+    yield c.wait_for_data(wait_for_ready = False)
+    yield (nysa.wait_clocks(100))
+
+    cocotb.log.info("Core should be waiting for more data from the FIFO")
+    cocotb.log.info("Send another block of data from the local core")
+    yield cocotb.external(driver.send_block_from_local_buffer)()
+
+    #Read third chunk of data ( 0x040 - 0x05F )
+    yield c.wait_for_data(wait_for_ready = False)
+    yield (nysa.wait_clocks(10))
+
+    #Read Status Indicating the end of a block
     yield (nysa.wait_clocks(10))
     yield c.wait_for_data(wait_for_ready = False)
     yield (nysa.wait_clocks(400))
+
+    ##Read Final Status
+    #yield (nysa.wait_clocks(10))
+    #yield c.wait_for_data(wait_for_ready = False)
+    #yield (nysa.wait_clocks(400))
 
 

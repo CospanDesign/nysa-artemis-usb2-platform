@@ -55,11 +55,12 @@ BAR_ADDR5                       =   24
 IRQ_CHANNEL_SELECT              =   25
 CFG_READ_EXEC                   =   26
 CFG_SM_STATE                    =   27
-INGRESS_COUNT                   =   28
-INGRESS_STATE                   =   29
-INGRESS_RI_COUNT                =   30
-INGRESS_CI_COUNT                =   31
-INGRESS_ADDR                    =   32
+CTR_SM_STATE                    =   28
+INGRESS_COUNT                   =   29
+INGRESS_STATE                   =   30
+INGRESS_RI_COUNT                =   31
+INGRESS_CI_COUNT                =   32
+INGRESS_ADDR                    =   33
 
 
 BAR_ADDR_BASE                   =   19
@@ -95,30 +96,32 @@ STS_BIT_PCIE_EXT_RESET          =   30
 STS_BIT_AXI_RECEIVE_READY       =   31
 
 
-DBG_CORRECTABLE                 =   0
-DBG_FATAL                       =   1
-DBG_NON_FATAL                   =   2
-DBG_UNSUPPORTED                 =   3
 
-DBG_BAD_DLLP_STATUS             =   0
-DBG_BAD_TLP_LCRC                =   1
-DBG_BAD_TLP_SEQ_NUM             =   2
-DBG_BAD_TLP_STATUS              =   3
-DBG_DL_PROTOCOL_STATUS          =   4
-DBG_FC_PROTOCOL_ERR_STATUS      =   5
-DBG_MLFMD_LENGTH                =   6
-DBG_MLFMD_MPS                   =   7
-DBG_MLFMD_TCVC                  =   8
-DBG_MLFMD_TLP_STATUS            =   9
-DBG_MLFMD_UNREC_TYPE            =   10
-DBG_POISTLPSTATUS               =   11
-DBG_RCVR_OVERFLOW_STATUS        =   12
-DBG_RPLY_ROLLOVER_STATUS        =   13
-DBG_RPLY_TIMEOUT_STATUS         =   14
-DBG_UR_NO_BAR_HIT               =   15
-DBG_UR_POIS_CFG_WR              =   16
-DBG_UR_STATUS                   =   17
-DBG_UR_UNSUP_MSG                =   18
+DBG_DTCT_CRCT                   =   0
+DBG_DTCT_FATL                   =   1
+DBG_DTCT_NFTL                   =   2
+DBG_DTCT_UNSP                   =   3
+DBG_DLLP_STS                    =   4
+DBG_BD_TLP_LCRC                 =   5
+DBG_BD_TLP_SQNM                 =   6
+DBG_BD_TLP_STS                  =   7
+DBG_DL_PTCL_STS                 =   8
+DBG_FC_PTCL_STS                 =   9
+DBG_MLFM_LEN                    =   10
+DBG_MLFM_MPS                    =   11
+DBG_MLFM_TCVC                   =   12
+DBG_MLFM_TLP_STS                =   13
+DBG_MLFM_TLP_UNREC              =   14
+DBG_PLP_STS                     =   15
+DBG_RCVR_OVFL_STS               =   16
+DBG_RCVR_RLVR_STS               =   17
+DBG_RCVR_TMT_STS                =   18
+DBG_UR_NO_BAR                   =   19
+DBG_UR_POIS                     =   20
+DBG_UR_STS                      =   21
+DBG_UR_UNSUP_MSG                =   22
+
+
 
 LOCAL_BUFFER_OFFSET             =   0x100
 
@@ -259,7 +262,7 @@ class ArtemisPCIEDriver(driver.Driver):
             Nothing
         """
         if size is None:
-            size = self.buffer_size / 4
+            size = self.buffer_size
         return self.read(address + (LOCAL_BUFFER_OFFSET), length = size)
 
     def write_local_buffer(self, data, address = 0x00):
@@ -336,18 +339,6 @@ class ArtemisPCIEDriver(driver.Driver):
         else:
             return "Unknown State: 0x%02X" % state
 
-    def is_correctable_error(self):
-        return self.is_register_bit_set(DBG_DATA, DBG_CORRECTABLE)
-
-    def is_fatal_error(self):
-        return self.is_register_bit_set(DBG_DATA, DBG_FATAL)
-
-    def is_non_fatal_error(self):
-        return self.is_register_bit_set(DBG_DATA, DBG_NON_FATAL)
-
-    def is_unsupported_error(self):
-        return self.is_register_bit_set(DBG_DATA, DBG_UNSUPPORTED)
-
     def get_cfg_command(self):
         return self.read_register(CONFIG_COMMAND)
 
@@ -368,42 +359,53 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def read_debug_flags(self):
         flags = self.get_debug_flags()
-        print "Debug Flags:"
-        if (flags & (1 << DBG_BAD_DLLP_STATUS)) > 0:
+        print "PCIE Debug Flags:"
+        #print "\tGeneral Errors:"
+        if (flags & (1 << DBG_DTCT_CRCT) > 0):
+            print "\tDetect Correctable Error"
+        if (flags & (1 << DBG_DTCT_FATL) > 0):
+            print "\tDetect Fatal Error"
+        if (flags & (1 << DBG_DTCT_NFTL) > 0):
+            print "\tDetect Non Fatal Error"
+        if (flags & (1 << DBG_DTCT_UNSP) > 0):
+            print "\tDetect Unsupported Error"
+        print ""
+        #print "\tSpecific Errors:"
+        if (flags & (1 << DBG_DLLP_STS)) > 0:
             print "\tBad DLLP CRC Error"
-        if (flags & (1 << DBG_BAD_TLP_LCRC)) > 0:
+        if (flags & (1 << DBG_BD_TLP_LCRC)) > 0:
             print "\tLCP with an LCRC Error detected"
-        if (flags & (1 << DBG_BAD_TLP_SEQ_NUM)) > 0:
+        if (flags & (1 << DBG_BD_TLP_SQNM)) > 0:
             print "\tTLP with an invalid sequence number"
-        if (flags & (1 << DBG_BAD_TLP_STATUS)) > 0:
+        if (flags & (1 << DBG_BD_TLP_STS)) > 0:
             print "\tTLP with an error detected"
-        if (flags & (1 << DBG_DL_PROTOCOL_STATUS)) > 0:
+        if (flags & (1 << DBG_DL_PTCL_STS)) > 0:
             print "\tOut of Range ACK or NACK is received"
-        if (flags & (1 << DBG_FC_PROTOCOL_ERR_STATUS)) > 0:
+        if (flags & (1 << DBG_FC_PTCL_STS)) > 0:
             print "\tProtocol error with the received flow control update"
-        if (flags & (1 << DBG_MLFMD_LENGTH)) > 0:
+        if (flags & (1 << DBG_MLFM_LEN)) > 0:
             print "\tTLP Length did not match what was in the TLP header"
-        if (flags & (1 << DBG_MLFMD_MPS)) > 0:
+        if (flags & (1 << DBG_MLFM_MPS)) > 0:
             print "\tTLP Length had a length that did not match the negotiated MPS"
-        if (flags & (1 << DBG_MLFMD_TCVC)) > 0:
+        if (flags & (1 << DBG_MLFM_TCVC)) > 0:
             print "\tInvalid TC or VC value"
-        if (flags & (1 << DBG_MLFMD_TLP_STATUS)) > 0:
+        if (flags & (1 << DBG_MLFM_TLP_STS)) > 0:
             print "\tMalformed TLP is received"
-        if (flags & (1 << DBG_MLFMD_UNREC_TYPE)) > 0:
+        if (flags & (1 << DBG_MLFM_TLP_UNREC)) > 0:
             print "\tTLP had invalid/unrecognized field"
-        if (flags & (1 << DBG_POISTLPSTATUS)) > 0:
+        if (flags & (1 << DBG_PLP_STS)) > 0:
             print "\tTLP was received with the EP (poisoned status bit set)"
-        if (flags & (1 << DBG_RCVR_OVERFLOW_STATUS)) > 0:
+        if (flags & (1 << DBG_RCVR_OVFL_STS)) > 0:
             print "\tTLP violates the advertise credits"
-        if (flags & (1 << DBG_RPLY_ROLLOVER_STATUS)) > 0:
+        if (flags & (1 << DBG_RCVR_RLVR_STS)) > 0:
             print "\tRollover counter expires"
-        if (flags & (1 << DBG_RPLY_TIMEOUT_STATUS)) > 0:
+        if (flags & (1 << DBG_RCVR_TMT_STS)) > 0:
             print "\tReplay time-out conter expires"
-        if (flags & (1 << DBG_UR_NO_BAR_HIT)) > 0:
+        if (flags & (1 << DBG_UR_NO_BAR)) > 0:
             print "\tReceived read/write did not match a configured BAR"
-        if (flags & (1 << DBG_UR_POIS_CFG_WR)) > 0:
+        if (flags & (1 << DBG_UR_POIS)) > 0:
             print "\tCFGWR TLP with the error/poisoned bit (EP) =  was received"
-        if (flags & (1 << DBG_UR_STATUS)) > 0:
+        if (flags & (1 << DBG_UR_STS)) > 0:
             print "\tUnsupported request is recieved"
         if (flags & (1 << DBG_UR_UNSUP_MSG)) > 0:
             print "\tMSG or MSGD TLP with unsupported type was received"
@@ -453,6 +455,9 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_config_state(self):
         return self.read_register(CFG_SM_STATE)
+
+    def get_control_state(self):
+        return self.read_register(CTR_SM_STATE)
 
     def get_config_state_read_count(self):
         return self.read_register(CFG_READ_EXEC)

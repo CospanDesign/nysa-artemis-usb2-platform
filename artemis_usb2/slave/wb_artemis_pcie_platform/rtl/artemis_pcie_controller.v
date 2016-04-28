@@ -658,48 +658,48 @@ pcie_control controller(
 
 //INGRESS FIFO
 ppfifo #(
-  .DATA_WIDTH       (32                  ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH     ) //16 32-bit values for the control
+  .DATA_WIDTH                 (32                        ),
+  .ADDRESS_WIDTH              (DATA_FIFO_DEPTH           ) //16 32-bit values for the control
 ) i_data_fifo(
-  .reset            (pcie_reset || rst   ),
+  .reset                      (pcie_reset || rst         ),
   //Write Side
-  .write_clock      (clk_62p5            ),
-  .write_ready      (w_i_data_fifo_rdy   ),
-  .write_activate   (w_o_data_fifo_act   ),
-  .write_fifo_size  (w_o_data_fifo_size  ),
-  .write_strobe     (w_i_data_fifo_stb   ),
-  .write_data       (w_i_data_fifo_data  ),
+  .write_clock                (clk_62p5                  ),
+  .write_ready                (w_i_data_fifo_rdy         ),
+  .write_activate             (w_o_data_fifo_act         ),
+  .write_fifo_size            (w_o_data_fifo_size        ),
+  .write_strobe               (w_i_data_fifo_stb         ),
+  .write_data                 (w_i_data_fifo_data        ),
 
   //Read Side
-  .read_clock       (i_data_clk           ),
-  .read_ready       (o_ingress_fifo_rdy   ),
-  .read_activate    (i_ingress_fifo_act   ),
-  .read_count       (o_ingress_fifo_size  ),
-  .read_strobe      (i_ingress_fifo_stb   ),
-  .read_data        (o_ingress_fifo_data  )
+  .read_clock                 (i_data_clk                 ),
+  .read_ready                 (o_ingress_fifo_rdy         ),
+  .read_activate              (i_ingress_fifo_act         ),
+  .read_count                 (o_ingress_fifo_size        ),
+  .read_strobe                (i_ingress_fifo_stb         ),
+  .read_data                  (o_ingress_fifo_data        )
 );
 
 //EGRESS FIFOs
 ppfifo #(
-  .DATA_WIDTH       (32                  ),
-  .ADDRESS_WIDTH    (DATA_FIFO_DEPTH     ) //16 32-bit values for the control
+  .DATA_WIDTH                 (32                         ),
+  .ADDRESS_WIDTH              (DATA_FIFO_DEPTH            ) //16 32-bit values for the control
 ) e_data_fifo(
-  .reset            (pcie_reset || rst   ),
+  .reset                      (pcie_reset || rst          ),
   //Write Side
-  .write_clock      (i_data_clk          ),
-  .write_ready      (o_egress_fifo_rdy   ),
-  .write_activate   (i_egress_fifo_act   ),
-  .write_fifo_size  (o_egress_fifo_size  ),
-  .write_strobe     (i_egress_fifo_stb   ),
-  .write_data       (i_egress_fifo_data  ),
+  .write_clock                (i_data_clk                 ),
+  .write_ready                (o_egress_fifo_rdy          ),
+  .write_activate             (i_egress_fifo_act          ),
+  .write_fifo_size            (o_egress_fifo_size         ),
+  .write_strobe               (i_egress_fifo_stb          ),
+  .write_data                 (i_egress_fifo_data         ),
 
   //Read Side
-  .read_clock       (clk_62p5           ),
-  .read_ready       (w_e_data_fifo_rdy   ),
-  .read_activate    (w_e_data_fifo_act   ),
-  .read_count       (w_e_data_fifo_size  ),
-  .read_strobe      (w_e_data_fifo_stb   ),
-  .read_data        (w_e_data_fifo_data  )
+  .read_clock                 (clk_62p5                   ),
+  .read_ready                 (w_e_data_fifo_rdy          ),
+  .read_activate              (w_e_data_fifo_act          ),
+  .read_count                 (w_e_data_fifo_size         ),
+  .read_strobe                (w_e_data_fifo_stb          ),
+  .read_data                  (w_e_data_fifo_data         )
 );
 
 pcie_ingress ingress(
@@ -809,9 +809,9 @@ assign  w_egress_fifo_data    = (w_ctr_fifo_sel)      ? w_e_ctr_fifo_data:
                                 32'h00;
 
 assign  w_e_ctr_fifo_act      = (w_ctr_fifo_sel)      ? w_egress_fifo_act:
-                                  1'b0;
+                                 1'b0;
 assign  w_e_ctr_fifo_stb      = (w_ctr_fifo_sel)      ? w_egress_fifo_stb:
-                                  1'b0;
+                                 1'b0;
 
 assign  w_e_data_fifo_act     = (w_dat_fifo_sel)      ? w_egress_fifo_act:
                                  1'b0;

@@ -326,7 +326,7 @@ def test_pcie_read_two_block_command(dut):
 
     #Read first chunk of data  ( 0x00 - 0x01F )
     yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
+    yield c.wait_for_data(wait_for_ready = True)
 
     #Read second chunk of data ( 0x01F - 0x03F )
     yield (nysa.wait_clocks(10))

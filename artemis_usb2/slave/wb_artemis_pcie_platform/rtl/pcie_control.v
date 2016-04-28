@@ -121,6 +121,8 @@ module pcie_control(
   output      [3:0]         o_sm_state
 
 );
+
+
 //local parameters
 localparam      IDLE                          = 4'h0;
 
@@ -370,6 +372,7 @@ always @ (posedge clk) begin
         r_sts_done          <= 0;
         r_sts_cmd_err       <= 0;
         r_tlp_tag           <= 0;
+        r_buf_rdy           <= 0;
 
         r_data_count        <= 0;
         r_data_pos          <= 0;
@@ -439,14 +442,17 @@ always @ (posedge clk) begin
             if (r_buf_rdy == 2'b11) begin
               r_buf_sel                 <=  r_buf_next_sel;
               r_buf_next_sel            <=  ~r_buf_next_sel;  //Flip Flop the buffers
+              r_buf_rdy[r_buf_next_sel] <=  0;
             end
             else if (r_buf_rdy == 2'b01) begin
               r_buf_next_sel            <=  1;                //Next time if there is a choice send the other
               r_buf_sel                 <=  0;
+              r_buf_rdy[0]              <=  0;
             end
             else if (r_buf_rdy == 2'b10) begin
               r_buf_next_sel            <=  0;                //Next time if there is a choice send the other
               r_buf_sel                 <=  1;
+              r_buf_rdy[1]              <=  0;
             end
             state                       <=  WAIT_FOR_FPGA_EGRESS_FIFO;
           end
@@ -456,7 +462,6 @@ always @ (posedge clk) begin
         //Send data to the host
         if ((r_data_count >= o_data_size) || (r_block_count >= i_buffer_size)) begin
           //De-assert the buffers
-          r_buf_rdy[r_buf_sel]          <=  0;
           r_buf_done[r_buf_sel]         <=  1;
           r_buf_sel                     <=  0;
           //Let the host know that we updated the data and buffer status
@@ -559,7 +564,7 @@ always @ (posedge clk) begin
       end
     endcase
     if (i_update_buf_stb) begin
-      r_buf_rdy          <=  i_update_buf;
+      r_buf_rdy          <=  r_buf_rdy | i_update_buf;
     end
     if (i_cmd_rst_stb) begin
       r_sts_reset             <=  1;

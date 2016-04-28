@@ -10,11 +10,9 @@
     <testcase classname="test_dut" name="test_pcie_config_read_wait_for_ready" time="0.0">
       <skipped />
     </testcase>
-    <testcase classname="test_dut" name="test_pcie_read_two_block_command" time="0.0">
-      <skipped />
-    </testcase>
     <testcase classname="test_dut" name="test_write_pcie_register" time="0.0">
       <skipped />
     </testcase>
+    <testcase classname="test_dut" name="test_pcie_read_two_block_command" time="1.3172500133514404" />
   </testsuite>
 </testsuites>

@@ -34,7 +34,7 @@ typedef struct _nysa_pcie_dev_t
   //Data References
   size_t                  user_data_count;
   size_t                  user_data_pos;
-  char *                  user_data_buf;
+  char __user *           user_data_buf;
 
   //Data Fields
   unsigned char *         status_buffer;
@@ -79,6 +79,6 @@ nysa_pcie_dev_t * get_nysa_pcie_dev(int index);
 int write_register(nysa_pcie_dev_t * dev, unsigned int address, unsigned int value);
 int write_command(nysa_pcie_dev_t * pdev, unsigned int command, unsigned int device_address, unsigned int value);
 
-ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char * user_buf, size_t count);
+ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, void __user * user_buf, size_t count);
 
 #endif //__PCIE_CTRL_H__

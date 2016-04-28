@@ -136,11 +136,12 @@ ssize_t nysa_pcie_write(struct file *filp, const char *buf, size_t count, loff_t
   return retval;
 }
 
-ssize_t nysa_pcie_read(struct file *filp, char * buf, size_t count, loff_t *f_pos)
+ssize_t nysa_pcie_read(struct file *filp, char __user * buf, size_t count, loff_t *f_pos)
 {
   
   nysa_pcie_dev_t *dev;
   dev = filp->private_data;
+  mod_info_dbg("Buffer Pointer: %p\n", buf);
   return nysa_pcie_read_data(dev, buf, count);
 }
 

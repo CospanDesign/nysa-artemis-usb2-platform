@@ -274,7 +274,7 @@ void update_buffer_status(nysa_pcie_dev_t *dev, unsigned int buffer_status)
   write_register(dev, HDR_BUFFER_READY, buffer_status);
 }
 
-ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char * user_buf, size_t count)
+ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, void __user * user_buf, size_t count)
 {
   int retval = 0;
 
@@ -293,50 +293,45 @@ ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char * user_buf, size_t count)
   update_buffer_status(dev, 0x3); //bitmask of both buffers ready
   mod_info_dbg("Wait for read transaction to be finished\n");
   //wait_for_completion(&dev->read_complete);
-  //retval = wait_for_completion_interruptible(&dev->read_complete);
-  mod_info_dbg("Bypassed completion just to make sure things work!\n");
-  return retval;
+  retval = wait_for_completion_interruptible(&dev->read_complete);
+  //mod_info_dbg("Bypassed completion just to make sure things work!\n");
+  return count;
 }
 
 void process_read_data(nysa_pcie_dev_t *dev, int buffer_index, unsigned int pos, bool done)
 {
+  int retval = 0;
   int i;
   unsigned int size;
+  //void * to_buf;
+  void * from_buf;
 
 
   size = NYSA_PCIE_BUFFER_SIZE;
-  if ((pos + size) > dev->user_data_count)
+  if (size > dev->user_data_count)
   {
-    size = dev->user_data_count - pos;
+    size = dev->user_data_count;
   }
-
-
-  dma_sync_single_for_cpu(&dev->pdev->dev, dev->read_dma_addr[1], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-  for (i = 0; i < 8; i ++)
-  {
-    mod_info_dbg("[0x%02X]: 0x%08X\n", i, dev->read_buffer[1][i]);
-  }
-  dev->read_buffer[1][0] = 0x04;
-  dev->read_buffer[1][1] = 0x05;
-  dma_sync_single_for_device(&dev->pdev->dev, dev->read_dma_addr[1], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-
-
-
+  //to_buf = &dev->user_data_buf[pos];
+  from_buf = dev->read_buffer[buffer_index];
 
   mod_info_dbg("Index: %d\n", buffer_index);
   mod_info_dbg("Copy over %d bytes from %p to user buffer at offset 0x%08X\n", size, dev->read_buffer[buffer_index], pos);
   dma_sync_single_for_cpu(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-  mod_info_dbg("Fourth Byte: 0x%02X\n", dev->read_buffer[buffer_index][4]);
-  copy_to_user(&dev->user_data_buf[pos], dev->read_buffer[buffer_index], size);
-  dev->read_buffer[buffer_index][4] = 0xA1;
-  mod_info_dbg("Fourth Byte: 0x%02X\n", dev->read_buffer[buffer_index][4]);
+
+
+  //mod_info_dbg("Buffer Pointer: %p\n", to_buf);
+  mod_info_dbg("Buffer Pointer: %p\n", dev->user_data_buf);
+
+  //retval = copy_to_user(to_buf, from_buf, size);
+  retval = copy_to_user(dev->user_data_buf, from_buf, size);
+  mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
+  //memcpy(to_buf, from_buf, size);
   for (i = 0x000; i < 0x20; i++)
   {
     mod_info_dbg("[0x%02X]: 0x%02X\n", i, dev->read_buffer[buffer_index][i]);
   }
   dma_sync_single_for_device(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-
-
 
   dev->user_data_count += size;
   if (done)
@@ -366,7 +361,6 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
   //Get reference to nysa_pcie_dev
   dev = &nysa_pcie_devs[index];
   mod_info_dbg("Got Device\n");
-
 
   //----------------------------
   // Configure PCIE
@@ -477,7 +471,7 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
   }
   for (i = 0; i < WRITE_BUFFER_COUNT; i++)
   {
-    dev->write_dma_addr[i] = pci_map_single(pdev, &dev->write_buffer[i], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_TODEVICE);
+    dev->write_dma_addr[i] = pci_map_single(pdev, dev->write_buffer[i], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_TODEVICE);
     mod_info_dbg("Write Buf [%d] Addr: %p : DMA Buf Addr : %p\n", i, dev->write_buffer[i], (void *) dev->write_dma_addr[i]);
     if (0 == dev->write_dma_addr[i])
     {
@@ -499,7 +493,7 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
   }
   for (i = 0; i < READ_BUFFER_COUNT; i++)
   {
-    dev->read_dma_addr[i] = pci_map_single(pdev, &dev->read_buffer[i], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
+    dev->read_dma_addr[i] = pci_map_single(pdev, dev->read_buffer[i], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
     mod_info_dbg("Read Buf [%d] Addr: %p : DMA Buf Addr : %p\n", i, dev->read_buffer[i], (void *) dev->read_dma_addr[i]);
     if (0 == dev->read_dma_addr[i])
     {
@@ -778,8 +772,7 @@ static void workqueue_reader(struct work_struct *wk)
     mod_info("\t0x%08X\n", dev->config_space[i]);
   }
 
-
-  //process_read_data(dev, buf_work->index, buf_work->pos, buf_work->done);
+  process_read_data(dev, buf_work->index, buf_work->pos, buf_work->done);
   /*
   if (!completion_done(&dev->read_complete))
   {

@@ -179,6 +179,7 @@ reg                         r_sts_done;
 reg   [31:0]                r_data_count;
 reg   [31:0]                r_data_pos;
 reg   [23:0]                r_block_count;
+reg   [23:0]                r_fifo_size;
 
 wire                        w_control_sm_idle;
 wire                        w_config_sm_idle;
@@ -357,6 +358,7 @@ always @ (posedge clk) begin
 
     r_buf_sel           <=  0;
     r_buf_next_sel      <=  0;
+    r_fifo_size         <=  0;
 
   end
   else begin
@@ -472,6 +474,7 @@ always @ (posedge clk) begin
           state                         <=  SEND_EGRESS_STATUS_SLEEP;
         end
         else if (i_e_fifo_rdy) begin
+          r_fifo_size                   <=  i_e_fifo_size;
           r_tlp_address                 <=  read_buf_map[r_buf_sel] + r_block_count;
           state                         <=  SEND_EGRESS_DATA;
         end
@@ -482,8 +485,8 @@ always @ (posedge clk) begin
         r_send_data_en                  <=  1;
         if (i_egress_finished) begin
           //Add the amount we sent through the egress FIFO to our data count
-          r_block_count                 <=  r_block_count + i_e_fifo_size;
-          r_data_count                  <=  r_data_count + i_e_fifo_size;
+          r_block_count                 <=  r_block_count + (r_fifo_size << 2);
+          r_data_count                  <=  r_data_count  + (r_fifo_size << 2);
           state                         <=  WAIT_FOR_FPGA_EGRESS_FIFO;
         end
       end
@@ -499,9 +502,6 @@ always @ (posedge clk) begin
           state                         <=  EGRESS_DATA_FLOW;
         end
       end
-
-
-
 
 
 

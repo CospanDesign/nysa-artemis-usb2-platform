@@ -105,6 +105,7 @@ void PCIE::write_command(unsigned int address, unsigned int value, unsigned int 
 
 ssize_t PCIE::read_periph_data(unsigned int address, unsigned char *buf, unsigned int count)
 {
+  //FPGA Speaks in 32-bit values so when asking for a size, make sure to specify the size in dwords
 	write_command(PERIPHERAL_READ, count, address);
-	return read(fn, buf, count);	
+	return read(fn, buf, count);
 }

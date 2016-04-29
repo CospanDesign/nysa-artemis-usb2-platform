@@ -21,8 +21,9 @@ install: instrules
 rmrules:
 	sudo rm /etc/udev/rules.d/${RULES_FILE}
 
-remove: rmrules
+remove:
 	make -C $(MODULEDIR) remove
+	sudo rm /etc/udev/rules.d/${RULES_FILE}
 
 clean:
 	make -C $(MODULEDIR) clean

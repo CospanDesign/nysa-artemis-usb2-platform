@@ -189,10 +189,17 @@ class Test (unittest.TestCase):
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
         #self.driver.reset_debug_flags()
-        self.driver.send_block_from_local_buffer()
-        self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
-        print ""
-        self.driver.read_debug_flags()
+        #self.driver.send_block_from_local_buffer()
+        #self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
+        #print ""
+        #self.driver.read_debug_flags()
+        #
+
+        for i in range (128):
+            self.driver.send_block_from_local_buffer()
+            self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
+            print ""
+            self.driver.read_debug_flags()
 
 if __name__ == "__main__":
     unittest.main()

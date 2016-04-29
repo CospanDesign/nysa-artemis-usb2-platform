@@ -9,7 +9,9 @@
 #include <linux/fs.h>
 #include <linux/sysfs.h>
 #include <linux/ioport.h>
-#include <linux/workqueue.h>
+#include <linux/semaphore.h>
+#include <linux/kfifo.h>
+#include <linux/sched.h>
 #include <linux/uaccess.h>
 
 #include "nysa_pcie.h"
@@ -61,8 +63,6 @@
 #define STATUS_BIT_DONE           14
 #define STATUS_BIT_CMD_ERR        15
 
-
-
 //Keep a list of devices
 static struct class * pci_class;
 static nysa_pcie_dev_t *nysa_pcie_devs;
@@ -90,7 +90,6 @@ enum MSI_ISR
 // Function Prototypes
 //-----------------------------------------------------------------------------
 irqreturn_t msi_isr(int irq, void *data);
-static void workqueue_reader(struct work_struct *wk);
 
 //-----------------------------------------------------------------------------
 // SYSFS Interface
@@ -116,10 +115,6 @@ static ssize_t test_nysa_store(struct device *dev, struct device_attribute *attr
   d = pci_get_drvdata(pdev);
 	if (sscanf(buf, "%d", &d->test) == 1)
   {
-    if (!completion_done(&d->read_complete))
-    {
-      complete(&d->read_complete);
-    }
     retval = strlen(buf);
   }
   return retval;
@@ -185,7 +180,9 @@ int construct_pcie_ctr(int dev_count)
   mod_info_dbg("Creating space for %d devices\n", nysa_pcie_dev_count);
   for (i = 0; i < nysa_pcie_dev_count; i++)
   {
-    nysa_pcie_devs[i].initialized = false;
+    nysa_pcie_devs[i].state = NOT_INITIALIZED;
+    nysa_pcie_devs[i].index = i;
+    //nysa_pcie_devs[i].initialized = false;
   }
   //Success!
   return retval;
@@ -274,71 +271,72 @@ void update_buffer_status(nysa_pcie_dev_t *dev, unsigned int buffer_status)
   write_register(dev, HDR_BUFFER_READY, buffer_status);
 }
 
-ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, void __user * user_buf, size_t count)
+ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char __user * user_buf, size_t count)
 {
   int retval = 0;
+  int pos = 0;
+  int size = 0;
+  unsigned char buffer_index = 0;
 
-  //If a previous read happened we need to reset the complete flag
-  if (completion_done(&dev->read_complete))
+  //Clear out the KFIFO
+  while (!kfifo_is_empty(&dev->read_fifo))
   {
-    reinit_completion(&dev->read_complete);
+    kfifo_get(&dev->read_fifo, &buffer_index);
   }
 
-  //Set up the structure with amount of data to read from the device
-  dev->user_data_count = count;
-  //Give a reference to the buffer to the structure
-  dev->user_data_buf = user_buf;
+  //Take two of the semaphors
+  down_trylock(&dev->read_semaphore);
+  down_trylock(&dev->read_semaphore);
 
   //Update the buffer status on the FPGA so that it knows it can write to both the buffers
   update_buffer_status(dev, 0x3); //bitmask of both buffers ready
-  mod_info_dbg("Wait for read transaction to be finished\n");
-  //wait_for_completion(&dev->read_complete);
-  retval = wait_for_completion_interruptible(&dev->read_complete);
-  //mod_info_dbg("Bypassed completion just to make sure things work!\n");
+
+  //There should be a count of zero on the semaphore, when the interrupt context reads a packet it should call this
+  //There should also be information within the kfifo
+
+  while (pos < count)
+  {
+    mod_info_dbg("Wait for read transaction to be finished\n");
+    if (down_interruptible(&dev->read_semaphore))
+    {
+      mod_info_dbg("Received an interrupt while waiting for data\n");
+      return pos;  //We were interrupted
+    }
+    if (dev->state != RUNNING)
+    {
+      //Need to bail, things just got shut down
+      mod_info_dbg("Module was destroyed while reading\n");
+      return pos;
+    }
+    if (kfifo_get(&dev->read_fifo, &buffer_index) == 0)
+    {
+      //There was no data in the KFIFO, this is bad, run RUN!
+      mod_info_dbg("A semaphore woke us up but there was no data in KFIFO!?\n");
+      return pos;
+    }
+
+    //Process the data
+    size = NYSA_PCIE_BUFFER_SIZE;
+    if (size > (count - pos)) {
+      size = count - pos;
+    }
+    mod_info_dbg("Copy over %d bytes from buffer %d to user buffer at offset 0x%08X\n", size, buffer_index, pos);
+    dma_sync_single_for_cpu(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
+    retval = copy_to_user(&user_buf[pos], dev->read_buffer[buffer_index], size);
+    dma_sync_single_for_device(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
+    mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
+    pos += size;
+    if (buffer_index == 0)
+    {
+        update_buffer_status(dev, 0x01);
+    }
+    else
+    {
+        update_buffer_status(dev, 0x02);
+    }
+  }
+  mod_info_dbg("Finished!\n");
   return count;
-}
-
-void process_read_data(nysa_pcie_dev_t *dev, int buffer_index, unsigned int pos, bool done)
-{
-  int retval = 0;
-  int i;
-  unsigned int size;
-  //void * to_buf;
-  void * from_buf;
-
-
-  size = NYSA_PCIE_BUFFER_SIZE;
-  if (size > dev->user_data_count)
-  {
-    size = dev->user_data_count;
-  }
-  //to_buf = &dev->user_data_buf[pos];
-  from_buf = dev->read_buffer[buffer_index];
-
-  mod_info_dbg("Index: %d\n", buffer_index);
-  mod_info_dbg("Copy over %d bytes from %p to user buffer at offset 0x%08X\n", size, dev->read_buffer[buffer_index], pos);
-  dma_sync_single_for_cpu(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-
-
-  //mod_info_dbg("Buffer Pointer: %p\n", to_buf);
-  mod_info_dbg("Buffer Pointer: %p\n", dev->user_data_buf);
-
-  //retval = copy_to_user(to_buf, from_buf, size);
-  retval = copy_to_user(dev->user_data_buf, from_buf, size);
-  mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
-  //memcpy(to_buf, from_buf, size);
-  for (i = 0x000; i < 0x20; i++)
-  {
-    mod_info_dbg("[0x%02X]: 0x%02X\n", i, dev->read_buffer[buffer_index][i]);
-  }
-  dma_sync_single_for_device(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-
-  dev->user_data_count += size;
-  if (done)
-  {
-    mod_info_dbg("Finished sending data\n");
-    complete(&dev->read_complete);
-  }
 }
 
 //Device
@@ -506,21 +504,30 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
   write_register(dev, HDR_READ_BUF_B_ADDR,  (u32) dev->read_dma_addr[1]);
   write_register(dev, HDR_BUFFER_SIZE,      (u32) NYSA_PCIE_BUFFER_SIZE);
 
-/*
-  device = device_create( pci_class,
-                          NULL,          // no parent device
-                          devno,
-                          pdev,          // no additional data
-                          MODULE_NAME "%d",
-                          index);
-*/
-  device = device_create_with_groups (pci_class,          // Parent Class
-                                      NULL,               // No Parent Device
-                                      devno,              // Major/Minor Number
-                                      pdev,               // Our Data
-                                      //&attr_group,      // Attribute Group
-                                      nysa_pcie_groups,   // Attribute Group
+  device = device_create_with_groups (pci_class,                 // Parent Class
+                                      NULL,                      // No Parent Device
+                                      devno,                     // Major/Minor Number
+                                      pdev,                      // Our Data
+                                      nysa_pcie_groups,          // Attribute Group
                                       MODULE_NAME "%d", index);  // Format
+
+
+  //Initialized the Semaphore
+  sema_init(&dev->read_semaphore, READ_BUFFER_COUNT);
+  //Allocate a buffer for the KFIFO
+  if ((retval = kfifo_alloc(&dev->read_fifo, READ_BUFFER_COUNT, GFP_KERNEL)) != 0)
+  {
+    mod_info_dbg("Error while trying to create a kfifo: %d\n", retval);
+    goto fail_kfifo_alloc;
+  }
+
+  for (i = 0; i < READ_BUFFER_COUNT; i++)
+  {
+    dev->read_fifo_item[i].buf_index = i;
+    dev->read_fifo_item[i].waiting = false;
+    dev->read_fifo_item[i].done = false;
+    atomic_set(&dev->read_fifo_item[i].kill, 0);
+  }
 
 
   if (IS_ERR(device))
@@ -529,36 +536,19 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
     mod_info_dbg("Error %d while trying to create %s%d\n", retval, MODULE_NAME, index);
     goto fail_reset_device;
   }
-  mod_info_dbg("Create work queue structures\n");
-  //dev->workqueue = create_singlethread_workqueue("NPD_Reader");
-  dev->workqueue = alloc_workqueue("NPD_Reader", WQ_UNBOUND, 2);
-  if (dev->workqueue == NULL)
-  {
-    mod_info_dbg("Failed to create workqueue\n");
-    goto fail_workqueue;
-  }
-
-  for (i = 0; i < NUM_BUFFERS; i++)
-  {
-    dev->buf_work[i].index = i;
-    dev->buf_work[i].pos = 0x00;
-    dev->buf_work[i].done = false;
-    dev->buf_work[i].dev = dev;
-    INIT_WORK(&dev->buf_work[i].work, &workqueue_reader);
-
-  }
-  init_completion(&dev->read_complete);
+//  init_completion(&dev->read_complete);
 
   dev->pdev = pdev;
   pci_set_drvdata(pdev, dev);
-  dev->initialized = true;
+  //dev->initialized = true;
+  dev->state = RUNNING;
   return SUCCESS;
 
-//Handle Failures
-fail_workqueue:
-  destroy_workqueue(dev->workqueue);
 
+//Handle Failures
 fail_reset_device:
+  kfifo_free(&dev->read_fifo);
+fail_kfifo_alloc:
   fail_index = READ_BUFFER_COUNT;
 fail_read_dma_map:
   for (i = 0; i < fail_index; i++)
@@ -612,11 +602,15 @@ void destroy_pcie_device(struct pci_dev *pdev)
   int i = 0;
   int index = 0;
   nysa_pcie_dev_t *dev = NULL;
+
+
+
   dev = pci_get_drvdata(pdev);
-  if (!dev->initialized)
+  //if (!dev->initialized)
+  if (dev->state == NOT_INITIALIZED)
   {
     //Nothing to do, we are not initialized
-    mod_info_dbg("Device is not initialized, do not clean up\n");
+    mod_info_dbg("Device %d is not initialized, do not clean up\n", dev->index);
     return;
   }
 
@@ -626,15 +620,25 @@ void destroy_pcie_device(struct pci_dev *pdev)
   device_destroy(pci_class, MKDEV(major_num, index));
   mod_info_dbg("Device: %d Clean up DMA\n", index);
 
-  mod_info_dbg("Cancelling all work queue items\n");
-  for (i =0; i < NUM_BUFFERS; i++)
-  {
-    mod_info_dbg("Flush workqueue item: %d\n", i);
-    flush_work(&dev->buf_work[i].work);
-  }
-  destroy_workqueue(dev->workqueue);
-  mod_info_dbg("Workqueue destroyed\n");
 
+
+  for (i = 0; i < READ_BUFFER_COUNT; i++)
+  {
+    //Tell the calling function that we are going to end
+
+    atomic_set(&dev->read_fifo_item[i].kill, 1);
+  }
+  dev->state = DESTROY;
+  //Make sure there are no waiting items
+  up(&dev->read_semaphore);
+  //Just in case the read process is waiting for a semaphore, allow it to wake up and finish
+  schedule();
+
+
+
+
+
+  kfifo_free(&dev->read_fifo);
   /*
   if (!completion_done(&dev->read_complete))
   {
@@ -689,7 +693,8 @@ void destroy_pcie_device(struct pci_dev *pdev)
   kfree(dev->status_buffer);
   dev->status_buffer = NULL;
   dev->pdev = NULL;
-  dev->initialized = false;
+  //dev->initialized = false;
+  dev->state = NOT_INITIALIZED;
   mod_info_dbg("Device: %d destroyed\n", index);
   return;
 }
@@ -701,10 +706,11 @@ void destroy_pcie_device(struct pci_dev *pdev)
 irqreturn_t msi_isr(int irq, void *data)
 {
   int i;
+  int buf_index = 0;
   struct pci_dev * pdev;
   nysa_pcie_dev_t *dev;
 
-  //mod_info_dbg("Entered Interrupt: ISR #: %d\n", irq);
+  mod_info_dbg("Entered Interrupt\n");
   pdev = (struct pci_dev *) data;
   dev = pci_get_drvdata(pdev);
   //Read the configuration data
@@ -719,42 +725,30 @@ irqreturn_t msi_isr(int irq, void *data)
     ///mod_info("\t0x%08X\n", dev->config_space[i]);
   }
 
-  //mod_info_dbg("Temporarily disable work queues to debug communication\n");
-  //mod_info_dbg("Device Status: 0x%08X\n", dev->config_space[STS_DEV_STATUS]);
+  mod_info_dbg("Device Status: 0x%08X\n", dev->config_space[STS_DEV_STATUS]);
   if (dev->config_space[STS_BUF_RDY] > 0)
   {
+    mod_info_dbg("Buffer Ready Status: 0x%02X\n", dev->config_space[STS_BUF_RDY]);
     if (dev->config_space[STS_BUF_RDY] & 0x01)
-    {
-      dev->buf_work[0].done = (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_DONE));
-      dev->buf_work[0].pos = dev->config_space[STS_BUF_POS];
-      queue_work(dev->workqueue, &dev->buf_work[0].work);
-    }
-    else
-    {
-      dev->buf_work[1].done = (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_DONE));
-      dev->buf_work[1].pos = dev->config_space[STS_BUF_POS];
-      queue_work(dev->workqueue, &dev->buf_work[1].work);
-    }
-  }
-/*
-  dma_sync_single_for_cpu(&pdev->dev, dev->read_dma_addr[0], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-  for (i = 0x000; i < 0x20; i++)
-  {
-    mod_info_dbg("[0x%02X]: 0x%02X\n", i, dev->read_buffer[0][i]);
-  }
+      buf_index = 0;
 
-  dma_sync_single_for_device(&pdev->dev, dev->read_dma_addr[0], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-  if (!completion_done(&dev->read_complete))
-  {
-    complete(&dev->read_complete);
+    else
+      buf_index = 1;
+
+    dev->read_fifo_item[buf_index].pos = (dev->config_space[STS_BUF_POS] << 2);
+    dev->read_fifo_item[buf_index].done = (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_DONE));
+    kfifo_put(&dev->read_fifo, buf_index);
+    //Give back the semaphore
+    up(&dev->read_semaphore);
+
   }
-*/
   return IRQ_HANDLED;
 }
 
 //-----------------------------------------------------------------------------
 // Work Queue Function
 //-----------------------------------------------------------------------------
+/*
 static void workqueue_reader(struct work_struct *wk)
 {
   int i;
@@ -773,12 +767,7 @@ static void workqueue_reader(struct work_struct *wk)
   }
 
   process_read_data(dev, buf_work->index, buf_work->pos, buf_work->done);
-  /*
-  if (!completion_done(&dev->read_complete))
-  {
-    complete(&dev->read_complete);
-  }
-  */
   return;
 }
+*/
 

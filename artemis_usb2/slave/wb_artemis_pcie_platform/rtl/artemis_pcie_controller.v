@@ -389,8 +389,8 @@ wire                        w_dat_fifo_sel;
 /****************************************************************************
  * Interrupt State Machine Signals
  ****************************************************************************/
-//pcie_axi_bridge pcie_interface
-sim_pcie_axi_bridge pcie_interface
+pcie_axi_bridge pcie_interface
+//sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface

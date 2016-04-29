@@ -4,7 +4,8 @@
 
 #include <linux/cdev.h>
 #include <linux/pci.h>
-#include <linux/workqueue.h>
+#include <linux/kfifo.h>
+#include <linux/semaphore.h>
 
 
 //The total number of items in the configuration registers
@@ -12,29 +13,35 @@
 #define CMD_OFFSET            0x080
 #define NUM_BUFFERS           2
 
+typedef enum
+{
+  NOT_INITIALIZED = 0,
+  RUNNING,
+  DESTROY
+} nysa_pcie_states_t;
+
+
 struct _nysa_pcie_dev_t;
 
 typedef struct
 {
-  struct work_struct work;
-  unsigned int index;
+  unsigned int buf_index;
   unsigned int pos;
+  bool waiting;
   bool done;
-  struct _nysa_pcie_dev_t * dev;
-} buffer_work_t;
+  atomic_t kill;
+} read_fifo_item_t;
+
 
 typedef struct _nysa_pcie_dev_t
 {
-  bool                    initialized;
+  //bool                    initialized;
   unsigned int            buffer_size;
   unsigned int            bar_addr;                 //BAR 0 Physical Address
   unsigned int            bar_len;                  //Length of BAR 0
   void *                  virt_addr;                //Virtual Address of BAR0 Memory
 
-  //Data References
-  size_t                  user_data_count;
-  size_t                  user_data_pos;
-  char __user *           user_data_buf;
+  nysa_pcie_states_t      state;
 
   //Data Fields
   unsigned char *         status_buffer;
@@ -51,10 +58,16 @@ typedef struct _nysa_pcie_dev_t
   struct pci_dev          *pdev;                    //PCI Driver
   void *                  private_data;
   struct cdev             cdev;
-  struct completion       read_complete;            //Used to block user applications when reading
+//  struct completion       read_complete;            //Used to block user applications when reading
 
-  struct workqueue_struct *workqueue;
-  buffer_work_t           buf_work[NUM_BUFFERS];
+//  struct workqueue_struct *workqueue;
+//  buffer_work_t           buf_work[NUM_BUFFERS];
+
+  struct semaphore        read_semaphore;
+  
+  struct kfifo            read_fifo;
+  read_fifo_item_t        read_fifo_item[READ_BUFFER_COUNT];
+  
 
   //Sys Fs Fields
 	int									    test;                     //XXX: Just for demo
@@ -79,6 +92,6 @@ nysa_pcie_dev_t * get_nysa_pcie_dev(int index);
 int write_register(nysa_pcie_dev_t * dev, unsigned int address, unsigned int value);
 int write_command(nysa_pcie_dev_t * pdev, unsigned int command, unsigned int device_address, unsigned int value);
 
-ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, void __user * user_buf, size_t count);
+ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char __user * user_buf, size_t count);
 
 #endif //__PCIE_CTRL_H__

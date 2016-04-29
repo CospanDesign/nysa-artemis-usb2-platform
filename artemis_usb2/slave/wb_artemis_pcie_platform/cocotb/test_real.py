@@ -193,9 +193,8 @@ class Test (unittest.TestCase):
         #self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
         #print ""
         #self.driver.read_debug_flags()
-        #
 
-        for i in range (128):
+        for i in range (64):
             self.driver.send_block_from_local_buffer()
             self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
             print ""

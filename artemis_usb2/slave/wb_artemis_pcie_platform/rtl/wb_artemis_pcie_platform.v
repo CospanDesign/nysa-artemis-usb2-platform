@@ -129,7 +129,7 @@ SOFTWARE.
 
 
 module wb_artemis_pcie_platform #(
-  parameter           DATA_FIFO_DEPTH = 5
+  parameter           DATA_FIFO_DEPTH = 6
 ) (
   input               clk,
   input               rst,

@@ -8,8 +8,8 @@ PYTHONPATH := ./model:$(PYTHONPATH)
 export PYTHONPATH
 export PYTHONHOME=$(shell python -c "from distutils.sysconfig import get_config_var; print(get_config_var('prefix'))")
 
-EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION -Wall
-#EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION
+#EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION -Wall
+EXTRA_ARGS+=-I$(TOPDIR)/rtl/ -I$(TOPDIR)/sim/ -I$(NYSA)/verilog/ -DSIMULATION
 
 #Dependencies
 VERILOG_SOURCES = $(NYSA)/verilog/wishbone/master/wishbone_master.v
@@ -31,6 +31,9 @@ VERILOG_SOURCES += ${TOPDIR}/rtl/config_parser.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_control.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_egress.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/pcie_ingress.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/credit_manager.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/ingress_buffer_manager.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/buffer_builder.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_controller.v
 
 

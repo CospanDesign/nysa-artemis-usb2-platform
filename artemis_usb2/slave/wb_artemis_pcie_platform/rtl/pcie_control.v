@@ -30,7 +30,10 @@ SOFTWARE.
 `include "pcie_defines.v"
 `include "nysa_pcie_defines.v"
 
-module pcie_control(
+module pcie_control #(
+  parameter                 MAX_REQUEST_PAYLOAD_SIZE  = 2048,
+  parameter                 MAX_TAG_CNT               = 4
+)(
   input                     clk,
   input                     rst,
 
@@ -89,8 +92,6 @@ module pcie_control(
   output  reg               o_data_write_flg,
 
   //Flow Controller
-  input                     i_pcie_fc_ready,
-
   //Peripheral/Memory/DMA Egress FIFO Interface
   input                     i_e_fifo_rdy,
   input       [23:0]        i_e_fifo_size,
@@ -115,6 +116,21 @@ module pcie_control(
   input                     i_egress_fifo_stb,
   output      [31:0]        o_egress_fifo_data,
 
+  //Flow Control Interface
+  input                     i_fc_ready,
+  output  reg               o_fc_cmt_stb,
+
+  //Ingress Buffer Interface
+  input                     i_ibm_buf_fin_stb,    // ingress buffer manager (Buffer Finished Strobe)
+  input       [1:0]         i_ibm_buf_fin,        // ingress buffer manager (Buffer Finished)
+  output  reg               o_ibm_en,             // ingress buffer manager (Enable Buffer Manager)
+  output  reg               o_ibm_req_stb,        // ingress buffer manager (Request Buffer Strobe)
+  input       [7:0]         i_ibm_tag,            // ingress buffer manager (Tag to use)
+  input                     i_ibm_tag_rdy,        // ingress buffer manager (Tag is ready)
+  input       [9:0]         i_ibm_dword_cnt,      // ingress buffer manager (Dword Count)
+
+  output  reg [9:0]         o_dword_req_cnt,
+
   output                    o_sys_rst,
   output  reg [7:0]         o_cfg_read_exec,
   output      [3:0]         o_cfg_sm_state,
@@ -130,17 +146,17 @@ localparam      EGRESS_DATA_FLOW              = 4'h1;
 localparam      WAIT_FOR_HOST_EGRESS_BUFFER   = 4'h2;
 localparam      WAIT_FOR_FPGA_EGRESS_FIFO     = 4'h3;
 localparam      SEND_EGRESS_DATA              = 4'h4;
-localparam      INGRESS_DATA_FLOW             = 4'h5;
-localparam      WAIT_FOR_FPGA_INGRESS_FIFO    = 4'h6;
-localparam      WAIT_FOR_HOST_INGRESS_BUFFER  = 4'h7;
-localparam      WAIT_FOR_FLOW_CONTROL         = 4'h8;
-localparam      SEND_INGRESS_DATA             = 4'h9;
-localparam      SEND_EGRESS_STATUS_SLEEP      = 4'hA;
-localparam      SEND_EGRESS_STATUS            = 4'hB;
-
-localparam      SEND_CONFIG                   = 4'hC;
-localparam      SEND_CONFIG_SLEEP             = 4'hD;
-localparam      WAIT_FOR_CONFIG               = 4'hE;
+localparam      SEND_EGRESS_STATUS_SLEEP      = 4'h5;
+localparam      SEND_EGRESS_STATUS            = 4'h6;
+localparam      INGRESS_DATA_FLOW             = 4'h7;
+localparam      WAIT_FOR_HOST_INGRESS_BUFFER  = 4'h8;
+localparam      WAIT_FOR_FLOW_CONTROL         = 4'h9;
+localparam      SEND_INGRESS_DATA             = 4'hA;
+localparam      SEND_INGRESS_STATUS_SLEEP     = 4'hB;
+localparam      SEND_INGRESS_STATUS           = 4'hC;
+localparam      SEND_CONFIG                   = 4'hD;
+localparam      SEND_CONFIG_SLEEP             = 4'hE;
+localparam      WAIT_FOR_CONFIG               = 4'hF;
 
 
 localparam      PREPARE                       = 4'h1;
@@ -305,18 +321,18 @@ assign  o_sm_state                          = state;
 assign  w_sts_ready                         = (state == IDLE);
 assign  w_sts_hst_buf_stall                 = (state == WAIT_FOR_HOST_EGRESS_BUFFER)  ||
                                               (state == WAIT_FOR_HOST_INGRESS_BUFFER);
-assign  w_sts_flg_fifo_stall                = (state == WAIT_FOR_FPGA_EGRESS_FIFO)    ||
-                                              (state == WAIT_FOR_FPGA_INGRESS_FIFO);
+assign  w_sts_flg_fifo_stall                = (state == WAIT_FOR_FPGA_EGRESS_FIFO);
 
 
-assign  w_control_sm_idle                   = (state == IDLE)                     ||
-                                              (state == EGRESS_DATA_FLOW)         ||
-                                              (state == INGRESS_DATA_FLOW)        ||
-                                              (state == SEND_CONFIG)              ||
-                                              (state == SEND_CONFIG_SLEEP)        ||
-                                              (state == WAIT_FOR_CONFIG)          ||
-                                              (state == SEND_EGRESS_STATUS_SLEEP) ||
-                                              (state == SEND_EGRESS_STATUS);
+assign  w_control_sm_idle                   = (state == IDLE)                         ||
+                                              (state == EGRESS_DATA_FLOW)             ||
+                                              (state == INGRESS_DATA_FLOW)            ||
+                                              (state == SEND_CONFIG)                  ||
+                                              (state == SEND_CONFIG_SLEEP)            ||
+                                              (state == WAIT_FOR_CONFIG)              ||
+                                              (state == SEND_EGRESS_STATUS_SLEEP)     ||
+                                              (state == SEND_EGRESS_STATUS)           ||
+                                              (state == WAIT_FOR_HOST_INGRESS_BUFFER);
 
 assign  w_config_sm_idle                    = (cfg_state == IDLE)           ||
                                               (cfg_state == PREPARE);
@@ -327,6 +343,9 @@ assign  w_valid_bus_select                  = (i_cmd_flg_sel_periph || i_cmd_flg
 always @ (posedge clk) begin
   r_send_cfg_stb        <=  0;
   r_send_data_en        <=  0;
+  o_fc_cmt_stb          <=  0;
+
+  o_ibm_req_stb         <=  0;
 
   if (rst || i_cmd_rst_stb) begin
     state               <=  IDLE;
@@ -360,10 +379,15 @@ always @ (posedge clk) begin
     r_buf_next_sel      <=  0;
     r_fifo_size         <=  0;
 
+    o_dword_req_cnt     <=  0;
+
+    o_ibm_en            <=  0;
+
   end
   else begin
     case (state)
       IDLE: begin
+        o_ibm_en            <= 0;
         o_data_write_flg    <= 0;
         o_data_read_flg     <= 0;
         o_data_fifo_flg     <= 0;
@@ -505,40 +529,63 @@ always @ (posedge clk) begin
 
 
 
-
       //Ingress Flow
       INGRESS_DATA_FLOW: begin
+        o_ibm_en                        <=  0;
         r_tlp_command                   <=  `PCIE_MRD_32B;
         r_tlp_flags                     <=  (`FLAG_NORMAL);
+        o_dword_req_cnt                 <=  MAX_REQUEST_PAYLOAD_SIZE;
         if (r_data_count < o_data_size) begin
           //More data to send
+          state                         <=  WAIT_FOR_HOST_INGRESS_BUFFER;
         end
         else begin
-          r_sts_done          <=  1;
-          state               <=  SEND_CONFIG;
+          r_sts_done                    <=  1;
+          state                         <=  SEND_CONFIG;
         end
       end
-      WAIT_FOR_FPGA_INGRESS_FIFO: begin
-      end
       WAIT_FOR_HOST_INGRESS_BUFFER: begin
+        //This means both the host is ready and all the data in the incomming FIFO has been read out
+        //Buffer Controller Is good
+        //Host has populated a buffer
+        if (i_ibm_tag_rdy) begin
+          r_tlp_tag                     <=  i_ibm_tag;
+          o_dword_req_cnt               <=  i_ibm_dword_cnt;
+          o_ibm_req_stb                 <=  1;
+          state                         <=  WAIT_FOR_FLOW_CONTROL;
+        end
+        else if (r_buf_rdy > 0) begin
+          state                         <=  SEND_INGRESS_STATUS_SLEEP;
+          r_send_cfg_stb                <=  1;
+        end
       end
       WAIT_FOR_FLOW_CONTROL: begin
         //Config State Machine Idle
-        if (w_config_sm_idle) begin
-          state               <=  SEND_INGRESS_DATA;
+        if (w_config_sm_idle && i_fc_ready) begin
+          o_fc_cmt_stb                  <= 1;
+          state                         <= SEND_INGRESS_DATA;
         end
       end
       SEND_INGRESS_DATA: begin
         //At the end of a block send, send the updated buffer status to the host
         // go back to the 'Ingress data flow' to figure out if we need to read mroe data
-        r_send_data_en        <=  1;
+        r_send_data_en                  <= 1;
         if (i_egress_finished) begin
-          r_data_count        <= r_data_count + 
-          r_tlp_tag           <= r_tlp_tag + 1;
+          r_data_count                  <= r_data_count + o_dword_req_cnt;
+          state                         <= INGRESS_DATA_FLOW;
         end
       end
-
-
+      SEND_INGRESS_STATUS_SLEEP: begin
+        if (cfg_state != IDLE) begin
+          state                         <= SEND_INGRESS_STATUS;
+        end
+      end
+      SEND_INGRESS_STATUS: begin
+        if ((cfg_state == IDLE) && (!i_ibm_buf_fin_stb) )begin
+          r_buf_rdy                     <=  0;
+          state                         <=  SEND_INGRESS_DATA;
+        end
+      end
 
 
 
@@ -563,12 +610,19 @@ always @ (posedge clk) begin
       default: begin
       end
     endcase
+
+
     if (i_update_buf_stb) begin
-      r_buf_rdy          <=  r_buf_rdy | i_update_buf;
+      r_buf_rdy               <=  r_buf_rdy | i_update_buf;
     end
     if (i_cmd_rst_stb) begin
       r_sts_reset             <=  1;
       state                   <=  SEND_CONFIG;
+    end
+
+
+    if (i_ibm_buf_fin_stb) begin
+      r_buf_rdy               <=  i_ibm_buf_fin;
     end
   end
 end

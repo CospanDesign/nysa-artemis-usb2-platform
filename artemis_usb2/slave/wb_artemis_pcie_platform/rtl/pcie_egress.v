@@ -43,6 +43,9 @@ module  pcie_egress (
   input       [15:0]        i_requester_id,
   input       [7:0]         i_tag,
 
+  //PCIE Egress
+  input       [9:0]         i_req_dword_cnt,
+
   //AXI Stream Device 2 Host
   input                     i_axi_egress_ready,
   //output  reg [31:0]        o_axi_egress_data,
@@ -187,7 +190,7 @@ always @ (posedge clk) begin
       SEND_DATA: begin
         //o_axi_egress_data   <=  i_fifo_data;
         o_fifo_stb          <=  1;
-        if (r_data_count + 1 >= i_fifo_size) begin 
+        if (r_data_count + 1 >= i_fifo_size) begin
           state             <=  FINISHED;
           o_axi_egress_last <=  1;
         end

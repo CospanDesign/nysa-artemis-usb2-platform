@@ -256,7 +256,7 @@ def test_pcie_small_read_command(dut):
     #yield (nysa.wait_clocks(400))
 
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_pcie_read_two_block_command(dut):
     """
     Description:
@@ -312,10 +312,10 @@ def test_pcie_read_two_block_command(dut):
 
     c.configure_FPGA()
     cocotb.log.info("Reduce the block size to 0x400")
-    c.set_buffer_size(0x040)
+    c.set_buffer_size(0x0200)
 
     cocotb.log.info("Request 0x600 words from the device")
-    COUNT = 0x0060
+    COUNT = 0x0300
     ADDRESS = 0x00
 
     dcount = 0
@@ -355,4 +355,52 @@ def test_pcie_read_two_block_command(dut):
     #yield c.wait_for_data(wait_for_ready = False)
     #yield (nysa.wait_clocks(400))
 
+
+@cocotb.test(skip = False)
+def test_pcie_write_command(dut):
+    """
+    Description:
+        Perform a simple write
+
+    Test ID: 5
+
+    Expected Results:
+        Data is sent from the host to the device
+    """
+
+    dut.test_id = 5
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    COUNT = 16
+    ADDRESS = 0x00
+
+    data = Array('B')
+    for i in range(COUNT * 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    cocotb.log.info("Reduce the block size to 0x400")
+    c.set_buffer_size(0x0200)
+
+
+    yield (nysa.wait_clocks(50))
+    yield (c.write_pcie_data_command)(ADDRESS, data)
+    yield (nysa.wait_clocks(400))
 

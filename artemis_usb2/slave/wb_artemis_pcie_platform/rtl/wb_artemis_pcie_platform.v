@@ -129,7 +129,8 @@ SOFTWARE.
 
 
 module wb_artemis_pcie_platform #(
-  parameter           DATA_FIFO_DEPTH = 6
+  parameter           DATA_INGRESS_FIFO_DEPTH = 10,
+  parameter           DATA_EGRESS_FIFO_DEPTH  = 6
 ) (
   input               clk,
   input               rst,
@@ -168,7 +169,7 @@ module wb_artemis_pcie_platform #(
 );
 
 //Local Parameters
-localparam    DATA_BUFFER_SIZE = 2 ** DATA_FIFO_DEPTH;
+localparam    DATA_BUFFER_SIZE = 2 ** DATA_EGRESS_FIFO_DEPTH;
 
 localparam    CONTROL             = 0;
 localparam    STATUS              = 1;
@@ -231,16 +232,6 @@ reg                             r_irq_stb = 0;
 // Transaction (TRN) Interface
 wire                            user_lnk_up;
 
-  // Flow Control
-wire      [2:0]                 fc_sel;
-wire      [7:0]                 fc_nph;
-wire      [11:0]                fc_npd;
-wire      [7:0]                 fc_ph;
-wire      [11:0]                fc_pd;
-wire      [7:0]                 fc_cplh;
-wire      [11:0]                fc_cpld;
-
-
 // Configuration: Error
 wire                             cfg_err_ur;
 wire                             cfg_err_cor;
@@ -289,7 +280,7 @@ wire                              gtp_reset_done;
 
 //User Memory Interface
 reg                               r_lcl_mem_we;
-wire  [DATA_FIFO_DEPTH -1: 0]     w_lcl_mem_addr;
+wire  [DATA_EGRESS_FIFO_DEPTH -1: 0]     w_lcl_mem_addr;
 reg   [31:0]                      r_lcl_mem_din;
 wire  [31:0]                      w_lcl_mem_dout;
 wire                              w_lcl_mem_valid;
@@ -386,7 +377,8 @@ reg                               r_rst_dbg;
 //Submodules
 //artemis_pcie_interface #(
 artemis_pcie_controller #(
-  .DATA_FIFO_DEPTH                   (DATA_FIFO_DEPTH              ),
+  .DATA_INGRESS_FIFO_DEPTH           (DATA_INGRESS_FIFO_DEPTH      ),
+  .DATA_EGRESS_FIFO_DEPTH            (DATA_EGRESS_FIFO_DEPTH       ),
   .SERIAL_NUMBER                     (64'h000000000000C594         )
 )api (
   .clk                               (clk                          ),
@@ -435,15 +427,6 @@ artemis_pcie_controller #(
   .o_egress_fifo_size                (w_fifo_egress_wr_size        ),
   .i_egress_fifo_stb                 (w_fifo_egress_wr_stb         ),
   .i_egress_fifo_data                (w_fifo_egress_wr_data        ),
-
-  // Flow Control
-  .fc_sel                            (fc_sel                       ),
-  .fc_nph                            (fc_nph                       ),
-  .fc_npd                            (fc_npd                       ),
-  .fc_ph                             (fc_ph                        ),
-  .fc_pd                             (fc_pd                        ),
-  .fc_cplh                           (fc_cplh                      ),
-  .fc_cpld                           (fc_cpld                      ),
 
   .o_bar_addr0                       (w_bar_addr0                  ),
   .o_bar_addr1                       (w_bar_addr1                  ),
@@ -539,7 +522,7 @@ artemis_pcie_controller #(
 );
 
 adapter_dpb_ppfifo #(
-  .MEM_DEPTH                          (DATA_FIFO_DEPTH             ),
+  .MEM_DEPTH                          (DATA_EGRESS_FIFO_DEPTH      ),
   .DATA_WIDTH                         (32                          )
 )dpb_bridge (
   .clk                                (clk                         ),

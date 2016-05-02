@@ -224,4 +224,8 @@ class CocotbPCIE (object):
         self.tm.parse_raw(data)
         self.tm.pretty_print()
 
+    @cocotb.coroutine
+    def write_pcie_data_command(self, address, data):
+        self.write_command(CMD_PERIPHERAL_WRITE, len(data), address)
+        yield RisingEdge(self.dut.clk)
 

@@ -80,10 +80,19 @@ module pcie_ingress (
   output  reg [31:0]        o_cmd_data_count,
   output  reg [31:0]        o_cmd_data_address,
 
+  //Flow Control
+  output  reg               o_cplt_pkt_stb,
+  output  reg [9:0]         o_cplt_pkt_cnt,
+
+  //Buffer Manager
+  output      [7:0]         o_cplt_pkt_tag,
+  output      [11:0]        o_cplt_pkt_byte_count,
+  output      [6:0]         o_cplt_pkt_lwr_addr,
+
   //Buffer Interface
-  input       [31:0]        i_buf_offset,
+  input       [12:0]        i_buf_offset,
   output  reg               o_buf_we,
-  output  reg [31:0]        o_buf_addr,
+  output  reg [12:0]        o_buf_addr,
   output  reg [31:0]        o_buf_data,
 
   output      [3:0]         o_state,
@@ -128,9 +137,6 @@ localparam  CMD_LPRF                = 8'h14;
 localparam  CMD_EPRF                = 8'h15;
 localparam  CMD_UNKNOWN             = 8'h16;
 
-
-
-
 //registes/wires
 reg   [3:0]                 state;
 reg   [23:0]                r_data_count;
@@ -150,7 +156,6 @@ reg   [31:0]                r_buf_cnt;
 wire  [6:0]                 w_cmplt_lower_addr;
 
 reg                         r_config_space_done;
-
 
 wire  [31:0]                w_hdr0;
 wire  [31:0]                w_hdr1;
@@ -212,6 +217,11 @@ assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_co
 assign  w_cmd_en              = (w_reg_addr > `CMD_OFFSET);
 assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
 
+
+assign  o_cplt_pkt_tag        = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][15:8] : 8'h00;
+assign  o_cplt_pkt_byte_count = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[1][11:0] : 12'h00;
+assign  o_cplt_pkt_lwr_addr   = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][6:0]  : 7'h0;
+
 integer i;
 //synchronous logic
 always @ (posedge clk) begin
@@ -229,8 +239,9 @@ always @ (posedge clk) begin
   o_cmd_flg_sel_mem_stb       <=  0;
   o_cmd_flg_sel_dma_stb       <=  0;
 
-
   o_update_buf_stb            <=  0;
+
+  o_cplt_pkt_stb              <=  0;
 
   if (rst) begin
     state                     <=  IDLE;
@@ -265,6 +276,9 @@ always @ (posedge clk) begin
     o_ingress_ri_count        <=  0;
     o_ingress_ci_count        <=  0;
     o_ingress_addr            <=  0;
+
+    //Complete
+    o_cplt_pkt_cnt            <=  0;
 
     for (i = 0; i < 4; i = i + 1) begin
       r_hdr[i]                <=  0;
@@ -303,6 +317,8 @@ always @ (posedge clk) begin
               state                   <=  WRITE_REG_CMD;
             end
             CMD_COMPLETE_DATA: begin
+              o_cplt_pkt_cnt          <=  w_pkt_data_size;
+              o_cplt_pkt_stb          <=  1;
               state                   <=  READ_CMPLT;
             end
             default: begin

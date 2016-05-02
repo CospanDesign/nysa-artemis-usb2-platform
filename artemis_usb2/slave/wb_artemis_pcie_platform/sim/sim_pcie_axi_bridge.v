@@ -32,7 +32,13 @@ SOFTWARE.
 
 
 module sim_pcie_axi_bridge #(
-  parameter USR_CLK_DIVIDE      = 4
+  parameter USR_CLK_DIVIDE                            = 4,
+
+  parameter   [6:0] VC0_TOTAL_CREDITS_PH              = 32,
+  parameter  [10:0] VC0_TOTAL_CREDITS_PD              = 211,
+  parameter   [6:0] VC0_TOTAL_CREDITS_NPH             = 8,
+  parameter   [6:0] VC0_TOTAL_CREDITS_CH              = 40,
+  parameter  [10:0] VC0_TOTAL_CREDITS_CD              = 211
 )(
 
   // PCI Express Fabric Interface
@@ -419,7 +425,7 @@ always @ (posedge clk) begin
     if (cfg_rd_en) begin
       cfg_rd_wr_done  <=  1;
       case (cfg_dwaddr)
-        4: cfg_do           <=  32'h00000200; 
+        4: cfg_do           <=  32'h00000200;
         5: cfg_do           <=  32'h00001000;
         6: cfg_do           <=  32'h00000000;
         7: cfg_do           <=  32'h00000000;
@@ -430,6 +436,17 @@ always @ (posedge clk) begin
     end
   end
 end
+
+
+
+
+//  input       [2:0]         fc_sel,
+assign  fc_nph      = 8;
+assign  fc_npd      = 211;
+assign  fc_ph       = 32;
+assign  fc_pd       = 211;
+assign  fc_cplh     = 40;
+assign  fc_cpld     = 211;
 
 
 //AXI Data D2H

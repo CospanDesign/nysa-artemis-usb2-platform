@@ -74,6 +74,7 @@ CTRL_BIT_MANUAL_USER_RESET      =   5
 CTRL_BIT_RESET_DBG_REGS         =   6
 CTRL_BIT_READ_BAR_ADDR_STB      =   7
 CTRL_BIT_SEND_IRQ               =   8
+CTRL_BIT_SEND_TO_HOST_EN        =   9
 
 STS_BIT_PCIE_RESET              =   0
 STS_BIT_LINKUP                  =   1
@@ -168,6 +169,12 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def is_pcie_read_block_enabled(self):
         return self.is_register_bit_set(CONTROL, CTRL_BIT_ENABLE_LOCAL_READ)
+
+    def enable_egress_fifo_send(self, enable):
+        self.enable_register_bit(CONTROL, CTRL_BIT_SEND_TO_HOST_EN, enable)
+
+    def is_egress_fifo_send_enabled(self):
+        return self.is_register_bit_set(CONTROL, CTRL_BIT_SEND_TO_HOST_EN)
 
     def send_block_from_local_buffer(self):
         self.set_register_bit(CONTROL, CTRL_BIT_SEND_CONTROL_BLOCK)

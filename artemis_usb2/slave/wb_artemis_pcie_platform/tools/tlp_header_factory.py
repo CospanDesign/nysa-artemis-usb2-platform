@@ -3,6 +3,7 @@
 from tlp_memory_read_req import TLPMemoryReadRequest
 from tlp_memory_write import TLPMemoryWrite
 from tlp_completer_data import TLPCompleterData
+from tlp_type import TLPType
 
 HEADERS = {
     TLPMemoryReadRequest.get_type(): TLPMemoryReadRequest,

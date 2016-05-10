@@ -32,6 +32,10 @@ SOFTWARE.
 
 
 module sim_pcie_axi_bridge #(
+  parameter PCIE_BUS_NUM                              = 8'h02,
+  parameter PCIE_FUN_NUM                              = 3'h0,
+  parameter PCIE_DEV_NUM                              = 5'h0,
+
   parameter USR_CLK_DIVIDE                            = 4,
 
   parameter   [6:0] VC0_TOTAL_CREDITS_PH              = 32,
@@ -121,7 +125,7 @@ module sim_pcie_axi_bridge #(
   input       [63:0]        cfg_dsn,
   output      [7:0]         cfg_bus_number,
   output      [4:0]         cfg_device_number,
-  output  reg [2:0]         cfg_function_number,
+  output      [2:0]         cfg_function_number,
 
   output      [15:0]        cfg_status,
   output      [15:0]        cfg_command,
@@ -239,12 +243,15 @@ assign  w_func_size               = w_func_size_map[cfg_function_number];
 //TODO
 assign  received_hot_reset        = 0;
 
-assign  fc_nph                    = 0;
-assign  fc_npd                    = 0;
-assign  fc_ph                     = 0;
-assign  fc_pd                     = 0;
-assign  fc_cplh                   = 0;
-assign  fc_cpld                   = 0;
+//  input       [2:0]         fc_sel,
+assign  fc_nph      = 8'h8;
+assign  fc_npd      = 12'h211;
+assign  fc_ph       = 8'h32;
+assign  fc_pd       = 12'h211;
+assign  fc_cplh     = 8'h40;
+assign  fc_cpld     = 12'h211;
+
+
 
 assign  cfg_err_cpl_rdy           = 0;
 
@@ -256,8 +263,6 @@ assign  cfg_err_cpl_rdy           = 0;
 assign  cfg_to_turnoff            = 0;
 
 assign  cfg_pcie_link_state       = 0;
-assign  cfg_bus_number            = 0;
-assign  cfg_device_number         = 0;
 
 assign  cfg_status                = 0;
 assign  cfg_command               = 0;
@@ -315,16 +320,6 @@ always @ (posedge clk) begin
   end
 end
 
-//Leave the cfg_function_number available for cocotb to modify in python
-always @ (posedge clk) begin
-  if (rst) begin
-    cfg_function_number <=  0;
-  end
-  else begin
-  end
-end
-
-
 
 //Data From PCIE to Core Ggenerator
 reg [3:0] dm_state;
@@ -342,6 +337,9 @@ assign  m_axis_rx_tuser   =  {13'h0,
                               m_axis_rx_tvalid,
                               1'b0};
 
+assign  cfg_bus_number      = PCIE_BUS_NUM;
+assign  cfg_function_number = PCIE_FUN_NUM;
+assign  cfg_device_number   = PCIE_DEV_NUM;
 
 always @ (posedge clk) begin
   m_axis_rx_tkeep   <=  4'b1111;
@@ -439,14 +437,6 @@ end
 
 
 
-
-//  input       [2:0]         fc_sel,
-assign  fc_nph      = 8;
-assign  fc_npd      = 211;
-assign  fc_ph       = 32;
-assign  fc_pd       = 211;
-assign  fc_cplh     = 40;
-assign  fc_cpld     = 211;
 
 
 //AXI Data D2H

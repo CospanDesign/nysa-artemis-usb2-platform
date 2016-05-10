@@ -76,6 +76,7 @@ localparam        WRITE       = 2;
 localparam        FINISHED    = 3;
 
 localparam        BASE0_OFFSET  = 0;
+//localparam        BASE1_OFFSET  = ((2 ** (MEM_DEPTH) / 2));
 localparam        BASE1_OFFSET  = ((2 ** MEM_DEPTH) / 2);
 
 //registes/wires
@@ -114,6 +115,7 @@ always @ (posedge ppfifo_clk) begin
   o_write_stb                     <= 0;
   if (rst) begin
     o_write_activate              <= 0;
+    o_ppfifo_wr_fin               <= 0;
     count                         <= 0;
     r_addr                        <= 0;
     state                         <= IDLE;
@@ -121,6 +123,7 @@ always @ (posedge ppfifo_clk) begin
   else begin
     case (state)
       IDLE: begin
+        o_ppfifo_wr_fin           <= 0;
         o_write_activate          <= 0;
         r_addr                    <= 0;
 

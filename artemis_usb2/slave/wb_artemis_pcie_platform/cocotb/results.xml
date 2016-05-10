@@ -4,7 +4,13 @@
     <testcase classname="test_dut" name="test_pcie_command" time="0.0">
       <skipped />
     </testcase>
+    <testcase classname="test_dut" name="test_pcie_write_medium_length_command" time="0.0">
+      <skipped />
+    </testcase>
     <testcase classname="test_dut" name="test_pcie_small_read_command" time="0.0">
+      <skipped />
+    </testcase>
+    <testcase classname="test_dut" name="test_pcie_write_med_length_command" time="0.0">
       <skipped />
     </testcase>
     <testcase classname="test_dut" name="test_pcie_config_read_wait_for_ready" time="0.0">
@@ -13,9 +19,15 @@
     <testcase classname="test_dut" name="test_pcie_read_two_block_command" time="0.0">
       <skipped />
     </testcase>
+    <testcase classname="test_dut" name="test_pcie_write_command" time="0.0">
+      <skipped />
+    </testcase>
+    <testcase classname="test_dut" name="test_pcie_write_multiple_buffers" time="0.0">
+      <skipped />
+    </testcase>
     <testcase classname="test_dut" name="test_write_pcie_register" time="0.0">
       <skipped />
     </testcase>
-    <testcase classname="test_dut" name="test_pcie_write_command" time="0.26300692558288574" />
+    <testcase classname="test_dut" name="test_pcie_write_three_buffers" time="3.079468011856079" />
   </testsuite>
 </testsuites>

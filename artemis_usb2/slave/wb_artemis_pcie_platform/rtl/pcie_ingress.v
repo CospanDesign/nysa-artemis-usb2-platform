@@ -92,7 +92,7 @@ module pcie_ingress (
   //Buffer Interface
   input       [12:0]        i_buf_offset,
   output  reg               o_buf_we,
-  output  reg [12:0]        o_buf_addr,
+  output  reg [10:0]        o_buf_addr,
   output  reg [31:0]        o_buf_data,
 
   output      [3:0]         o_state,
@@ -109,8 +109,9 @@ localparam  READ_HDR                = 4'h2;
 localparam  WRITE_REG_CMD           = 4'h3;
 localparam  READ_ADDR               = 4'h4;
 localparam  READ_CMPLT              = 4'h5;
-localparam  READ_BAR_ADDR           = 4'h6;
-localparam  FLUSH                   = 4'h7;
+localparam  SEND_DATA               = 4'h6;
+localparam  READ_BAR_ADDR           = 4'h7;
+localparam  FLUSH                   = 4'h8;
 
 //Commands
 localparam  CMD_MEM_READ            = 8'h00;
@@ -215,7 +216,8 @@ assign  w_cmplt_lower_addr    = r_hdr[3][`CMPLT_LOWER_ADDR_RANGE];
 
 assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
 assign  w_cmd_en              = (w_reg_addr > `CMD_OFFSET);
-assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
+//assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
+assign  w_buf_pkt_addr_base   = i_buf_offset - w_cmplt_lower_addr;
 
 
 assign  o_cplt_pkt_tag        = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][15:8] : 8'h00;
@@ -287,6 +289,8 @@ always @ (posedge clk) begin
   else begin
     case (state)
       IDLE: begin
+        r_buf_cnt                     <=  0;
+        o_buf_addr                    <=  0;
         r_data_count                  <=  0;
         r_hdr_index                   <=  0;
         o_enable_config_read          <=  0;
@@ -318,7 +322,6 @@ always @ (posedge clk) begin
             end
             CMD_COMPLETE_DATA: begin
               o_cplt_pkt_cnt          <=  w_pkt_data_size;
-              o_cplt_pkt_stb          <=  1;
               state                   <=  READ_CMPLT;
             end
             default: begin
@@ -430,15 +433,26 @@ always @ (posedge clk) begin
         state                         <=  FLUSH;
       end
       READ_CMPLT: begin
+        o_buf_addr                    <=  w_buf_pkt_addr_base;
+        o_buf_we                      <=  1;
+        o_buf_data                    <=  i_axi_ingress_data;
+        r_buf_cnt                     <=  r_buf_cnt + 1;
+        state                         <=  SEND_DATA;
+      end
+      SEND_DATA: begin
         //The Buffer is available
         if (r_buf_cnt < w_pkt_data_size) begin
-          o_buf_addr                  <=  w_buf_pkt_addr_base + r_buf_cnt;
+          //o_buf_addr                  <=  w_buf_pkt_addr_base + r_buf_cnt;
+          o_buf_addr                  <=  o_buf_addr + 1;
+          r_buf_cnt                   <=  r_buf_cnt + 1;
           o_buf_data                  <=  i_axi_ingress_data;
           o_buf_we                    <=  1;
         end
         else begin
+          o_cplt_pkt_stb              <=  1;
           state                       <=  FLUSH;
         end
+
       end
       FLUSH: begin
         if (!i_axi_ingress_valid) begin

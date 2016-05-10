@@ -82,13 +82,16 @@ wire  [31:0]                w_hdr0;
 wire  [31:0]                w_hdr1;
 wire  [31:0]                w_hdr2;
 wire  [31:0]                w_hdr3;
+
+wire                        w_non_data_packet;
 //Submodules
 //Asynchronous Logic
 
 assign  o_axi_egress_keep                   = 4'hF;
 
 //1st Dword
-assign  w_pkt_data_count                    = (i_command == `PCIE_MRD_32B) ? 32'h0 : i_fifo_size;
+assign  w_non_data_packet                   = (i_command == `PCIE_MRD_32B);
+assign  w_pkt_data_count                    = (i_command == `PCIE_MRD_32B) ? i_req_dword_cnt : i_fifo_size;
 
 assign  w_hdr[0][`PCIE_TYPE_RANGE]          = i_command;
 assign  w_hdr[0][`PCIE_FLAGS_RANGE]         = i_flags;
@@ -133,7 +136,12 @@ always @ (posedge clk) begin
         r_data_count      <=  0;
         r_hdr_index       <=  0;
         if (i_enable) begin
-          state           <=  WAIT_FOR_FIFO;
+          if (w_non_data_packet) begin
+            state         <=  WAIT_FOR_PCIE_CORE;
+          end
+          else begin
+            state         <=  WAIT_FOR_FIFO;
+          end
         end
       end
       WAIT_FOR_FIFO: begin
@@ -149,7 +157,7 @@ always @ (posedge clk) begin
         if (i_axi_egress_ready && o_axi_egress_valid) begin
           r_hdr_index           <=  r_hdr_index + 1;
           if (r_hdr_index + 1 >= w_hdr_size) begin
-            if (w_pkt_data_count == 0) begin
+            if (w_non_data_packet) begin
               o_axi_egress_last <=  1;
               state             <=  FINISHED;
             end

@@ -65,7 +65,7 @@ module credit_manager (
   input         [11:0]      i_fc_cpld,            //Completion Data Credits
 
   //PCIE Control Interface
-  output  reg               o_ready,              //Ready for a new request
+  output                    o_ready,              //Ready for a new request
   input         [9:0]       i_dword_req_count,
   input                     i_cmt_stb,            //Controller commited this request
 
@@ -85,6 +85,7 @@ reg             [7:0]       r_max_hdr_req;
 
 wire            [7:0]       w_hdr_avail;
 wire            [11:0]      w_dat_avail;
+wire            [15:0]      w_dword_avail;
 
 
 reg             [7:0]       r_hdr_rcv_size;
@@ -146,11 +147,15 @@ assign  w_data_credit_rcv_size  = (i_dword_rcv_count[9:2] == 0) ? 10'h1  : i_dwo
 
 assign  w_hdr_avail             = (i_fc_cplh - r_hdr_in_flt);
 assign  w_dat_avail             = (i_fc_cpld - r_dat_in_flt);
+assign  w_dword_avail           = {w_dat_avail, 2'b00};
 
 assign  w_hdr_rdy               = (w_hdr_avail > r_max_hdr_req);
 assign  w_dat_rdy               = (w_dat_avail > w_data_credit_req_size);
 
 assign  o_fc_sel                = 3'h0;
+
+
+assign  o_ready                 = (w_hdr_rdy & w_dat_rdy);
 
 //synchronous logic
 always  @ (posedge clk) begin

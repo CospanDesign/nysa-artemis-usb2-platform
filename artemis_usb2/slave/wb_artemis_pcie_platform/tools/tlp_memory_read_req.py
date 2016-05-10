@@ -21,16 +21,16 @@ import os
 import argparse
 from array import array as Array
 
-from tlp_header import TLPTransferHeader
+from tlp_transfer import TLPTransfer
 #sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
 TLP_TYPE = "mrd"
 
-class TLPMemoryReadRequest(TLPTransferHeader):
+class TLPMemoryReadRequest(TLPTransfer):
 
     @staticmethod
     def get_fields():
-        return TLPTransferHeader.get_fields()
+        return TLPTransfer.get_fields()
 
     @staticmethod
     def get_type():
@@ -38,7 +38,7 @@ class TLPMemoryReadRequest(TLPTransferHeader):
 
     @staticmethod
     def get_description(key):
-        return TLPTransferHeader.get_description(key)
+        return TLPTransfer.get_description(key)
 
     def __init__(self):
         super (TLPMemoryReadRequest, self).__init__()
@@ -53,8 +53,6 @@ class TLPMemoryReadRequest(TLPTransferHeader):
         return super (TLPMemoryReadRequest, self).generate_raw()
 
     def set_value(self, key, value):
-        if key == "dword_count":
-            value = 0
         super (TLPMemoryReadRequest, self).set_value(key, value)
 
     def get_value(self, key):

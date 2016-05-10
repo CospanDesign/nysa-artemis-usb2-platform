@@ -16,7 +16,7 @@
 #define READ_BUFFER_COUNT           2
 
 #define NYSA_PCIE_BUFFER_SIZE       4096
-#define NYSA_MAX_PACKET_SIZE        512
+#define NYSA_MAX_PACKET_SIZE        256
 
 
 #define CONTROL_BAR                 0

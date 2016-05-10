@@ -80,7 +80,7 @@ module artemis_pcie_controller #(
   parameter SERIAL_NUMBER             = 64'h000000000000C594,
   parameter DATA_INGRESS_FIFO_DEPTH   = 10,   //4096
   parameter DATA_EGRESS_FIFO_DEPTH    = 6,    //256
-  parameter MAX_REQUEST_PAYLOAD_SIZE  = 2048,
+  parameter MAX_REQUEST_PAYLOAD_SIZE  = 512,
   parameter MAX_TAG_CNT               = 4
 )(
   input                     clk,
@@ -403,7 +403,7 @@ wire                        w_e_dma_fifo_stb;
 
 wire  [12:0]                w_ibm_buf_offset;
 wire                        w_bb_buf_we;
-wire  [12:0]                w_bb_buf_addr;
+wire  [10:0]                w_bb_buf_addr;
 wire  [31:0]                w_bb_buf_data;
 
 wire  [1:0]                 w_i_data_fifo_rdy;
@@ -445,12 +445,16 @@ wire  [9:0]                 w_pcie_ing_fc_rcv_cnt;
 //Buffer Manager
 wire                        w_hst_buf_fin_stb;
 wire  [1:0]                 w_hst_buf_fin;
+wire                        w_hst_buf_fin_ack_stb;
 
 wire                        w_ctr_en;
 wire                        w_ctr_mem_rd_req_stb;
 wire                        w_ctr_tag_rdy;
 wire  [7:0]                 w_ctr_tag;
 wire  [9:0]                 w_ctr_dword_size;
+wire                        w_ctr_buf_sel;
+wire                        w_ctr_idle;
+wire  [11:0]                w_ctr_start_addr;
 
 wire  [7:0]                 w_ing_cplt_tag;
 wire  [11:0]                w_ing_cplt_byte_count;
@@ -632,7 +636,7 @@ config_parser cfg (
 );
 
 buffer_builder #(
-  .MEM_DEPTH                  (13                         ),   //8K Buffer
+  .MEM_DEPTH                  (11                         ),   //8K Buffer
   .DATA_WIDTH                 (32                         )
 ) bb (
   .mem_clk                    (clk_62p5                   ),
@@ -685,6 +689,7 @@ ingress_buffer_manager buf_man (
   .i_hst_buf_rdy              (w_update_buf               ),
   .o_hst_buf_fin_stb          (w_hst_buf_fin_stb          ),
   .o_hst_buf_fin              (w_hst_buf_fin              ),
+  .i_hst_buf_fin_ack_stb      (w_hst_buf_fin_ack_stb      ),
 
   //PCIE Control Interface
   .i_ctr_en                   (w_ctr_en                   ),
@@ -692,6 +697,9 @@ ingress_buffer_manager buf_man (
   .o_ctr_tag_rdy              (w_ctr_tag_rdy              ),
   .o_ctr_tag                  (w_ctr_tag                  ),
   .o_ctr_dword_size           (w_ctr_dword_size           ),
+  .o_ctr_start_addr           (w_ctr_start_addr           ),
+  .o_ctr_buf_sel              (w_ctr_buf_sel              ),
+  .o_ctr_idle                 (w_ctr_idle                 ),
 
   //PCIE Ingress Interface
   .i_ing_cplt_stb             (w_pcie_ing_fc_rcv_stb      ),
@@ -791,12 +799,18 @@ pcie_control #(
   //Ingress Buffer Interface
   .i_ibm_buf_fin_stb          (w_hst_buf_fin_stb          ),
   .i_ibm_buf_fin              (w_hst_buf_fin              ),
+  .o_ibm_buf_fin_ack_stb      (w_hst_buf_fin_ack_stb      ),
 
   .o_ibm_en                   (w_ctr_en                   ),
   .o_ibm_req_stb              (w_ctr_mem_rd_req_stb       ),
   .i_ibm_tag_rdy              (w_ctr_tag_rdy              ),
   .i_ibm_tag                  (w_ctr_tag                  ),
   .i_ibm_dword_cnt            (w_ctr_dword_size           ),
+  .i_ibm_start_addr           (w_ctr_start_addr           ),
+  .i_ibm_buf_sel              (w_ctr_buf_sel              ),
+  .i_ibm_idle                 (w_ctr_idle                 ),
+
+
 
   //System Interface
   .o_sys_rst                  (o_sys_rst                  ),

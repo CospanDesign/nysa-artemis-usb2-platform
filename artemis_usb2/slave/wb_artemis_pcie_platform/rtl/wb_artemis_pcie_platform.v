@@ -73,6 +73,7 @@ SOFTWARE.
 `define CTRL_BIT_RESET_DBG_REGS       6
 `define CTRL_BIT_READ_BAR_ADDR_STB    7
 `define CTRL_BIT_SEND_IRQ             8
+`define CTRL_BIT_SEND_TO_HOST_EN      9
 
 `define STS_BIT_PCIE_RESET            0
 `define STS_BIT_LINKUP                1
@@ -372,6 +373,7 @@ wire                              dbg_ur_unsup_msg;
 
 reg [31:0]                        r_dbg_reg;
 reg                               r_rst_dbg;
+reg                               r_egress_fifo_send_en;
 
 
 //Submodules
@@ -528,7 +530,7 @@ adapter_dpb_ppfifo #(
   .clk                                (clk                         ),
   .rst                                (rst                         ),
   .i_ppfifo_2_mem_en                  (r_ppfifo_2_mem_en           ),
-  .i_mem_2_ppfifo_stb                 (r_mem_2_ppfifo_stb          ),
+  .i_mem_2_ppfifo_stb                 (r_mem_2_ppfifo_stb || r_egress_fifo_send_en  ),
   .i_cancel_write_stb                 (r_cancel_write_stb          ),
   .o_num_reads                        (w_num_reads                 ),
   .o_idle                             (w_idle                      ),
@@ -733,6 +735,7 @@ always @ (posedge clk) begin
 
     r_bar_hit_temp              <=  0;
     r_rst_dbg                   <=  0;
+    r_egress_fifo_send_en       <=  0;
   end
   else begin
     if (r_dbg_reg == 0) begin
@@ -765,6 +768,7 @@ always @ (posedge clk) begin
               //r_enable_ext_reset    <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
               //r_manual_pcie_reset   <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
               //r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
+              r_egress_fifo_send_en <=  i_wbs_dat[`CTRL_BIT_SEND_TO_HOST_EN];
               r_irq_stb             <=  i_wbs_dat[`CTRL_BIT_SEND_IRQ];
 
             end

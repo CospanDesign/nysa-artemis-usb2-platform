@@ -11,6 +11,22 @@ import time
 from array import array as Array
 from dut_driver import ArtemisPCIEDriver
 from cocotb_pcie_controller import CocotbPCIE
+from cocotb_pcie_controller import NysaPCIEConfig
+from cocotb_pcie_controller import array_to_dword
+
+from cocotb_pcie_controller import HDR_STATUS_BUF_ADDR
+from cocotb_pcie_controller import HDR_BUFFER_READY
+from cocotb_pcie_controller import HDR_WRITE_BUF_A_ADDR
+from cocotb_pcie_controller import HDR_WRITE_BUF_B_ADDR
+from cocotb_pcie_controller import HDR_READ_BUF_A_ADDR
+from cocotb_pcie_controller import HDR_READ_BUF_B_ADDR
+from cocotb_pcie_controller import HDR_BUFFER_SIZE
+from cocotb_pcie_controller import HDR_PING_VALUE
+from cocotb_pcie_controller import HDR_DEV_ADDR
+from cocotb_pcie_controller import STS_DEV_STATUS
+from cocotb_pcie_controller import STS_BUF_RDY
+from cocotb_pcie_controller import STS_BUF_POS
+from cocotb_pcie_controller import STS_INTERRUPT
 
 from cocotb.triggers import Timer
 from cocotb.triggers import RisingEdge
@@ -62,14 +78,14 @@ def test_write_pcie_register(dut):
 
 
     #Register Writes
-    status_addr   = 0x55555555
-    buffer_ready  = 0x03
-    wr_buf_a_addr = 0x88888888
-    wr_buf_b_addr = 0x99999999
-    rd_buf_a_addr = 0xAAAAAAAA
-    rd_buf_b_addr = 0xBBBBBBBB
-    buf_size      = 0x00000800
-    dev_addr      = 0xCCCCCCCC
+    status_addr     = 0x55555555
+    buffer_ready    = 0x03
+    wr_buf_a_addr   = 0x88888888
+    wr_buf_b_addr   = 0x99999999
+    rd_buf_a_addr   = 0xAAAAAAAA
+    rd_buf_b_addr   = 0xBBBBBBBB
+    buf_size        = 0x00000800
+    dev_addr        = 0x00000000
 
     c.set_status_buf_addr(status_addr)
     c.set_buffer_ready_status(buffer_ready)
@@ -77,7 +93,7 @@ def test_write_pcie_register(dut):
     c.set_write_buf_b_addr(wr_buf_b_addr)
     c.set_read_buf_a_addr(rd_buf_a_addr)
     c.set_read_buf_b_addr(rd_buf_b_addr)
-    c.set_buffer_size(buf_size)
+    c.set_dword_buffer_size(buf_size)
     c.set_dev_addr(dev_addr)
 
     yield (nysa.wait_clocks(300))
@@ -95,11 +111,11 @@ def test_write_pcie_register(dut):
     if dut.s1.api.ingress.o_read_b_addr.value != rd_buf_b_addr:
         cocotb.log.error("Rd buf B Address: 0x%08X != 0x%08X" % (rd_buf_b_addr, dut.s1.api.ingress.o_read_b_addr.value))
     if dut.s1.api.ingress.o_buffer_size.value != buf_size:
-        cocotb.log.error("Buffer Size: 0x%08X != 0x%08X" % (buf_size, dut.s1.api.ingress.o_buffer_size.value))
+        cocotb.log.error("Buffer Size: 0x%08X != 0x%08X" % (buf_size, dut.s1.api.ingress.o_dword_buffer_size.value))
     if dut.s1.api.ingress.o_dev_addr.value != dev_addr:
         cocotb.log.error("Device Address: 0x%08X != 0x%08X" % (dev_addr, dut.s1.api.ingress.o_dev_addr.value))
-
     yield (nysa.wait_clocks(100))
+
 
 @cocotb.test(skip = True)
 def test_pcie_command(dut):
@@ -174,8 +190,6 @@ def test_pcie_config_read_wait_for_ready(dut):
     #yield c.read_config_regs(wait_for_ready = False)
     yield (nysa.wait_clocks(500))
 
-
-
 @cocotb.test(skip = True)
 def test_pcie_small_read_command(dut):
     """
@@ -218,43 +232,17 @@ def test_pcie_small_read_command(dut):
 
     yield (nysa.wait_clocks(50))
     yield cocotb.external(driver.write_local_buffer)(data)
-    yield (nysa.wait_clocks(400))
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(600))
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(400))
+    yield (nysa.wait_clocks(50))
+    yield cocotb.external(driver.enable_egress_fifo_send)(True)
 
     v = yield cocotb.external(driver.get_control)()
 
     c.configure_FPGA()
+    yield (nysa.wait_clocks(400))
 
     COUNT = 0x0300
     ADDRESS = 0x00
-
-    dcount = 0
-    yield (nysa.wait_clocks(100))
-    yield c.read_pcie_data_command(count = COUNT, address = ADDRESS)
-    yield (nysa.wait_clocks(100))
-    c.set_buffer_ready_status(0x03)
-
-    #Read first block of data
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-
-    #Read first block of data
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-
-    #Read Status
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-    yield (nysa.wait_clocks(400))
-
-    ##Read Final Status
-    #yield (nysa.wait_clocks(10))
-    #yield c.wait_for_data(wait_for_ready = False)
-    #yield (nysa.wait_clocks(400))
-
+    yield c.read_pcie_data(address = ADDRESS, count = COUNT)
 
 @cocotb.test(skip = True)
 def test_pcie_read_two_block_command(dut):
@@ -302,61 +290,24 @@ def test_pcie_read_two_block_command(dut):
 
     yield (nysa.wait_clocks(50))
     yield cocotb.external(driver.write_local_buffer)(data)
-    yield (nysa.wait_clocks(400))
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(600))
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-    yield (nysa.wait_clocks(400))
+    yield (nysa.wait_clocks(50))
+    yield cocotb.external(driver.enable_egress_fifo_send)(True)
 
     v = yield cocotb.external(driver.get_control)()
 
     c.configure_FPGA()
     cocotb.log.info("Reduce the block size to 0x400")
-    c.set_buffer_size(0x0200)
+    c.set_dword_buffer_size(0x0200)
+    yield (nysa.wait_clocks(50))
 
     cocotb.log.info("Request 0x600 words from the device")
-    COUNT = 0x0300
+    COUNT = 0x0500
     ADDRESS = 0x00
-
-    dcount = 0
-    yield (nysa.wait_clocks(100))
-    yield c.read_pcie_data_command(count = COUNT, address = ADDRESS)
-    yield (nysa.wait_clocks(100))
-    c.set_buffer_ready_status(0x03)
-
-    #Read first chunk of data  ( 0x00 - 0x01F )
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = True)
-
-    #Read second chunk of data ( 0x01F - 0x03F )
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-
-    #Read Status Indicating the end of a block
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-    yield (nysa.wait_clocks(100))
-
-    cocotb.log.info("Core should be waiting for more data from the FIFO")
-    cocotb.log.info("Send another block of data from the local core")
-    yield cocotb.external(driver.send_block_from_local_buffer)()
-
-    #Read third chunk of data ( 0x040 - 0x05F )
-    yield c.wait_for_data(wait_for_ready = False)
-    yield (nysa.wait_clocks(10))
-
-    #Read Status Indicating the end of a block
-    yield (nysa.wait_clocks(10))
-    yield c.wait_for_data(wait_for_ready = False)
-    yield (nysa.wait_clocks(400))
-
-    ##Read Final Status
-    #yield (nysa.wait_clocks(10))
-    #yield c.wait_for_data(wait_for_ready = False)
-    #yield (nysa.wait_clocks(400))
+    yield (nysa.wait_clocks(50))
+    yield c.read_pcie_data(address = ADDRESS, count = COUNT)
 
 
-@cocotb.test(skip = False)
+@cocotb.test(skip = True)
 def test_pcie_write_command(dut):
     """
     Description:
@@ -397,10 +348,205 @@ def test_pcie_write_command(dut):
 
     c.configure_FPGA()
     cocotb.log.info("Reduce the block size to 0x400")
-    c.set_buffer_size(0x0200)
+    c.set_dword_buffer_size(0x0200)
 
 
     yield (nysa.wait_clocks(50))
-    yield (c.write_pcie_data_command)(ADDRESS, data)
+    #yield (c.write_pcie_data_command)(ADDRESS, len(data))
+    yield c.write_pcie_data(ADDRESS, data)
+    yield (nysa.wait_clocks(400))
+
+@cocotb.test(skip = True)
+def test_pcie_write_med_length_command(dut):
+    """
+    Description:
+        Perform a simple write
+
+    Test ID: 6
+
+    Expected Results:
+        Data is sent from the host to the device
+    """
+
+    dut.test_id = 6
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    BYTE_COUNT = 512
+    ADDRESS = 0x00
+
+    data = Array('B')
+    for i in range(BYTE_COUNT / 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    #cocotb.log.info("Reduce the block size to 0x400")
+    #c.set_dword_buffer_size(0x1000)
+
+    yield (nysa.wait_clocks(50))
+    yield c.write_pcie_data(ADDRESS, data)
+    yield (nysa.wait_clocks(400))
+
+
+@cocotb.test(skip = True)
+def test_pcie_write_medium_length_command(dut):
+    """
+    Description:
+        Perform a simple write
+
+    Test ID: 7
+
+    Expected Results:
+        Enough Data is sent from the host to the device that multiple tags must be used
+    """
+
+    dut.test_id = 7
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    BYTE_COUNT = 640
+    ADDRESS = 0x00
+
+    data = Array('B')
+    for i in range(BYTE_COUNT / 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    #cocotb.log.info("Reduce the block size to 0x400")
+    #c.set_dword_buffer_size(0x1000)
+
+    yield (nysa.wait_clocks(50))
+    yield c.write_pcie_data(ADDRESS, data)
+    yield (nysa.wait_clocks(400))
+
+
+
+@cocotb.test(skip = True)
+def test_pcie_write_multiple_buffers(dut):
+    """
+    Description:
+        Perform a long write
+
+    Test ID: 8
+
+    Expected Results:
+        Enough Data is sent from the host to the device that two buffers must be used
+    """
+
+    dut.test_id = 8
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    BUFFER_SIZE = 4096
+    BYTE_COUNT = BUFFER_SIZE * 2
+    ADDRESS = 0x00
+
+    data = Array('B')
+    for i in range(BYTE_COUNT / 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    #cocotb.log.info("Reduce the block size to 0x400")
+    #c.set_dword_buffer_size(0x1000)
+
+    yield (nysa.wait_clocks(50))
+    yield c.write_pcie_data(ADDRESS, data)
+    yield (nysa.wait_clocks(400))
+
+
+@cocotb.test(skip = False)
+def test_pcie_write_three_buffers(dut):
+    """
+    Description:
+        Perform a long write
+
+    Test ID: 9
+
+    Expected Results:
+        Enough Data is sent from the host to the device that three buffers must be used
+    """
+
+    dut.test_id = 9
+    #print "module path: %s" % MODULE_PATH
+    nysa = NysaSim(dut, SIM_CONFIG, CLK_PERIOD, user_paths = [MODULE_PATH])
+    #setup_dut(dut)
+    yield(nysa.reset())
+    nysa.read_sdb()
+    yield (nysa.wait_clocks(10))
+    nysa.pretty_print_sdb()
+    d = nysa.find_device(ArtemisPCIEDriver)[0]
+    #driver = ArtemisPCIEDriver(nysa, nysa.find_device(ArtemisPCIEDriver)[0])
+    driver = yield cocotb.external(ArtemisPCIEDriver)(nysa, d)
+    yield cocotb.external(driver.enable)(True)
+    c = CocotbPCIE(dut, debug = False)
+
+    BUFFER_SIZE = 4096
+    BYTE_COUNT = BUFFER_SIZE * 3
+    ADDRESS = 0x00
+
+    data = Array('B')
+    for i in range(BYTE_COUNT / 4):
+        v = i * 4
+        data.append((v + 0) % 256)
+        data.append((v + 1) % 256)
+        data.append((v + 2) % 256)
+        data.append((v + 3) % 256)
+
+    v = yield cocotb.external(driver.get_control)()
+
+    c.configure_FPGA()
+    #cocotb.log.info("Reduce the block size to 0x400")
+    #c.set_dword_buffer_size(0x1000)
+
+    yield (nysa.wait_clocks(50))
+    yield c.write_pcie_data(ADDRESS, data)
     yield (nysa.wait_clocks(400))
 

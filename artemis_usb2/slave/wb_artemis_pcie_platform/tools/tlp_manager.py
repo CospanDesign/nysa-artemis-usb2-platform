@@ -58,8 +58,8 @@ class TLPManager(object):
             raise AssertionError("Failed to find type: %s" % key)
 
     def get_value(self, key):
-        if key in get_fields(self.header.get_value("type")):
-            self.header.get_value(key, value)
+        if key in self.header.get_fields():
+            return self.header.get_value(key)
         raise AssertionError("Failed to find type: %s" % key)
 
     def get_description(self, key):

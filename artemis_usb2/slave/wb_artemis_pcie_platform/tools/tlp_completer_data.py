@@ -21,35 +21,31 @@ import os
 import argparse
 from array import array as Array
 
-from tlp_header import TLPHeader
+from tlp_transfer import TLPTransfer
 from tlp_common import print_tlp_line_hex
 #sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
 TLP_TYPE = "cpld"
 
 COMPLETER_ID = "completer_id"
-REQUESTER_ID = "requester_id"
-COMPLETE_STATUS = "complter_status"
+COMPLETE_STATUS = "complete_status"
 BCM = "bcm"
 BYTE_COUNT = "byte_count"
-TAG = "tag"
 LOWER_ADDRESS = "lower_address"
 
 DESCRIPTION_DICT = {
     COMPLETER_ID: "Id of the bus that sent the completer packet",
-    REQUESTER_ID: "Id of the entity that requested the data",
     COMPLETE_STATUS: "Status of read request: 000: Success, 001: Unsupported Request, 010: Config Retry, 100: Abort",
     BCM: "When a packet is broken up by a PCIX host, this bit is set with the first transaction, the 'byte count' field indiciates the size of just the first packet, not the rest",
-    TAG: "Tag for the requester to locate transfer, this should match the tag from read request",
     BYTE_COUNT: "Number of bytes required to complete a packet, if done this should read 0x00 (Unless BCM is set then this will report the size of the fist packet)",
     LOWER_ADDRESS: "When a packet is broken up this field represents the lower address field of the first byte enable"
 }
 
-class TLPCompleterData(TLPHeader):
+class TLPCompleterData(TLPTransfer):
 
     @staticmethod
     def get_fields():
-        fields = TLPHeader.get_fields()
+        fields = TLPTransfer.get_fields()
         fields.extend(DESCRIPTION_DICT.keys())
         return fields
 
@@ -59,7 +55,9 @@ class TLPCompleterData(TLPHeader):
 
     @staticmethod
     def get_description(key):
-        return TLPHeader.get_description(key)
+        if key in DESCRIPTION_DICT.keys():
+            return DESCRIPTION_DICT[key]
+        return TLPTransfer.get_description(key)
 
     def __init__(self):
         super (TLPCompleterData, self).__init__()
@@ -69,20 +67,20 @@ class TLPCompleterData(TLPHeader):
         self.set_value("type", TLP_TYPE)
         self.set_value("has_data", True)
         self.set_value(COMPLETER_ID, 0x001)
-        self.set_value(REQUESTER_ID, 0x002)
+        self.set_value("requester_id", 0x002)
         self.set_value(COMPLETE_STATUS, 0x00)
         self.set_value(BCM, 0x00)
         self.set_value(LOWER_ADDRESS, 0x00)
-        self.set_value(TAG, 0x04)
+        self.set_value("tag", 0x00)
         self.set_value(BYTE_COUNT, 0x00)
 
     def generate_raw(self):
         raw = super (TLPCompleterData, self).generate_raw()
         completer_id = self.get_value(COMPLETER_ID)
-        requester_id = self.get_value(REQUESTER_ID)
+        requester_id = self.get_value("requester_id")
         status = self.get_value(COMPLETE_STATUS)
         bcm = self.get_value(BCM)
-        tag = self.get_value(TAG)
+        tag = self.get_value("tag")
         lower_address = self.get_value(LOWER_ADDRESS)
         byte_count = self.get_value(BYTE_COUNT)
 
@@ -109,9 +107,7 @@ class TLPCompleterData(TLPHeader):
         lower_address = raw[11] & 0x7F
 
         self.set_value(COMPLETER_ID, completer_id)
-        self.set_value(REQUESTER_ID, requester_id)
         self.set_value(BCM, bcm)
-        self.set_value(TAG, tag)
         self.set_value(BYTE_COUNT, byte_count)
         self.set_value(LOWER_ADDRESS, lower_address)
         
@@ -122,16 +118,12 @@ class TLPCompleterData(TLPHeader):
         elif key in TLPCompleterData.get_fields():
             if key == COMPLETER_ID:
                 self.completer_id = value
-            if key == REQUESTER_ID:
-                self.requester_id = value
             if key == COMPLETE_STATUS:
                 self.complete_status = value
             if key == BCM:
                 self.bcm = value
             if key == LOWER_ADDRESS:
                 self.lower_address = value
-            if key == TAG:
-                self.tag = value
             if key == BYTE_COUNT:
                 self.byte_count = value
         else:
@@ -144,16 +136,12 @@ class TLPCompleterData(TLPHeader):
         elif key in TLPCompleterData.get_fields():
             if key == COMPLETER_ID:
                 return self.completer_id
-            if key == REQUESTER_ID:
-                return self.requester_id
             if key == COMPLETE_STATUS:
                 return self.complete_status
             if key == BCM:
                 return self.bcm
             if key == LOWER_ADDRESS:
                 return self.lower_address
-            if key == TAG:
-                return self.tag
             if key == BYTE_COUNT:
                 return self.byte_count
         else:
@@ -162,23 +150,21 @@ class TLPCompleterData(TLPHeader):
     def pretty_print(self, tab = 0):
         output_str = super(TLPCompleterData, self).pretty_print(tab = tab)
         completer_id = self.get_value(COMPLETER_ID)
-        requester_id = self.get_value(REQUESTER_ID)
+        requester_id = self.get_value("requester_id")
         complete_status = self.get_value(COMPLETE_STATUS)
         bcm = self.get_value(BCM)
         lower_addr = self.get_value(LOWER_ADDRESS)
-        tag = self.get_value(TAG)
+        tag = self.get_value("tag")
 
         output_str += "\t" * tab
         output_str += "Completion Header Specific Fields\n"
         output_str += print_tlp_line_hex("Completer ID", completer_id, DESCRIPTION_DICT[COMPLETER_ID], tab + 1)
-        output_str += print_tlp_line_hex("Requester ID", requester_id, DESCRIPTION_DICT[REQUESTER_ID], tab + 1)
+        output_str += print_tlp_line_hex("Requester ID", requester_id, DESCRIPTION_DICT["requester_id"], tab + 1)
         output_str += print_tlp_line_hex("Status", complete_status, DESCRIPTION_DICT[COMPLETE_STATUS], tab + 1)
         output_str += print_tlp_line_hex("BCM", bcm, DESCRIPTION_DICT[BCM], tab + 1)
         output_str += print_tlp_line_hex("Lower Addr", lower_addr, DESCRIPTION_DICT[LOWER_ADDRESS], tab + 1)
-        output_str += print_tlp_line_hex("Tag", tag, DESCRIPTION_DICT[TAG], tab + 1)
+        output_str += print_tlp_line_hex("tag", tag, DESCRIPTION_DICT["tag"], tab + 1)
         
         return output_str
-
-
 
 

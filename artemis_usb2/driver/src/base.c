@@ -107,42 +107,79 @@ ssize_t nysa_pcie_write(struct file *filp, const char *buf, size_t count, loff_t
 
   dev = filp->private_data;
 
-  if (count > 12){
-    mod_info_dbg("Copy only the first 12-bytes\n");
-    copy_from_user(kernel_buf, buf, 12);
+  if (is_command_mode_enabled(dev))
+  {
+    mod_info_dbg("Command Mode!\n");
+    if (count > 12){
+      mod_info_dbg("Copy only the first 12-bytes\n");
+      copy_from_user(kernel_buf, buf, 12);
+    }
+    else
+      copy_from_user(kernel_buf, buf, count);
+
+    address         = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2]  << 8) | (kernel_buf[3]);
+    value           = (kernel_buf[4] << 24) | (kernel_buf[5] << 16) | (kernel_buf[6]  << 8) | (kernel_buf[7]);
+    device_address  = (kernel_buf[8] << 24) | (kernel_buf[9] << 16) | (kernel_buf[10] << 8) | (kernel_buf[11]);
+
+    mod_info_dbg("Write: 0x%08X 0x%08X 0x%08X\n", (unsigned int) address, (unsigned int)value, (unsigned int)device_address);
+
+    //Need to determine if this is a register write or a command, if it is a command see if it takes an address
+    if (address < CMD_OFFSET)
+    {
+      //Write a Register
+      write_register(dev, address, value);
+    }
+    else
+    {
+      //Write Command
+      mod_info_dbg("Not Command Mode!\n");
+      write_command(dev, address, device_address, value);
+    }
   }
   else
-    copy_from_user(kernel_buf, buf, count);
-
-  address         = (kernel_buf[0] << 24) | (kernel_buf[1] << 16) | (kernel_buf[2]  << 8) | (kernel_buf[3]);
-  value           = (kernel_buf[4] << 24) | (kernel_buf[5] << 16) | (kernel_buf[6]  << 8) | (kernel_buf[7]);
-  device_address  = (kernel_buf[8] << 24) | (kernel_buf[9] << 16) | (kernel_buf[10] << 8) | (kernel_buf[11]);
-
-  mod_info_dbg("Write: 0x%08X 0x%08X 0x%08X\n", (unsigned int) address, (unsigned int)value, (unsigned int)device_address);
-
-  //Need to determine if this is a register write or a command, if it is a command see if it takes an address
-  if (address < CMD_OFFSET)
   {
-    //Write a Register
-    write_register(dev, address, value);
+    mod_info_dbg("Write Data: Count: 0x%08X\n", (unsigned int) count);
+    //return retval;
+    return nysa_pcie_write_data(dev, buf, count);
   }
-  else
-  {
-    //Write Command
-    write_command(dev, address, device_address, value);
-  }
-
   //Check to see if this is a command or just a register
   return retval;
 }
 
 ssize_t nysa_pcie_read(struct file *filp, char __user * buf, size_t count, loff_t *f_pos)
 {
-  
+
   nysa_pcie_dev_t *dev;
   dev = filp->private_data;
   mod_info_dbg("Buffer Pointer: %p\n", buf);
   return nysa_pcie_read_data(dev, buf, count);
+}
+
+loff_t nysa_pcie_llseek (struct file * filp, loff_t off, int whence)
+{
+  nysa_pcie_dev_t *dev;
+
+  dev = filp->private_data;
+  enable_command_mode(dev, false);
+
+  mod_info_dbg("in llseek\n");
+  switch (whence)
+  {
+    case 0: //Set
+      mod_info_dbg("disable command mode!\n");
+      break;
+    case 1: //Current Position
+      mod_info_dbg("disable command mode!\n");
+      break;
+    case 2: //End
+      mod_info_dbg("enable command mode!\n");
+      enable_command_mode(dev, true);
+      break;
+    default:
+      return -EINVAL;
+  }
+
+  return 0;
 }
 
 struct file_operations nysa_pcie_fops = {
@@ -150,7 +187,8 @@ struct file_operations nysa_pcie_fops = {
   read:     nysa_pcie_read,
   write:    nysa_pcie_write,
   open:     nysa_pcie_open,
-  release:  nysa_pcie_release
+  release:  nysa_pcie_release,
+  llseek:   nysa_pcie_llseek
 };
 
 //-----------------------------------------------------------------------------
@@ -255,7 +293,7 @@ static int __init nysa_pcie_init(void)
     goto unregister_chrdev_region;
   }
 
-  //Initialize each of the possible character devices  
+  //Initialize each of the possible character devices
   for (i = 0; i < MAX_DEVICES; i++)
   {
     cdevs[i].owner = THIS_MODULE;

@@ -99,7 +99,8 @@ module pcie_ingress (
   output  reg [7:0]         o_ingress_count,
   output  reg [7:0]         o_ingress_ri_count,
   output  reg [7:0]         o_ingress_ci_count,
-  output  reg [31:0]        o_ingress_addr
+  output  reg [31:0]        o_ingress_addr,
+  output  reg [7:0]         o_ingress_cmplt_count
 );
 
 //local parameters
@@ -215,7 +216,7 @@ assign  w_pkt_addr            = {r_hdr[2][31:2], 2'b00};
 assign  w_cmplt_lower_addr    = r_hdr[3][`CMPLT_LOWER_ADDR_RANGE];
 
 assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
-assign  w_cmd_en              = (w_reg_addr > `CMD_OFFSET);
+assign  w_cmd_en              = (w_reg_addr >= `CMD_OFFSET);
 //assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
 assign  w_buf_pkt_addr_base   = i_buf_offset - w_cmplt_lower_addr;
 
@@ -277,6 +278,7 @@ always @ (posedge clk) begin
     o_ingress_count           <=  0;
     o_ingress_ri_count        <=  0;
     o_ingress_ci_count        <=  0;
+    o_ingress_cmplt_count     <=  0;
     o_ingress_addr            <=  0;
 
     //Complete
@@ -343,6 +345,7 @@ always @ (posedge clk) begin
           case (w_reg_addr)
             `COMMAND_RESET: begin
               r_config_space_done             <=  0;
+              o_cmd_rst_stb                   <=  1;
             end
             `PERIPHERAL_WRITE: begin
               o_cmd_flg_sel_per_stb           <=  1;
@@ -437,6 +440,7 @@ always @ (posedge clk) begin
         o_buf_we                      <=  1;
         o_buf_data                    <=  i_axi_ingress_data;
         r_buf_cnt                     <=  r_buf_cnt + 1;
+        o_ingress_cmplt_count         <=  o_ingress_cmplt_count + 1;
         state                         <=  SEND_DATA;
       end
       SEND_DATA: begin

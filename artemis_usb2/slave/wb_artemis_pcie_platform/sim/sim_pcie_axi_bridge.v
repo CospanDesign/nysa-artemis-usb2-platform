@@ -32,9 +32,9 @@ SOFTWARE.
 
 
 module sim_pcie_axi_bridge #(
-  parameter PCIE_BUS_NUM                              = 8'h02,
-  parameter PCIE_FUN_NUM                              = 3'h0,
-  parameter PCIE_DEV_NUM                              = 5'h0,
+  parameter PCIE_BUS_NUM                              = 8'h55,
+  parameter PCIE_DEV_NUM                              = 5'hA,
+  parameter PCIE_FUN_NUM                              = 3'h2,
 
   parameter USR_CLK_DIVIDE                            = 4,
 

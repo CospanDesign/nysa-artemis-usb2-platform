@@ -68,7 +68,9 @@ localparam  WAIT_FOR_FIFO           = 4'h1;
 localparam  WAIT_FOR_PCIE_CORE      = 4'h2;
 localparam  SEND_HDR                = 4'h3;
 localparam  SEND_DATA               = 4'h4;
-localparam  FINISHED                = 4'h5;
+localparam  SEND_NON_DATA_PKT       = 4'h5;
+localparam  SEND_NON_DATA_PKT_FIN   = 4'h6;
+localparam  FINISHED                = 4'h7;
 
 //Registers/Wires
 reg   [3:0]                 state;
@@ -109,7 +111,7 @@ assign  w_hdr0      = w_hdr[0];
 assign  w_hdr1      = w_hdr[1];
 assign  w_hdr2      = w_hdr[2];
 
-assign  o_axi_egress_data = ((state == WAIT_FOR_PCIE_CORE) || (state == SEND_HDR)) ? w_hdr[r_hdr_index]:
+assign  o_axi_egress_data = ((state == WAIT_FOR_PCIE_CORE) || (state == SEND_HDR) || (state == SEND_NON_DATA_PKT) || (state == SEND_NON_DATA_PKT_FIN)) ? w_hdr[r_hdr_index]:
                             i_fifo_data;
 
 //Synchronous Logic
@@ -137,7 +139,7 @@ always @ (posedge clk) begin
         r_hdr_index       <=  0;
         if (i_enable) begin
           if (w_non_data_packet) begin
-            state         <=  WAIT_FOR_PCIE_CORE;
+            state         <=  SEND_NON_DATA_PKT;
           end
           else begin
             state         <=  WAIT_FOR_FIFO;
@@ -170,31 +172,6 @@ always @ (posedge clk) begin
         end
         o_axi_egress_valid      <=  1;
       end
-/*
-      WAIT_FOR_PCIE_CORE: begin
-        o_axi_egress_valid  <=  1;
-        if (i_axi_egress_ready) begin
-          //o_axi_egress_data <=  w_hdr[r_hdr_index];
-          r_hdr_index       <=  r_hdr_index + 1;
-          state             <=  SEND_HDR;
-        end
-      end
-      SEND_HDR: begin
-        //o_axi_egress_data   <=  w_hdr[r_hdr_index];
-        r_hdr_index         <=  r_hdr_index + 1;
-        if (r_hdr_index + 1 >= w_hdr_size) begin
-          if (w_pkt_data_count == 0) begin
-            o_axi_egress_last <=  1;
-            state             <=  FINISHED;
-          end
-          else begin
-            state             <=  SEND_DATA;
-            o_fifo_stb        <=  1;
-            r_data_count      <=  r_data_count + 1;
-          end
-        end
-      end
-*/
       SEND_DATA: begin
         //o_axi_egress_data   <=  i_fifo_data;
         o_fifo_stb          <=  1;
@@ -204,14 +181,30 @@ always @ (posedge clk) begin
         end
         r_data_count        <=  r_data_count + 1;
       end
+      SEND_NON_DATA_PKT: begin
+        if (i_axi_egress_ready && o_axi_egress_valid) begin
+          r_hdr_index         <=  r_hdr_index + 1;
+          if (r_hdr_index + 2 >= w_hdr_size) begin
+            o_axi_egress_last <=  1;
+            state             <=  SEND_NON_DATA_PKT_FIN;
+          end
+        end
+        o_axi_egress_valid    <=  1;
+      end
+      SEND_NON_DATA_PKT_FIN: begin
+        o_axi_egress_valid    <=  0;
+        o_axi_egress_last     <=  0;
+        o_fifo_act            <=  0;
+        state                 <=  FINISHED;
+      end
       FINISHED: begin
-        o_axi_egress_valid  <=  0;
-        o_axi_egress_last   <=  0;
-        o_fifo_act          <=  0;
-        o_finished          <=  1;
+        o_axi_egress_valid    <=  0;
+        o_axi_egress_last     <=  0;
+        o_fifo_act            <=  0;
+        o_finished            <=  1;
         if (!i_enable) begin
-          o_finished        <=  0;
-          state             <=  IDLE;
+          o_finished          <=  0;
+          state               <=  IDLE;
         end
       end
       default: begin

@@ -214,6 +214,7 @@ localparam    INGRESS_STATE       = 30;
 localparam    INGRESS_RI_COUNT    = 31;
 localparam    INGRESS_CI_COUNT    = 32;
 localparam    INGRESS_ADDR        = 33;
+localparam    INGRESS_CMPLT_COUNT = 34;
 
 
 //Local Registers/Wires
@@ -331,6 +332,7 @@ wire [7:0]                        w_ingress_count;
 wire [3:0]                        w_ingress_state;
 wire [7:0]                        w_ingress_ri_count;
 wire [7:0]                        w_ingress_ci_count;
+wire [7:0]                        w_ingress_cmplt_count;
 wire [31:0]                       w_ingress_addr;
 
 wire [31:0]                       w_data_size;
@@ -520,6 +522,7 @@ artemis_pcie_controller #(
   .o_ingress_state                   (w_ingress_state              ),
   .o_ingress_ri_count                (w_ingress_ri_count           ),
   .o_ingress_ci_count                (w_ingress_ci_count           ),
+  .o_ingress_cmplt_count             (w_ingress_cmplt_count        ),
   .o_ingress_addr                    (w_ingress_addr               )
 );
 
@@ -942,6 +945,9 @@ always @ (posedge clk) begin
             end
             INGRESS_CI_COUNT: begin
               o_wbs_dat                         <=  {24'h00, w_ingress_ci_count};
+            end
+            INGRESS_CMPLT_COUNT: begin
+              o_wbs_dat                         <=  {24'h00, w_ingress_cmplt_count};
             end
             INGRESS_ADDR: begin
               o_wbs_dat                         <=  w_ingress_addr;

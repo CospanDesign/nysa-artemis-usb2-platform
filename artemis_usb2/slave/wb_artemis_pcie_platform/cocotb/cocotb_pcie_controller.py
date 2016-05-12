@@ -53,7 +53,7 @@ READ_BUFFER_A_ADDRESS       = 0x04000000
 READ_BUFFER_B_ADDRESS       = 0x05000000
 BUFFER_SIZE                 = 0x00000400
 
-MAX_PACKET_SIZE             = 0x80
+MAX_PACKET_SIZE             = 0x40
 
 def dword_to_array(value):
     out = Array('B')
@@ -434,9 +434,36 @@ class CocotbPCIE (object):
         buf = [0, 0]
 
         #yield self.wait_for_data_background()
+        host_buffer = 0x3
+        print "Host Buffer Ready: 0x%02X" % host_buffer
+        while host_buffer > 0:
+            if host_buffer & 0x01 == 1:
+                bs = 1
+                host_buffer = host_buffer & 0x02
+            else:
+                bs = 2
+                host_buffer = host_buffer & 0x01
+
+            if data_pos < len(data):
+                length = len(data) - data_pos
+                if length > byte_length:
+                    length = byte_length
+                if bs == 1:
+                    buf[0] = data[data_pos: data_pos + length]
+                else:
+                    buf[1] = data[data_pos: data_pos + length]
+                self.set_buffer_ready_status(bs)
+                data_pos += length
+                print "****Total Size:  %d" % len(data)
+                print "****Buffer Size: %d" % byte_length
+                print "****Data Pos:    %d" % data_pos
+                print "****Length:      %d" % length
+                print "****Position:    %d" % bs
+                yield self.sleep(10)
+
 
         while True:
-            yield self.sleep(10)
+            yield self.sleep(50)
             yield self.wait_for_data(print_data = False)
             print "Data Send: %d Total Count: %d" % (data_sent, count)
             #yield self.wait_for_data(print_data = True)
@@ -535,7 +562,8 @@ class CocotbPCIE (object):
                         self.w.join()
                     yield self.sleep(50)
                     #data_sent += (byte_count / 4)
-                    data_sent += byte_size / 4
+                    #data_sent += byte_size / 4
+                    data_sent += length
                     #print "Lower Address: 0x%04X" % lower_addr
                     #print "data_sent: %d, byte count:  %d count: %d" % (pos, byte_size, count)
 

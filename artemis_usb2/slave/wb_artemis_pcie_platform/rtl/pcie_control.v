@@ -242,7 +242,7 @@ assign  read_buf_map[1]   = i_read_b_addr;
 ppfifo #(
   .DATA_WIDTH       (32                 ),
   .ADDRESS_WIDTH    (4                  ) //16 32-bit values for the control
-) egress_fifo(
+) egress_fifo (
   .reset            (rst || i_cmd_rst_stb),
   //Write Side
   .write_clock      (clk                ),
@@ -390,6 +390,9 @@ always @ (posedge clk) begin
     o_dword_req_cnt     <=  0;
 
     o_ibm_en            <=  0;
+    if (i_cmd_rst_stb) begin
+      r_sts_reset       <=  1;
+    end
 
   end
   else begin
@@ -402,11 +405,11 @@ always @ (posedge clk) begin
         o_per_sel           <= 0;
         o_mem_sel           <= 0;
         o_dma_sel           <= 0;
-        r_sts_reset         <= 0;
         r_sts_done          <= 0;
         r_sts_cmd_err       <= 0;
         r_tlp_tag           <= 0;
         r_buf_rdy           <= 0;
+        r_buf_done          <= 2'b00;
 
         r_data_count        <= 0;
         r_data_pos          <= 0;
@@ -620,6 +623,7 @@ always @ (posedge clk) begin
       WAIT_FOR_CONFIG: begin
         if (cfg_state == IDLE) begin
           state               <=  IDLE;
+          r_sts_reset         <=  0;
         end
       end
       default: begin
@@ -629,10 +633,6 @@ always @ (posedge clk) begin
 
     if (i_update_buf_stb) begin
       r_buf_rdy               <=  r_buf_rdy | i_update_buf;
-    end
-    if (i_cmd_rst_stb) begin
-      r_sts_reset             <=  1;
-      state                   <=  SEND_CONFIG;
     end
 
 

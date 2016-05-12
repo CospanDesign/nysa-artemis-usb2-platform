@@ -169,6 +169,7 @@ module artemis_pcie_controller #(
   output      [3:0]         o_ingress_state,
   output      [7:0]         o_ingress_ri_count,
   output      [7:0]         o_ingress_ci_count,
+  output      [7:0]         o_ingress_cmplt_count,
   output      [31:0]        o_ingress_addr,
 
   output                    dbg_reg_detected_correctable,
@@ -468,8 +469,8 @@ wire                        w_bld_buf_fin;
 /****************************************************************************
  * Interrupt State Machine Signals
  ****************************************************************************/
-//pcie_axi_bridge pcie_interface
-sim_pcie_axi_bridge pcie_interface
+pcie_axi_bridge pcie_interface
+//sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface
@@ -704,6 +705,7 @@ ingress_buffer_manager buf_man (
   //PCIE Ingress Interface
   .i_ing_cplt_stb             (w_pcie_ing_fc_rcv_stb      ),
   .i_ing_cplt_tag             (w_ing_cplt_tag             ),
+  .i_ing_cplt_pkt_cnt         (w_pcie_ing_fc_rcv_cnt      ),
   .i_ing_cplt_byte_count      (w_ing_cplt_byte_count      ),
   .i_ing_cplt_lwr_addr        (w_ing_cplt_lwr_addr        ),
 
@@ -829,24 +831,24 @@ pcie_control #(
 
 /****************************************************************************
  * Single IN/OUT FIFO Solution (This Can Change in the future):
- *  Instead of dedicating unique FIFOs for each bus, I can just doe one
+ *  Instead of dedicating unique FIFOs for each bus, I can just do one
  *  FIFO. This will reduce the size of the core at the cost of
  *  a certain amount of time it will take to fill up the FIFOs
  ****************************************************************************/
 
 //INGRESS FIFO
 ppfifo #(
-  .DATA_WIDTH                 (32                        ),
-  .ADDRESS_WIDTH              (DATA_INGRESS_FIFO_DEPTH   ) // 1024 32-bit values (4096 Bytes)
-) i_data_fifo (
-  .reset                      (pcie_reset || rst         ),
-  //Write Side
-  .write_clock                (clk_62p5                  ),
-  .write_ready                (w_i_data_fifo_rdy         ),
-  .write_activate             (w_o_data_fifo_act         ),
-  .write_fifo_size            (w_o_data_fifo_size        ),
-  .write_strobe               (w_i_data_fifo_stb         ),
-  .write_data                 (w_i_data_fifo_data        ),
+  .DATA_WIDTH                 (32                         ),
+  .ADDRESS_WIDTH              (DATA_INGRESS_FIFO_DEPTH    ) // 1024 32-bit values (4096 Bytes)
+) i_data_fifo (                                           
+  .reset                      (pcie_reset || rst          ),
+  //Write Side                                            
+  .write_clock                (clk_62p5                   ),
+  .write_ready                (w_i_data_fifo_rdy          ),
+  .write_activate             (w_o_data_fifo_act          ),
+  .write_fifo_size            (w_o_data_fifo_size         ),
+  .write_strobe               (w_i_data_fifo_stb          ),
+  .write_data                 (w_i_data_fifo_data         ),
 
   //Read Side
   .read_clock                 (i_data_clk                 ),
@@ -949,6 +951,7 @@ pcie_ingress ingress (
   .o_ingress_count            (o_ingress_count            ),
   .o_ingress_ri_count         (o_ingress_ri_count         ),
   .o_ingress_ci_count         (o_ingress_ci_count         ),
+  .o_ingress_cmplt_count      (o_ingress_cmplt_count      ),
   .o_ingress_addr             (o_ingress_addr             )
 );
 

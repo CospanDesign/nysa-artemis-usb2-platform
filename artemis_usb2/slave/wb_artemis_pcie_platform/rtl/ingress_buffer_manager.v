@@ -71,6 +71,7 @@ module ingress_buffer_manager #(
 
   //PCIE Ingress
   input                     i_ing_cplt_stb,       //Detect
+  input         [9:0]       i_ing_cplt_pkt_cnt,   //Number of dwords in this read
   input         [7:0]       i_ing_cplt_tag,       //Tag that refereneces
   input         [11:0]      i_ing_cplt_byte_count,//When this reaches 0 the tag is finished
   input         [6:0]       i_ing_cplt_lwr_addr,  //Lower address when complete is broken up into multple packets
@@ -125,7 +126,24 @@ wire            [NUM_TAGS - 1:0]    w_tag_bitfield1;
 
 //Tag State
 reg             [3:0]               tag_state[0:NUM_TAGS];
-reg             [12:0]              r_mem_offset[0:NUM_TAGS];
+reg             [11:0]              r_byte_cnt[0:NUM_TAGS];
+
+wire            [11:0]              byte_cnt0;
+wire            [11:0]              byte_cnt1;
+wire            [11:0]              byte_cnt2;
+wire            [11:0]              byte_cnt3;
+wire            [11:0]              byte_cnt4;
+wire            [11:0]              byte_cnt5;
+wire            [11:0]              byte_cnt6;
+wire            [11:0]              byte_cnt7;
+wire            [11:0]              byte_cnt8;
+wire            [11:0]              byte_cnt9;
+wire            [11:0]              byte_cnt10;
+wire            [11:0]              byte_cnt11;
+wire            [11:0]              byte_cnt12;
+wire            [11:0]              byte_cnt13;
+wire            [11:0]              byte_cnt14;
+wire            [11:0]              byte_cnt15;
 
 // DEBUG SIGNALS
 wire            [3:0]               tag_state0;
@@ -170,8 +188,7 @@ assign  w_tag_ingress_done[1] = ((r_tag_sm_fin & w_tag_bitfield[1]) == (r_tag_sm
                                  (r_tag_sm_en & w_tag_bitfield[1]) > 0);
 
 //Set the output block memory start address
-assign  o_bld_mem_addr    = (i_ing_cplt_tag << (MAX_REQ_WIDTH - 2)) + r_mem_offset[i_ing_cplt_tag];
-//assign  o_bld_mem_addr    = (i_ing_cplt_tag << (MAX_REQ_WIDTH - 2));
+assign  o_bld_mem_addr    = (i_ing_cplt_tag << (MAX_REQ_WIDTH - 2)) + r_byte_cnt[i_ing_cplt_tag][11:2];
 assign  o_ctr_dword_size  = DWORD_COUNT;
 
 assign  o_ctr_idle        = (r_tag_sm_en == 0);
@@ -193,6 +210,28 @@ assign  tag_state12       = tag_state[12];
 assign  tag_state13       = tag_state[13];
 assign  tag_state14       = tag_state[14];
 assign  tag_state15       = tag_state[15];
+
+
+
+
+assign  byte_cnt0 = r_byte_cnt[0];
+assign  byte_cnt1 = r_byte_cnt[1];
+assign  byte_cnt2 = r_byte_cnt[2];
+assign  byte_cnt3 = r_byte_cnt[3];
+assign  byte_cnt4 = r_byte_cnt[4];
+assign  byte_cnt5 = r_byte_cnt[5];
+assign  byte_cnt6 = r_byte_cnt[6];
+assign  byte_cnt7 = r_byte_cnt[7];
+assign  byte_cnt8 = r_byte_cnt[8];
+assign  byte_cnt9 = r_byte_cnt[9];
+assign  byte_cnt10 = r_byte_cnt[10];
+assign  byte_cnt11 = r_byte_cnt[11];
+assign  byte_cnt12 = r_byte_cnt[12];
+assign  byte_cnt13 = r_byte_cnt[13];
+assign  byte_cnt14 = r_byte_cnt[14];
+assign  byte_cnt15 = r_byte_cnt[15];
+
+
 // END DEBUG SIGNALS
 
 //synchronous logic
@@ -215,7 +254,8 @@ always @ (posedge clk) begin
     r_tag_rdy_pos                 <=  0;
     r_tag_rdy_cnt                 <=  0;
     r_tag_sm_en                   <=  0;
-    o_hst_buf_fin                 <=  2'b11;
+    //o_hst_buf_fin                 <=  2'b11;
+    o_hst_buf_fin                 <=  2'b00;
     o_ctr_buf_sel                 <=  0;
     r_start_control               <=  1;
     r_tag_fin                     <=  0;
@@ -328,27 +368,27 @@ for (i = 0; i < NUM_TAGS; i = i + 1) begin : tag_sm
 always @ (posedge clk) begin
   r_tag_sm_fin[i]   <=  0;
   if (rst || !i_ctr_en) begin
-    tag_state[i]    <=  IDLE;
-    r_tag_sm_fin[i] <=  0;
-    r_mem_offset[i] <=  0;
+    tag_state[i]            <=  IDLE;
+    r_tag_sm_fin[i]         <=  0;
+    r_byte_cnt[i]           <=  0;
   end
   else begin
     case (tag_state[i])
       IDLE: begin
-        r_mem_offset[i] <=  0;
+        r_byte_cnt[i]       <=  0;
         if (r_tag_sm_en[i]) begin
-          tag_state[i]  <=  WAIT_FOR_COMPLETION;
+          tag_state[i]      <=  WAIT_FOR_COMPLETION;
         end
       end
       WAIT_FOR_COMPLETION: begin
-        if (i_ing_cplt_stb && (i_ing_cplt_tag == i) && (i_ing_cplt_byte_count == 0)) begin
+        if ((i_ing_cplt_tag == i) && (r_byte_cnt[i] == MAX_REQ_SIZE)) begin
           //The tag completion strobe went off
           //The incomming tag matches one of our tags
           //The completion byte count == 0 (W'ere done!)
-          tag_state[i]  <=  FINISHED;
+          tag_state[i]      <=  FINISHED;
         end
         else if (i_ing_cplt_stb && i_ing_cplt_tag == i) begin
-          r_mem_offset[i]  <=  ((MAX_REQ_SIZE - i_ing_cplt_byte_count) >> 2);
+          r_byte_cnt[i]     <=  r_byte_cnt[i] + {i_ing_cplt_pkt_cnt, 2'b00};
         end
         
       end

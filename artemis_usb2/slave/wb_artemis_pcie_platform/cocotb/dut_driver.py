@@ -61,6 +61,7 @@ INGRESS_STATE                   =   30
 INGRESS_RI_COUNT                =   31
 INGRESS_CI_COUNT                =   32
 INGRESS_ADDR                    =   33
+INGRESS_CMPLT_COUNT             =   34
 
 
 BAR_ADDR_BASE                   =   19
@@ -480,6 +481,10 @@ class ArtemisPCIEDriver(driver.Driver):
 
     def get_ingress_ci_count(self):
         return self.read_register(INGRESS_CI_COUNT)
+
+    def get_ingress_cmplt_count(self):
+        return self.read_register(INGRESS_CMPLT_COUNT)
+
 
     def get_ingress_addr(self):
         return self.read_register(INGRESS_ADDR)

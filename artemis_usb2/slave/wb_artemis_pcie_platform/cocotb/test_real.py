@@ -19,6 +19,18 @@ from nysa.host.platform_scanner import PlatformScanner
 from dut_driver import ArtemisPCIEDriver
 DRIVER = ArtemisPCIEDriver
 
+def create_inc_buf(count):
+    buf = Array('B')
+    for i in range(count):
+        buf.append(i % 256)
+    return buf
+
+def create_empty_buf(count):
+    buf = Array('B')
+    for i in range(count):
+        buf.append(0x00)
+    return buf
+
 
 class Test (unittest.TestCase):
 
@@ -81,7 +93,7 @@ class Test (unittest.TestCase):
         RX_EQUALIZER = 0x3
 
 
-        self.s.Info("Attempting to set voltage range")
+        #self.s.Info("Attempting to set voltage range")
         self.s.Info("Enable PCIE")
         self.driver.enable(True)
         self.driver.enable_pcie_read_block(True)
@@ -149,56 +161,47 @@ class Test (unittest.TestCase):
         self.s.Verbose("Number of Reads:     %d" % self.driver.get_num_block_reads())
         #self.s.Info("Debug Flags: 0x%08X" % self.driver.get_debug_flags())
         self.driver.read_debug_flags()
-
         print ""
+        '''
         self.s.Important("Interrupt Test")
         self.s.Info("Setting interrupt channel to 0x00")
         self.driver.set_interrupt_channel(0x01)
         self.s.Info("Sending interrupt...")
         self.driver.send_irq()
-        print ""                             
+        print ""
+        '''
         self.s.Info("Ingress State:          0x%04X" % self.driver.get_ingress_state())
         self.s.Info("Ingress Count:          %d" % self.driver.get_ingress_count())
-        print ""                             
+        print ""
         self.s.Info("Ingress RI Count:       %d" % self.driver.get_ingress_ri_count())
         self.s.Info("Ingress CI Count:       %d" % self.driver.get_ingress_ci_count())
+        self.s.Info("Ingress CMPLT Count:    %d" % self.driver.get_ingress_cmplt_count())
         self.s.Info("Ingress Address:        0x%08X" % self.driver.get_ingress_addr())
-        print ""                             
+        print ""
         self.s.Info("Config Read Count:      %d" % self.driver.get_config_state_read_count())
         self.s.Info("Config State:           0x%04X" % self.driver.get_config_state())
-        print ""                             
+        print ""
         self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
         print ""
 
-        self.driver.get_config_data()        
+        self.driver.get_config_data()
         buffer_size = self.driver.get_local_buffer_size()
 
-        for i in range (6):                  
+        '''
+        for i in range (6):
             self.s.Info("Bus Address:            0x%08X" % self.driver.get_bar_address(i))
+        '''
 
-        data = Array('B')
-        for i in range(buffer_size * 4):
-            v = i * 4
-            data.append((v + 0) % 256)
-            data.append((v + 1) % 256)
-            data.append((v + 2) % 256)
-            data.append((v + 3) % 256)
-
+        #data = create_inc_buf(buffer_size * 4)
+        '''
+        data = create_empty_buf(buffer_size * 4)
         self.driver.write_local_buffer(data)
+        '''
 
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
-        #self.driver.reset_debug_flags()
-        #self.driver.send_block_from_local_buffer()
-        #self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
-        #print ""
-        #self.driver.read_debug_flags()
 
-        for i in range (64):
-            self.driver.send_block_from_local_buffer()
-            self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
-            print ""
-            self.driver.read_debug_flags()
+        self.driver.enable_egress_fifo_send(True)
 
 if __name__ == "__main__":
     unittest.main()

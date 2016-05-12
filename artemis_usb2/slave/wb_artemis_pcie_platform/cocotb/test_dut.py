@@ -382,7 +382,7 @@ def test_pcie_write_med_length_command(dut):
     yield cocotb.external(driver.enable)(True)
     c = CocotbPCIE(dut, debug = False)
 
-    BYTE_COUNT = 512
+    BYTE_COUNT = 0x10
     ADDRESS = 0x00
 
     data = Array('B')
@@ -434,12 +434,8 @@ def test_pcie_write_medium_length_command(dut):
     ADDRESS = 0x00
 
     data = Array('B')
-    for i in range(BYTE_COUNT / 4):
-        v = i * 4
-        data.append((v + 0) % 256)
-        data.append((v + 1) % 256)
-        data.append((v + 2) % 256)
-        data.append((v + 3) % 256)
+    for i in range(BYTE_COUNT):
+        data.append(i % 256)
 
     v = yield cocotb.external(driver.get_control)()
 
@@ -502,6 +498,7 @@ def test_pcie_write_multiple_buffers(dut):
     yield (nysa.wait_clocks(400))
 
 
+#@cocotb.test(skip = False)
 @cocotb.test(skip = False)
 def test_pcie_write_three_buffers(dut):
     """

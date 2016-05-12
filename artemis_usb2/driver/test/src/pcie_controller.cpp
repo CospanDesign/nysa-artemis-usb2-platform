@@ -49,6 +49,9 @@ void PCIE::enable_debug(bool enable)
 void PCIE::write_register(unsigned int address, unsigned int value)
 {
   char write_data[8];
+  if (lseek(fn, 0, SEEK_END) == -1) {
+    printf ("Failed to set command mode!\n"); 
+  }
 
   write_data[0]  = (0xFF & (address >> 24));
   write_data[1]  = (0xFF & (address >> 16));
@@ -62,6 +65,9 @@ void PCIE::write_register(unsigned int address, unsigned int value)
 
   write(fn, write_data, 8);
 
+  if (lseek(fn, 0, SEEK_SET) == -1) {
+    printf ("Failed to exit command mode!\n"); 
+  }
   if (debug)
   {
     for(int i=0; i < 8; i=i + 4)
@@ -75,6 +81,10 @@ void PCIE::write_register(unsigned int address, unsigned int value)
 void PCIE::write_command(unsigned int address, unsigned int value, unsigned int device_address)
 {
   char write_data[12];
+  
+  if (lseek(fn, 0, SEEK_END) == -1) {
+    printf ("Failed to set command mode!\n"); 
+  }
 
   write_data[0]  = (0xFF & (address >> 24));
   write_data[1]  = (0xFF & (address >> 16));
@@ -101,11 +111,20 @@ void PCIE::write_command(unsigned int address, unsigned int value, unsigned int 
       printf ("[%d]\t\t-> 0x%08X\n", i, write_word);
     }
   }
+
+  if (lseek(fn, 0, SEEK_SET) == -1) {
+    printf ("Failed to exit command mode!\n"); 
+  }
 }
 
 ssize_t PCIE::read_periph_data(unsigned int address, unsigned char *buf, unsigned int count)
 {
-  //FPGA Speaks in 32-bit values so when asking for a size, make sure to specify the size in dwords
 	write_command(PERIPHERAL_READ, count, address);
 	return read(fn, buf, count);
+}
+
+ssize_t PCIE::write_periph_data(unsigned int address, unsigned char * buf, unsigned int count)
+{
+	write_command(PERIPHERAL_WRITE, count / 4, address);
+	return write(fn, buf, count);
 }

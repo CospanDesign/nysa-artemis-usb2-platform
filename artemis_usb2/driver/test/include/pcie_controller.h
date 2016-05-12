@@ -1,9 +1,6 @@
 #ifndef __PCIE_H__
 #define __PCIE_H__
 
-
-
-
 class PCIE {
 
 private:
@@ -18,6 +15,7 @@ public:
     void write_command(unsigned int address, unsigned int value, unsigned int device_address);
 
     ssize_t read_periph_data(unsigned int address, unsigned char * buf, unsigned int count);
+    ssize_t write_periph_data(unsigned int address, unsigned char * buf, unsigned int count);
 };
 
 #endif //__PCIE_H__

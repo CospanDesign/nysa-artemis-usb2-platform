@@ -159,10 +159,10 @@ assign  o_ready                 = (w_hdr_rdy & w_dat_rdy);
 
 //synchronous logic
 always  @ (posedge clk) begin
-  r_delay_rcv_stb               <=  0;
   if (rst) begin
     r_hdr_in_flt                <=  0;
     r_dat_in_flt                <=  0;
+    r_delay_rcv_stb             <=  0;
   end
   else begin
     if (i_cmt_stb) begin
@@ -174,6 +174,7 @@ always  @ (posedge clk) begin
       end
     end
     else if (i_rcv_stb || r_delay_rcv_stb) begin
+      r_delay_rcv_stb           <=  0;
       r_hdr_in_flt              <=  r_hdr_in_flt - r_hdr_rcv_size;
       r_dat_in_flt              <=  r_dat_in_flt - w_data_credit_rcv_size;
     end

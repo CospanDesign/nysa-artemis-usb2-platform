@@ -50,7 +50,8 @@
 `define FLAG_TC_NORMAL    3'b000
 `define FLAG_POISONED     1'b0
 `define FLAG_ADDR_TRANS   2'b00
-`define FLAG_NO_SNOOP     1'b1
+//`define FLAG_NO_SNOOP     1'b1
+`define FLAG_NO_SNOOP     1'b0
 `define FLAG_PROC_HINT    1'b0
 `define FLAG_RELAX_ORD    1'b0
 `define FLAG_DIGEST       1'b0

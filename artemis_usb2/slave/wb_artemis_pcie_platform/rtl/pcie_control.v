@@ -31,8 +31,7 @@ SOFTWARE.
 `include "nysa_pcie_defines.v"
 
 module pcie_control #(
-  parameter                 MAX_REQUEST_PAYLOAD_SIZE  = 512,
-  parameter                 MAX_TAG_CNT               = 4
+  parameter                 MAX_REQUEST_PAYLOAD_SIZE  = 512
 )(
   input                     clk,
   input                     rst,
@@ -59,6 +58,8 @@ module pcie_control #(
   //Nysa Interface
   input       [31:0]        i_interrupt_value,
   input                     i_interrupt_stb,
+  output  reg               o_interrupt_send_en,
+  input                     i_interrupt_send_rdy,
 
   //In band reset
   input                     i_cmd_rst_stb,
@@ -108,7 +109,7 @@ module pcie_control #(
   //Egress FIFO for control data
   output  reg               o_ctr_sel,
   output  reg [7:0]         o_interrupt_msi_value,
-  output  reg               o_interrupt_stb,
+  //output  reg               o_interrupt_stb,
 
   output                    o_egress_fifo_rdy,
   input                     i_egress_fifo_act,
@@ -150,23 +151,20 @@ localparam      EGRESS_DATA_FLOW              = 4'h1;
 localparam      WAIT_FOR_HOST_EGRESS_BUFFER   = 4'h2;
 localparam      WAIT_FOR_FPGA_EGRESS_FIFO     = 4'h3;
 localparam      SEND_EGRESS_DATA              = 4'h4;
-localparam      SEND_EGRESS_STATUS_SLEEP      = 4'h5;
-localparam      SEND_EGRESS_STATUS            = 4'h6;
-localparam      INGRESS_DATA_FLOW             = 4'h7;
-localparam      WAIT_FOR_HOST_INGRESS_TAG     = 4'h8;
-localparam      WAIT_FOR_FLOW_CONTROL         = 4'h9;
-localparam      REQUEST_INGRESS_DATA          = 4'hA;
-localparam      SEND_INGRESS_STATUS_SLEEP     = 4'hB;
-localparam      SEND_INGRESS_STATUS           = 4'hC;
-localparam      SEND_CONFIG                   = 4'hD;
-localparam      SEND_CONFIG_SLEEP             = 4'hE;
-localparam      WAIT_FOR_CONFIG               = 4'hF;
+localparam      SEND_EGRESS_STATUS            = 4'h5;
+localparam      INGRESS_DATA_FLOW             = 4'h6;
+localparam      WAIT_FOR_HOST_INGRESS_TAG     = 4'h7;
+localparam      WAIT_FOR_FLOW_CONTROL         = 4'h8;
+localparam      REQUEST_INGRESS_DATA          = 4'h9;
+localparam      SEND_INGRESS_STATUS           = 4'hA;
+localparam      SEND_CONFIG                   = 4'hB;
 
 
 localparam      PREPARE                       = 4'h1;
 localparam      LOAD_FIFO                     = 4'h2;
 localparam      CFG_SEND_CONFIG               = 4'h3;
 localparam      SEND_INT                      = 4'h4;
+localparam      FINISH                        = 4'h5;
 
 //registes/wires
 
@@ -201,11 +199,8 @@ reg   [31:0]                r_data_pos;
 reg   [23:0]                r_block_count;
 reg   [23:0]                r_fifo_size;
 
-wire                        w_control_sm_idle;
-wire                        w_config_sm_idle;
-
 reg                         r_buf_sel;
-reg                         r_buf_next_sel;
+//reg                         r_buf_next_sel;
 reg   [1:0]                 r_buf_rdy;
 reg   [1:0]                 r_buf_done;
 
@@ -217,16 +212,19 @@ reg   [31:0]                r_tlp_address;          //XXX: Need to figure out th
 reg   [15:0]                r_tlp_requester_id;     //XXX: Need to figure out this!
 reg   [7:0]                 r_tlp_tag;              //XXX: Need to figure out this!
 
+reg                         r_send_cfg_en;
+reg                         r_send_cfg_fin;
+
 
 //Configuration State Machine
 reg   [3:0]                 cfg_state;
 wire                        r_cfg_ready;
-reg                         r_send_cfg_stb;
-reg                         r_send_cfg_en;
+reg                         r_cfg_chan_en;
 
 
 //Convenience Signals
 wire                        w_valid_bus_select;
+wire                        w_cfg_req;
 
 wire  [31:0]                write_buf_map [0:1];
 assign  write_buf_map[0]  = i_write_a_addr;
@@ -272,7 +270,8 @@ assign  register_map [`HDR_BUFFER_SIZE          ] = i_buffer_size;
 assign  register_map [`HDR_PING_VALUE           ] = i_ping_value;
 assign  register_map [`HDR_DEV_ADDR             ] = i_dev_addr;
 assign  register_map [`STS_DEV_STATUS           ] = w_comm_status;
-assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done[1] , r_buf_done[0] };
+//assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done[1] , r_buf_done[0] };
+assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done};
 assign  register_map [`STS_BUF_POS              ] = r_data_pos;
 assign  register_map [`STS_INTERRUPT            ] = i_interrupt_value;
 
@@ -301,20 +300,20 @@ assign  w_comm_status[`STATUS_BIT_INTERRUPT     ] = r_sts_interrupt;
 
 assign  o_sys_rst                           = i_cmd_rst_stb;
 
-assign  o_data_fifo_sel                     = (!r_send_cfg_en) ? (o_per_sel || o_mem_sel || o_dma_sel): 1'b0;
-assign  o_egress_enable                     = r_send_cfg_en || r_send_data_en;
-assign  o_egress_tlp_command                = (r_send_cfg_en) ? `PCIE_MWR_32B:
+assign  o_data_fifo_sel                     = (!r_cfg_chan_en) ? (o_per_sel || o_mem_sel || o_dma_sel): 1'b0;
+assign  o_egress_enable                     = r_cfg_chan_en || r_send_data_en;
+assign  o_egress_tlp_command                = (r_cfg_chan_en) ? `PCIE_MWR_32B:
                                                                 r_tlp_command;
 
-assign  o_egress_tlp_flags                  = (r_send_cfg_en) ? (`FLAG_NORMAL):
+assign  o_egress_tlp_flags                  = (r_cfg_chan_en) ? (`FLAG_NORMAL):
                                                                 r_tlp_flags;
-assign  o_egress_tlp_address                = (r_send_cfg_en) ? i_status_addr:
+assign  o_egress_tlp_address                = (r_cfg_chan_en) ? i_status_addr:
                                                                 r_tlp_address;
-//assign  o_egress_tlp_requester_id           = (r_send_cfg_en) ? 16'h0:
+//assign  o_egress_tlp_requester_id           = (r_cfg_chan_en) ? 16'h0:
 //                                                                r_tlp_requester_id;
 
 assign  o_egress_tlp_requester_id           = {i_pcie_bus_num, i_pcie_dev_num, i_pcie_fun_num};
-assign  o_egress_tag                        = (r_send_cfg_en) ? 8'h0:
+assign  o_egress_tag                        = (r_cfg_chan_en) ? 8'h0:
                                                                 r_tlp_tag;
 
 
@@ -329,27 +328,11 @@ assign  w_sts_hst_buf_stall                 = (state == WAIT_FOR_HOST_EGRESS_BUF
 assign  w_sts_flg_fifo_stall                = (state == WAIT_FOR_FPGA_EGRESS_FIFO);
 
 
-assign  w_control_sm_idle                   = (state == IDLE)                         ||
-                                              (state == EGRESS_DATA_FLOW)             ||
-                                              (state == INGRESS_DATA_FLOW)            ||
-                                              (state == SEND_CONFIG)                  ||
-                                              (state == SEND_CONFIG_SLEEP)            ||
-                                              (state == WAIT_FOR_CONFIG)              ||
-                                              (state == SEND_EGRESS_STATUS_SLEEP)     ||
-                                              (state == SEND_EGRESS_STATUS)           ||
-                                              (state == SEND_INGRESS_STATUS_SLEEP)    ||
-                                              (state == SEND_INGRESS_STATUS)          ||
-                                              (state == WAIT_FOR_HOST_INGRESS_TAG);
-
-assign  w_config_sm_idle                    = (cfg_state == IDLE)           ||
-                                              (cfg_state == PREPARE);
-
 assign  w_valid_bus_select                  = (i_cmd_flg_sel_periph || i_cmd_flg_sel_memory || i_cmd_flg_sel_dma);
+assign  w_cfg_req                           = (r_sts_unknown_cmd || r_sts_ping || r_sts_interrupt || r_sts_read_cfg);
 
 //synchronous logic
 always @ (posedge clk) begin
-  r_send_cfg_stb        <=  0;
-  r_send_data_en        <=  0;
   o_fc_cmt_stb          <=  0;
 
   o_ibm_req_stb         <=  0;
@@ -384,18 +367,41 @@ always @ (posedge clk) begin
     o_data_address      <=  0;
 
     r_buf_sel           <=  0;
-    r_buf_next_sel      <=  0;
+    //r_buf_next_sel      <=  0;
     r_fifo_size         <=  0;
 
     o_dword_req_cnt     <=  0;
 
     o_ibm_en            <=  0;
+
+    r_send_cfg_en       <=  0;
+    r_send_data_en      <=  0;
+
     if (i_cmd_rst_stb) begin
       r_sts_reset       <=  1;
     end
 
+    r_sts_ping          <=  0;
+    r_sts_read_cfg      <=  0;
+    r_sts_interrupt     <=  0;
+    r_sts_unknown_cmd   <=  0;
+
   end
   else begin
+
+    if (i_cmd_unknown) begin
+      r_sts_unknown_cmd <=  1;
+    end
+    if (i_cmd_ping_stb) begin
+      r_sts_ping        <=  1;
+    end
+    if (i_interrupt_stb) begin
+      r_sts_interrupt   <=  1;
+    end
+    if (i_cmd_rd_cfg_stb) begin
+      r_sts_read_cfg    <=  1;
+    end
+
     case (state)
       IDLE: begin
         o_ibm_en            <= 0;
@@ -415,7 +421,10 @@ always @ (posedge clk) begin
         r_data_pos          <= 0;
         r_block_count       <= 0;
         r_buf_sel           <= 0;
-        r_buf_next_sel      <= 0;
+        //r_buf_next_sel      <= 0;
+        r_send_cfg_en       <=  0;
+        r_send_data_en      <=  0;
+
 
         o_data_address      <= i_cmd_data_address;
         o_data_size         <= i_cmd_data_count;
@@ -433,7 +442,7 @@ always @ (posedge clk) begin
         end
         else if (i_cmd_rd_stb) begin
           if (w_valid_bus_select) begin
-            o_data_read_flg      <=  1;
+            o_data_read_flg <=  1;
             state           <=  EGRESS_DATA_FLOW;
           end
           else begin
@@ -442,20 +451,27 @@ always @ (posedge clk) begin
             state           <=  SEND_CONFIG;
           end
         end
+        else if (w_cfg_req) begin
+          state             <=  SEND_CONFIG;
+        end
         //Flags
         if (i_cmd_flg_fifo) begin
           o_data_fifo_flg   <=  1;
         end
         if (i_cmd_flg_sel_periph) begin
-          o_per_sel             <=  1;
+          o_per_sel         <=  1;
         end
         if (i_cmd_flg_sel_memory) begin
-          o_mem_sel             <=  1;
+          o_mem_sel         <=  1;
         end
         if (i_cmd_flg_sel_dma) begin
-          o_dma_sel             <=  1;
+          o_dma_sel         <=  1;
         end
       end
+
+
+
+
       //Egress Flow
       EGRESS_DATA_FLOW: begin
         r_tlp_command                   <=  `PCIE_MWR_32B;
@@ -466,30 +482,28 @@ always @ (posedge clk) begin
         end
         else begin
           r_sts_done                    <=  1;
-          //r_buf_done                    <=  0;
-          //state                         <=  SEND_CONFIG;
           state                         <=  IDLE;
         end
       end
       WAIT_FOR_HOST_EGRESS_BUFFER: begin
-        if (w_config_sm_idle) begin
+        if (!i_update_buf_stb) begin
           r_block_count                 <=  0;
-          //Select the next buffer
-          if (r_buf_rdy > 0) begin
-            if (r_buf_rdy == 2'b11) begin
-              r_buf_sel                 <=  r_buf_next_sel;
-              r_buf_next_sel            <=  ~r_buf_next_sel;  //Flip Flop the buffers
-              r_buf_rdy[r_buf_next_sel] <=  0;
-            end
-            else if (r_buf_rdy == 2'b01) begin
-              r_buf_next_sel            <=  1;                //Next time if there is a choice send the other
+          //Select a buffer
+          if (r_buf_rdy != 0) begin
+            if (r_buf_rdy == 2'b01) begin
+              //Select the first buffer
               r_buf_sel                 <=  0;
               r_buf_rdy[0]              <=  0;
             end
-            else if (r_buf_rdy == 2'b10) begin
-              r_buf_next_sel            <=  0;                //Next time if there is a choice send the other
+            else if( r_buf_rdy == 2'b10) begin
+              //Select the second buffer
               r_buf_sel                 <=  1;
               r_buf_rdy[1]              <=  0;
+            end
+            else begin  //both enabled
+              //Select buffer 0
+              r_buf_sel                 <=  0;
+              r_buf_rdy                 <=  2'b10;
             end
             state                       <=  WAIT_FOR_FPGA_EGRESS_FIFO;
           end
@@ -497,21 +511,19 @@ always @ (posedge clk) begin
       end
       WAIT_FOR_FPGA_EGRESS_FIFO: begin
         //Send data to the host
-        if ((r_data_count >= o_data_size) || (r_block_count >= i_buffer_size)) begin
-          //De-assert the buffers
+        if ((r_data_count < o_data_size) && (r_block_count < i_buffer_size)) begin
+          if (i_e_fifo_rdy) begin
+            r_fifo_size                 <=  i_e_fifo_size;
+            r_tlp_address               <=  read_buf_map[r_buf_sel] + r_block_count;
+            state                       <=  SEND_EGRESS_DATA;
+          end
+        end
+        else begin
           r_buf_done[r_buf_sel]         <=  1;
-          r_buf_sel                     <=  0;
-          //Let the host know that we updated the data and buffer status
-          r_send_cfg_stb                <=  1;
           if (r_data_count >= o_data_size) begin
             r_sts_done                  <=  1;
           end
-          state                         <=  SEND_EGRESS_STATUS_SLEEP;
-        end
-        else if (i_e_fifo_rdy) begin
-          r_fifo_size                   <=  i_e_fifo_size;
-          r_tlp_address                 <=  read_buf_map[r_buf_sel] + r_block_count;
-          state                         <=  SEND_EGRESS_DATA;
+          state                         <=  SEND_EGRESS_STATUS;
         end
       end
       SEND_EGRESS_DATA: begin
@@ -519,24 +531,25 @@ always @ (posedge clk) begin
         //Go back ot the 'egress data flow to start on the next block or see if we are done
         r_send_data_en                  <=  1;
         if (i_egress_finished) begin
+          r_send_data_en                <=  0;
           //Add the amount we sent through the egress FIFO to our data count
           r_block_count                 <=  r_block_count + (r_fifo_size << 2);
           r_data_count                  <=  r_data_count  + (r_fifo_size << 2);
           state                         <=  WAIT_FOR_FPGA_EGRESS_FIFO;
         end
       end
-      SEND_EGRESS_STATUS_SLEEP: begin
-        if (cfg_state != IDLE) begin
-          state                         <=  SEND_EGRESS_STATUS;
-        end
-      end
       SEND_EGRESS_STATUS: begin
-        if (cfg_state == IDLE) begin
+        r_send_cfg_en                   <=  1;
+        if (r_send_cfg_fin) begin
+          r_send_cfg_en                 <=  0;
           r_buf_done                    <=  0;
           r_data_pos                    <=  r_data_count;
           state                         <=  EGRESS_DATA_FLOW;
         end
       end
+
+
+
 
 
 
@@ -570,13 +583,12 @@ always @ (posedge clk) begin
           state                         <=  WAIT_FOR_FLOW_CONTROL;
         end
         else if (r_buf_done > 0) begin
-          state                         <=  SEND_INGRESS_STATUS_SLEEP;
-          r_send_cfg_stb                <=  1;
+          state                         <=  SEND_INGRESS_STATUS;
         end
       end
       WAIT_FOR_FLOW_CONTROL: begin
         //Config State Machine Idle
-        if (w_config_sm_idle && i_fc_ready) begin
+        if (i_fc_ready) begin
           o_fc_cmt_stb                  <= 1;
           state                         <= REQUEST_INGRESS_DATA;
         end
@@ -586,18 +598,15 @@ always @ (posedge clk) begin
         // go back to the 'Ingress data flow' to figure out if we need to read mroe data
         r_send_data_en                  <= 1;
         if (i_egress_finished) begin
-          //r_data_count                  <= r_data_count + (o_dword_req_cnt << 2);
-          r_data_count                  <=  r_data_count + o_dword_req_cnt;
+          r_send_data_en                <= 0;
+          r_data_count                  <= r_data_count + o_dword_req_cnt;
           state                         <= INGRESS_DATA_FLOW;
         end
       end
-      SEND_INGRESS_STATUS_SLEEP: begin
-        if (cfg_state != IDLE) begin
-          state                         <= SEND_INGRESS_STATUS;
-        end
-      end
       SEND_INGRESS_STATUS: begin
-        if ((cfg_state == IDLE) && (!i_ibm_buf_fin_stb) )begin
+        r_send_cfg_en                   <=  1;
+        if (r_send_cfg_fin && !i_ibm_buf_fin_stb)begin
+          r_send_cfg_en                 <=  0;
           r_buf_done                    <=  0;
           o_ibm_buf_fin_ack_stb         <=  1;
           state                         <=  INGRESS_DATA_FLOW;
@@ -606,35 +615,28 @@ always @ (posedge clk) begin
 
 
 
+
       //At the end of a transaction send the final status
       SEND_CONFIG: begin
-        if(cfg_state == IDLE) begin
-          //Send Config Strobe
-          r_send_cfg_stb      <=  1;
-          //state               <=  WAIT_FOR_CONFIG;
-          state               <=  SEND_CONFIG_SLEEP;
-        end
-      end
-      SEND_CONFIG_SLEEP: begin
-        if (cfg_state != IDLE) begin
-          state               <=  WAIT_FOR_CONFIG;
-        end
-      end
-      WAIT_FOR_CONFIG: begin
-        if (cfg_state == IDLE) begin
-          state               <=  IDLE;
+        r_send_cfg_en         <=  1;
+        if (r_send_cfg_fin) begin
+          r_send_cfg_en       <=  0;
+          r_sts_cmd_err       <=  0;
           r_sts_reset         <=  0;
+          r_sts_ping          <=  0;
+          r_sts_read_cfg      <=  0;
+          r_sts_interrupt     <=  0;
+          r_sts_unknown_cmd   <=  0;
+          state               <=  IDLE;
         end
       end
       default: begin
       end
     endcase
 
-
     if (i_update_buf_stb) begin
       r_buf_rdy               <=  r_buf_rdy | i_update_buf;
     end
-
 
     if (i_ibm_buf_fin_stb) begin
       r_buf_done              <=  i_ibm_buf_fin;
@@ -646,7 +648,8 @@ end
 always @ (posedge clk) begin
   //Strobes
   r_fifo_stb                            <=  0;
-  o_interrupt_stb                       <=  0;
+  //o_interrupt_stb                       <=  0;
+  r_send_cfg_fin                        <=  0;
 
   if (rst || i_cmd_rst_stb) begin
     cfg_state                           <=  IDLE;
@@ -654,57 +657,33 @@ always @ (posedge clk) begin
     r_fifo_data                         <=  0;
     o_ctr_sel                           <=  0;
     r_fifo_count                        <=  0;
-    r_send_cfg_en                       <=  0;
+    r_cfg_chan_en                       <=  0;
     o_interrupt_msi_value               <=  `NYSA_INTERRUPT_CONFIG;
     o_cfg_read_exec                     <=  0;
+    o_interrupt_send_en                 <=  0;
 
-    r_sts_ping                          <=  0;
-    r_sts_read_cfg                      <=  0;
-    r_sts_interrupt                     <=  0;
-    r_sts_unknown_cmd                   <=  0;
   end
   else begin
     case (cfg_state)
       IDLE: begin
-        r_sts_ping                      <=  0;
-        r_sts_read_cfg                  <=  0;
-        r_sts_interrupt                 <=  0;
-        r_sts_unknown_cmd               <=  0;
 
         r_fifo_count                    <=  0;
         o_ctr_sel                       <=  0;
-        if (i_cmd_unknown) begin
-          r_sts_unknown_cmd             <=  1;
-        end
-        if (i_cmd_ping_stb) begin
+        if (r_send_cfg_en) begin
           cfg_state                     <=  PREPARE;
-          r_sts_ping                    <=  1;
-        end
-        else if (i_cmd_rd_cfg_stb) begin
-          cfg_state                     <=  PREPARE;
-          r_sts_read_cfg                <=  1;
-        end
-        else if (r_send_cfg_stb) begin
-          cfg_state                     <=  PREPARE;
-        end
-        else if (i_interrupt_stb) begin
-          cfg_state                     <=  PREPARE;
-          r_sts_interrupt               <=  1;
         end
       end
       PREPARE: begin
-        if (w_control_sm_idle) begin
-          o_ctr_sel                     <=  1;
-          if ((w_fifo_rdy > 0) && (r_fifo_act == 0)) begin
-            r_fifo_count                <=  0;
-            if (w_fifo_rdy[0]) begin
-              r_fifo_act[0]             <=  1;
-            end
-            else begin
-              r_fifo_act[1]             <=  1;
-            end
-            cfg_state                   <=  LOAD_FIFO;
+        o_ctr_sel                       <=  1;
+        if ((w_fifo_rdy > 0) && (r_fifo_act == 0)) begin
+          r_fifo_count                  <=  0;
+          if (w_fifo_rdy[0]) begin
+            r_fifo_act[0]               <=  1;
           end
+          else begin
+            r_fifo_act[1]               <=  1;
+          end
+          cfg_state                     <=  LOAD_FIFO;
         end
       end
       LOAD_FIFO: begin
@@ -720,18 +699,27 @@ always @ (posedge clk) begin
         end
       end
       CFG_SEND_CONFIG: begin
-        r_send_cfg_en                   <=  1;
+        r_cfg_chan_en                   <=  1;
         if (i_egress_finished) begin
-          r_send_cfg_en                 <=  0;
+          r_cfg_chan_en                 <=  0;
           cfg_state                     <=  SEND_INT;
         end
       end
       SEND_INT: begin
-        o_interrupt_stb                 <=  1;
-        cfg_state                       <=  IDLE;
+        o_interrupt_send_en             <=  1;
+        if (i_interrupt_send_rdy) begin
+          o_interrupt_send_en           <=  0;
+          cfg_state                     <=  FINISH;
+        end
+        //o_interrupt_stb                 <=  1;
+      end
+      FINISH: begin
+        r_send_cfg_fin                  <=  1;
+        if (!r_send_cfg_en) begin
+          cfg_state                     <=  IDLE;
+        end
       end
       default: begin
-        cfg_state                       <=  IDLE;
       end
     endcase
   end

@@ -13,6 +13,7 @@
 #include <linux/kfifo.h>
 #include <linux/sched.h>
 #include <linux/uaccess.h>
+#include <linux/workqueue.h>
 
 #include "nysa_pcie.h"
 #include "pcie_ctr.h"
@@ -290,7 +291,7 @@ int get_nysa_pcie_dev_index(nysa_pcie_dev_t * dev)
 int write_register(nysa_pcie_dev_t *dev, unsigned int reg_addr, unsigned int value)
 {
   int retval = 0;
-  mod_info_dbg("Writting Register: Addr: 0x%08X Data: 0x%08X\n", (unsigned int) reg_addr, (unsigned int) value);
+  mod_info_dbg("Write Register: Addr: 0x%08X Data: 0x%08X\n", (unsigned int) reg_addr, (unsigned int) value);
   //mod_info_dbg("\tVirtual Address: 0x%08zX\n", (ssize_t) (dev->virt_addr + (reg_addr << 2)));
   iowrite32(cpu_to_be32(value), (void *) (dev->virt_addr + (reg_addr << 2)));
   return retval;
@@ -358,7 +359,7 @@ ssize_t nysa_pcie_write_data(nysa_pcie_dev_t *dev, const char __user * user_buf,
       retval = copy_from_user(dev->write_buffer[buffer_index], &user_buf[pos], size);
       dma_sync_single_for_device(&dev->pdev->dev, dev->write_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_TODEVICE);
 
-      mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
+      //mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
       pos += size;
       update_buffer_status(dev, (1 << buffer_index));
     }
@@ -411,7 +412,7 @@ ssize_t nysa_pcie_write_data(nysa_pcie_dev_t *dev, const char __user * user_buf,
     retval = copy_from_user(dev->read_buffer[buffer_index], &user_buf[pos], size);
     dma_sync_single_for_device(&dev->pdev->dev, dev->write_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_TODEVICE);
 
-    mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
+    //mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
     pos += size;
     update_buffer_status(dev, (1 << buffer_index));
   } while (pos < count);
@@ -446,7 +447,7 @@ ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char __user * user_buf, size_t
 
   while (pos < count)
   {
-    mod_info_dbg("Wait for read transaction to be finished\n");
+    mod_info_dbg("Wait for semaphore...\n");
     if (down_interruptible(&dev->rw_sem))
     {
       mod_info_dbg("Received an interrupt while waiting for data\n");
@@ -464,6 +465,7 @@ ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char __user * user_buf, size_t
       mod_info_dbg("A semaphore woke us up but there was no data in KFIFO!?\n");
       return pos;
     }
+    mod_info_dbg("Buf: %d, pos: 0x%08X\n", buffer_index, dev->rw_fifo_item[buffer_index].pos);
 
     //Process the data
     size = NYSA_PCIE_BUFFER_SIZE;
@@ -474,9 +476,16 @@ ssize_t nysa_pcie_read_data(nysa_pcie_dev_t *dev, char __user * user_buf, size_t
     dma_sync_single_for_cpu(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
     retval = copy_to_user(&user_buf[pos], dev->read_buffer[buffer_index], size);
     dma_sync_single_for_device(&dev->pdev->dev, dev->read_dma_addr[buffer_index], NYSA_PCIE_BUFFER_SIZE, PCI_DMA_FROMDEVICE);
-    mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
+    //mod_info_dbg("Number of bytes not copied to user: %d\n", retval);
     pos += size;
-    update_buffer_status(dev, (1 << buffer_index));
+    if (buffer_index == 0) {
+      //mod_info_dbg("Update Buffer: %d\n", buffer_index);
+      update_buffer_status(dev, 0x01);
+    }
+    else {
+      //mod_info_dbg("Update Buffer: %d\n", buffer_index);
+      update_buffer_status(dev, 0x02);
+    }
   }
   mod_info_dbg("Finished!\n");
   return count;
@@ -672,6 +681,8 @@ int construct_pcie_device(struct pci_dev *pdev, dev_t devno)
     atomic_set(&dev->rw_fifo_item[i].kill, 0);
   }
 
+  //Create Work Queue
+  //dev->wq = alloc_ordered_workqueue("nysa_pcie", NULL); 
 
   if (IS_ERR(device))
   {
@@ -842,7 +853,7 @@ irqreturn_t msi_isr(int irq, void *data)
   struct pci_dev * pdev;
   nysa_pcie_dev_t *dev;
 
-  mod_info_dbg("Entered Interrupt\n");
+  //mod_info_dbg("Entered Interrupt\n");
   pdev = (struct pci_dev *) data;
   dev = pci_get_drvdata(pdev);
   //Read the configuration data
@@ -857,12 +868,12 @@ irqreturn_t msi_isr(int irq, void *data)
     ///mod_info("\t0x%08X\n", dev->config_space[i]);
   }
 
-  mod_info_dbg("Device Status: 0x%08X\n", dev->config_space[STS_DEV_STATUS]);
+  //mod_info_dbg("Device Status: 0x%08X\n", dev->config_space[STS_DEV_STATUS]);
   buf_status = dev->config_space[STS_BUF_RDY];
 
   if (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_WRITE))
   {
-    mod_info_dbg("Writing: Buffer Ready Status: 0x%02X\n", dev->config_space[STS_BUF_RDY]);
+    //mod_info_dbg("Writing: Buffer Ready Status: 0x%02X\n", dev->config_space[STS_BUF_RDY]);
     //Writing
     if (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_DONE))
     {
@@ -886,16 +897,18 @@ irqreturn_t msi_isr(int irq, void *data)
         //Clear the previous index position
         buf_status &= ~(1 << buf_index);
         dev->rw_fifo_item[buf_index].pos  = (dev->config_space[STS_BUF_POS] << 2);
+        kfifo_put(&dev->rw_fifo, buf_index);
+        //Give back the semaphore
+        up(&dev->rw_sem);
+
       }
-      kfifo_put(&dev->rw_fifo, buf_index);
-      //Give back the semaphore
-      up(&dev->rw_sem);
     }
   }
   else if (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_READ))
   {
     //Reading
-    mod_info_dbg("Reading: Buffer Ready Status: 0x%02X\n", dev->config_space[STS_BUF_RDY]);
+    //mod_info_dbg("Reading: Buffer Ready Status: 0x%02X\n", dev->config_space[STS_BUF_RDY]);
+    //printk("%d\n", dev->config_space[STS_BUF_RDY]);
     if (dev->config_space[STS_BUF_RDY] > 0)
     {
       if (dev->config_space[STS_BUF_RDY] & 0x01)
@@ -913,6 +926,7 @@ irqreturn_t msi_isr(int irq, void *data)
     {
       buf_index = 0;
       //Done with write transaction, let the blocked function know
+      mod_info_dbg("MSI: Done!\n");
       dev->rw_fifo_item[buf_index].done = (dev->config_space[STS_DEV_STATUS] & (1 << STATUS_BIT_DONE));
       kfifo_put(&dev->rw_fifo, buf_index);
       up(&dev->rw_sem);

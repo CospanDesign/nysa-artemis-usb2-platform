@@ -244,7 +244,7 @@ def test_pcie_small_read_command(dut):
     ADDRESS = 0x00
     yield c.read_pcie_data(address = ADDRESS, count = COUNT)
 
-@cocotb.test(skip = True)
+@cocotb.test(skip = False)
 def test_pcie_read_two_block_command(dut):
     """
     Description:
@@ -296,15 +296,16 @@ def test_pcie_read_two_block_command(dut):
     v = yield cocotb.external(driver.get_control)()
 
     c.configure_FPGA()
-    cocotb.log.info("Reduce the block size to 0x400")
-    c.set_dword_buffer_size(0x0200)
+    #cocotb.log.info("Reduce the block size to 0x400")
+    #c.set_dword_buffer_size(0x0200)
     yield (nysa.wait_clocks(50))
 
     cocotb.log.info("Request 0x600 words from the device")
-    COUNT = 0x0500
+    COUNT = 0x02000
     ADDRESS = 0x00
     yield (nysa.wait_clocks(50))
     yield c.read_pcie_data(address = ADDRESS, count = COUNT)
+    yield (nysa.wait_clocks(50))
 
 
 @cocotb.test(skip = True)

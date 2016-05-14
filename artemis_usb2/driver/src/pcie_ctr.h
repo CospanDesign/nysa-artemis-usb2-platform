@@ -7,6 +7,7 @@
 #include <linux/kfifo.h>
 #include <linux/semaphore.h>
 #include <linux/kernel.h>
+#include <linux/workqueue.h>
 
 
 //The total number of items in the configuration registers
@@ -26,6 +27,12 @@ typedef enum
 } nysa_pcie_states_t;
 
 struct _nysa_pcie_dev_t;
+
+typedef struct {
+  struct work_struct ws;
+  unsigned int  status;
+  unsigned int  buf_status;
+} wq_item_t;
 
 typedef struct
 {
@@ -70,6 +77,13 @@ typedef struct _nysa_pcie_dev_t
 	int									    test;                     //XXX: Just for demo
   unsigned int            config_space[CONFIG_REGISTER_COUNT];
   bool                    command_mode;
+  
+/*
+  struct workqueue_struct *wq; 
+
+  wq_item_t               wq_items[READ_BUFFER_COUNT];
+*/
+
 } nysa_pcie_dev_t;
 
 //-----------------------------------------------------------------------------

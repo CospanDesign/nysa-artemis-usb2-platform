@@ -80,8 +80,7 @@ module artemis_pcie_controller #(
   parameter SERIAL_NUMBER             = 64'h000000000000C594,
   parameter DATA_INGRESS_FIFO_DEPTH   = 10,   //4096
   parameter DATA_EGRESS_FIFO_DEPTH    = 6,    //256
-  parameter MAX_REQUEST_PAYLOAD_SIZE  = 512,
-  parameter MAX_TAG_CNT               = 4
+  parameter MAX_REQUEST_PAYLOAD_SIZE  = 512
 )(
   input                     clk,
   input                     rst,
@@ -277,7 +276,7 @@ wire                        cfg_trn_pending;
 
 wire                        cfg_interrupt_stb;
 
-reg                         cfg_interrupt;
+wire                        cfg_interrupt;
 wire                        cfg_interrupt_rdy;
 wire                        cfg_interrupt_assert;
 wire          [7:0]         cfg_interrupt_do;
@@ -717,8 +716,7 @@ ingress_buffer_manager buf_man (
 
 
 pcie_control #(
-  .MAX_REQUEST_PAYLOAD_SIZE   (MAX_REQUEST_PAYLOAD_SIZE   ),
-  .MAX_TAG_CNT                (MAX_TAG_CNT                )
+  .MAX_REQUEST_PAYLOAD_SIZE   (MAX_REQUEST_PAYLOAD_SIZE   )
 ) controller (
   .clk                        (clk_62p5                   ),
   .rst                        (pcie_reset                 ),
@@ -790,7 +788,9 @@ pcie_control #(
   .o_egress_tag               (w_egress_tag               ),
 
   .o_interrupt_msi_value      (w_interrupt_msi_value      ),
-  .o_interrupt_stb            (w_interrupt_stb            ),
+//  .o_interrupt_stb            (w_interrupt_stb            ),
+  .o_interrupt_send_en        (cfg_interrupt              ),
+  .i_interrupt_send_rdy       (cfg_interrupt_rdy          ),
 
   .o_egress_fifo_rdy          (w_e_ctr_fifo_rdy           ),
   .i_egress_fifo_act          (w_e_ctr_fifo_act           ),
@@ -840,9 +840,9 @@ pcie_control #(
 ppfifo #(
   .DATA_WIDTH                 (32                         ),
   .ADDRESS_WIDTH              (DATA_INGRESS_FIFO_DEPTH    ) // 1024 32-bit values (4096 Bytes)
-) i_data_fifo (                                           
+) i_data_fifo (
   .reset                      (pcie_reset || rst          ),
-  //Write Side                                            
+  //Write Side
   .write_clock                (clk_62p5                   ),
   .write_ready                (w_i_data_fifo_rdy          ),
   .write_activate             (w_o_data_fifo_act          ),
@@ -1067,7 +1067,7 @@ assign  rx_np_ok              =  1'b1;
 //assign  cfg_interrupt_di  = i_interrupt_channel;
 //assign  cfg_interrupt_stb = i_interrupt_stb;
 assign  cfg_interrupt_di  = w_interrupt_msi_value;
-assign  cfg_interrupt_stb = w_interrupt_stb;
+//assign  cfg_interrupt_stb = w_interrupt_stb;
 
 assign  w_rcb_128B_sel    = cfg_lcommand[3];
 
@@ -1081,6 +1081,7 @@ localparam  SEND_INTERRUPT  = 1;
 
 reg int_state = IDLE;
 
+/*
 always @ (posedge clk_62p5) begin
   if (pcie_reset) begin
     cfg_interrupt         <=  0;
@@ -1103,5 +1104,6 @@ always @ (posedge clk_62p5) begin
     endcase
   end
 end
+*/
 
 endmodule

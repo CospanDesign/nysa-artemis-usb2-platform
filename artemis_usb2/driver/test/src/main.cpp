@@ -18,14 +18,15 @@
 char devname[] = "/dev/nysa_pcie0";
 int fn = -1;
 
-#define READ_COUNT  0x04000
-#define WRITE_COUNT 0x04000
+//#define READ_COUNT  0x04000
+#define WRITE_COUNT 0x08000
 //#define WRITE_COUNT 0x0100
 
-#define READ_BUFF_SIZE 0x08000
+#define READ_COUNT      0x00100000
+#define READ_BUFF_SIZE  0x00100000
 
 int main(){
-  int i = 0;
+  //int i = 0;
   unsigned char buf[READ_BUFF_SIZE];
 
   PCIE *pcie = new PCIE(devname);
@@ -33,15 +34,16 @@ int main(){
   //pcie->write_register(0x00, 0x01);
   //pcie->write_command(0x08A, 0x01, 0x00);
 
-/*
   //Read a small block of data
   pcie->read_periph_data(0x00, buf, READ_COUNT);
+  /*
   for (i = 0; i < READ_COUNT; i++)
   {
     printf ("[0x%02X] 0x%02X\n", i, buf[i]);
   }
-*/
+  */
 
+/*
   //Configure everything for a write
   for (i = 0; i < WRITE_COUNT; i++)
   {
@@ -50,6 +52,7 @@ int main(){
     //buf[i] = 0x00;
   }
   pcie->write_periph_data(0x00, buf, WRITE_COUNT);
+*/
 
 }
 

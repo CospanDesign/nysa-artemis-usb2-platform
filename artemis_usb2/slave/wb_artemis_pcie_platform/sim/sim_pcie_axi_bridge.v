@@ -106,7 +106,7 @@ module sim_pcie_axi_bridge #(
 
   // Conifguration: Interrupt
   input                     cfg_interrupt,
-  output  reg               cfg_interrupt_rdy,
+  output  reg               cfg_interrupt_rdy = 1,
   input                     cfg_interrupt_assert,
   output  reg [7:0]         cfg_interrupt_do  = 0,
   input       [7:0]         cfg_interrupt_di,

@@ -336,7 +336,7 @@ always @ (posedge clk) begin
         o_ingress_addr                        <=  w_reg_addr;
         if (w_cmd_en) begin
           o_update_buf                        <=  2'b00;
-          o_update_buf_stb                    <=  1;
+          //o_update_buf_stb                    <=  1;
           o_cmd_data_count                    <=  i_axi_ingress_data;
           o_cmd_flg_sel_per_stb               <=  0;
           o_cmd_flg_sel_mem_stb               <=  0;
@@ -402,7 +402,7 @@ always @ (posedge clk) begin
               o_status_addr           <=  i_axi_ingress_data;
             end
             `HDR_BUFFER_READY: begin
-              o_update_buf            <=  i_axi_ingress_data[`HDR_BUFFER_READY_RANGE];
+              o_update_buf            <=  i_axi_ingress_data[1:0];
               o_update_buf_stb        <=  1;
             end
             `HDR_WRITE_BUF_A_ADDR: begin

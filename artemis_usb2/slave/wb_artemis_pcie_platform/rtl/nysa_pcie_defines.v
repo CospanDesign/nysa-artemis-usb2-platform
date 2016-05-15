@@ -8,7 +8,7 @@
 `define HDR_READ_BUF_A_ADDR       4
 `define HDR_READ_BUF_B_ADDR       5
 `define HDR_BUFFER_SIZE           6
-`define HDR_PING_VALUE            7
+`define HDR_INDEX_VALUE           7
 `define HDR_DEV_ADDR              8
 `define STS_DEV_STATUS            9
 `define STS_BUF_RDY               10

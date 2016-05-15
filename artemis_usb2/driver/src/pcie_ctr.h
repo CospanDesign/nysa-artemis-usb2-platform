@@ -7,7 +7,7 @@
 #include <linux/kfifo.h>
 #include <linux/semaphore.h>
 #include <linux/kernel.h>
-#include <linux/workqueue.h>
+#include <linux/spinlock.h>
 
 
 //The total number of items in the configuration registers
@@ -28,16 +28,11 @@ typedef enum
 
 struct _nysa_pcie_dev_t;
 
-typedef struct {
-  struct work_struct ws;
-  unsigned int  status;
-  unsigned int  buf_status;
-} wq_item_t;
-
 typedef struct
 {
   unsigned int buf_index;
   unsigned int pos;
+  unsigned int index;
   bool waiting;
   bool done;
   atomic_t kill;
@@ -69,6 +64,8 @@ typedef struct _nysa_pcie_dev_t
   void *                  private_data;
   struct cdev             cdev;
 
+  spinlock_t              rw_spinlock;
+  int                     rw_index;
   struct semaphore        rw_sem;
   struct kfifo            rw_fifo;
   rw_fifo_item_t          rw_fifo_item[READ_BUFFER_COUNT];
@@ -77,13 +74,6 @@ typedef struct _nysa_pcie_dev_t
 	int									    test;                     //XXX: Just for demo
   unsigned int            config_space[CONFIG_REGISTER_COUNT];
   bool                    command_mode;
-  
-/*
-  struct workqueue_struct *wq; 
-
-  wq_item_t               wq_items[READ_BUFFER_COUNT];
-*/
-
 } nysa_pcie_dev_t;
 
 //-----------------------------------------------------------------------------

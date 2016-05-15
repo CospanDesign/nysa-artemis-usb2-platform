@@ -193,6 +193,8 @@ reg                         r_sts_cmd_err;
 reg                         r_sts_reset;
 reg                         r_sts_done;
 
+reg   [31:0]                r_index_value;
+
 
 reg   [31:0]                r_data_count;
 reg   [31:0]                r_data_pos;
@@ -267,7 +269,8 @@ assign  register_map [`HDR_WRITE_BUF_B_ADDR     ] = i_write_b_addr;
 assign  register_map [`HDR_READ_BUF_A_ADDR      ] = i_read_a_addr;
 assign  register_map [`HDR_READ_BUF_B_ADDR      ] = i_read_b_addr;
 assign  register_map [`HDR_BUFFER_SIZE          ] = i_buffer_size;
-assign  register_map [`HDR_PING_VALUE           ] = i_ping_value;
+//assign  register_map [`HDR_PING_VALUE           ] = i_ping_value;
+assign  register_map [`HDR_INDEX_VALUE          ] = r_index_value;
 assign  register_map [`HDR_DEV_ADDR             ] = i_dev_addr;
 assign  register_map [`STS_DEV_STATUS           ] = w_comm_status;
 //assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done[1] , r_buf_done[0] };
@@ -346,6 +349,7 @@ always @ (posedge clk) begin
     r_tlp_address       <=  0;
     r_tlp_requester_id  <=  0;
     r_tlp_tag           <=  0;
+    r_index_value       <=  0;
 
     r_buf_done          <=  2'b00;
 
@@ -424,6 +428,7 @@ always @ (posedge clk) begin
         //r_buf_next_sel      <= 0;
         r_send_cfg_en       <=  0;
         r_send_data_en      <=  0;
+        r_index_value       <=  0;
 
 
         o_data_address      <= i_cmd_data_address;
@@ -545,6 +550,7 @@ always @ (posedge clk) begin
           r_buf_done                    <=  0;
           r_data_pos                    <=  r_data_count;
           state                         <=  EGRESS_DATA_FLOW;
+          r_index_value                 <=  r_index_value + 1;
         end
       end
 

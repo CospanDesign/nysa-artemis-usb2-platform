@@ -22,8 +22,8 @@ int fn = -1;
 #define WRITE_COUNT 0x08000
 //#define WRITE_COUNT 0x0100
 
-#define READ_COUNT      0x00100000
-#define READ_BUFF_SIZE  0x00100000
+#define READ_COUNT      0x00400000
+#define READ_BUFF_SIZE  0x00400000
 
 int main(){
   //int i = 0;

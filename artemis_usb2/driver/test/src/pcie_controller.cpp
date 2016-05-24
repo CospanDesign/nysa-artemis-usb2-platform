@@ -14,9 +14,13 @@
 #define HDR_READ_BUF_A_ADDR   0x004
 #define HDR_READ_BUF_B_ADDR   0x005
 #define HDR_BUFFER_SIZE       0x006
-#define HDR_PING_VALUE        0x007
-#define HDR_DEV_ADDR          0x008
-
+#define HDR_INDEX_VALUEA      0x007
+#define HDR_INDEX_VALUEB      0x008
+#define HDR_DEV_ADDR          0x009
+#define STS_DEV_STATUS        0x00A
+#define STS_BUF_RDY           0x00B
+#define STS_BUF_POS           0x00C
+#define STS_INTERRUPT         0x00D
 
 #define COMMAND_RESET         0x080
 #define PERIPHERAL_WRITE      0x081

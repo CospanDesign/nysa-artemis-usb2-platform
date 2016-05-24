@@ -8,15 +8,17 @@
 `define HDR_READ_BUF_A_ADDR       4
 `define HDR_READ_BUF_B_ADDR       5
 `define HDR_BUFFER_SIZE           6
-`define HDR_INDEX_VALUE           7
-`define HDR_DEV_ADDR              8
-`define STS_DEV_STATUS            9
-`define STS_BUF_RDY               10
-`define STS_BUF_POS               11
-`define STS_INTERRUPT             12
+`define HDR_INDEX_VALUEA          7
+`define HDR_INDEX_VALUEB          8
+`define HDR_DEV_ADDR              9
+`define STS_DEV_STATUS            10
+`define STS_BUF_RDY               11
+`define STS_BUF_POS               12
+`define STS_INTERRUPT             13
+`define HDR_AUX_BUFFER_READY      14
 
 //The total number of items in the configuration registers
-`define CONFIG_REGISTER_COUNT     13
+`define CONFIG_REGISTER_COUNT     15
 
 `define CMD_OFFSET                32'h00000080
 

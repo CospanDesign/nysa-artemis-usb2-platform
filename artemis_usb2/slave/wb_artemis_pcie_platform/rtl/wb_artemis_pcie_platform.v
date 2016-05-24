@@ -115,6 +115,14 @@ SOFTWARE.
 `define DBG_UR_POIS                   20
 `define DBG_UR_STS                    21
 `define DBG_UR_UNSUP_MSG              22
+`define DBG_TX_BUF_EMPTY              23
+`define DBG_TX_ERR_DROP               24
+`define DBG_RX_ERR_FWD                25
+`define DBG_READY_DROP                26
+`define DBG_UNKNOWN_TLP               27
+`define DBG_UNEXPECTED_END            28
+`define DBG_REENABLE                  29
+`define DBG_REENABLE_NZERO            30
 
 
 
@@ -184,18 +192,13 @@ localparam    LTSSM_STATE         = 8;
 localparam    TX_PRE_EMPH         = 9;
 localparam    DBG_DATA            = 10;
 
-/*
-localparam    CONFIG_COMMAND      = 11;
-localparam    CONFIG_STATUS       = 12;
-localparam    CONFIG_DCOMMAND     = 13;
-localparam    CONFIG_DSTATUS      = 14;
-localparam    CONFIG_LCOMMAND     = 15;
-localparam    CONFIG_LSTATUS      = 16;
-*/
-
 localparam    USR_IF_FLAGS        = 11;
 localparam    USR_IF_SIZE         = 12;
 localparam    USR_IF_ADDRESS      = 13;
+
+localparam    INGRESS_TAG_DONE    = 14;
+localparam    INGRESS_TAG_EN      = 15;
+localparam    CMPLT_STS           = 16;
 
 localparam    DBG_FLAGS           = 17;
 localparam    BAR_SELECT          = 18;
@@ -216,9 +219,15 @@ localparam    INGRESS_CI_COUNT    = 32;
 localparam    INGRESS_ADDR        = 33;
 localparam    INGRESS_CMPLT_COUNT = 34;
 
+localparam    CONFIG_COMMAND      = 35;
+localparam    CONFIG_STATUS       = 36;
+localparam    CONFIG_DCOMMAND     = 37;
+localparam    CONFIG_DSTATUS      = 38;
+localparam    CONFIG_LCOMMAND     = 39;
+localparam    CONFIG_LSTATUS      = 40;
+
 
 //Local Registers/Wires
-
 wire      [31:0]                status;
 
 reg                             r_enable_pcie = 1;
@@ -317,7 +326,6 @@ wire                              w_rx_data_valid;
 
 reg  [6:0]                        r_bar_hit_temp;
 
-
 wire [31:0]                       w_bar_addr0;
 wire [31:0]                       w_bar_addr1;
 wire [31:0]                       w_bar_addr2;
@@ -332,7 +340,7 @@ wire [7:0]                        w_ingress_count;
 wire [3:0]                        w_ingress_state;
 wire [7:0]                        w_ingress_ri_count;
 wire [7:0]                        w_ingress_ci_count;
-wire [7:0]                        w_ingress_cmplt_count;
+wire [31:0]                       w_ingress_cmplt_count;
 wire [31:0]                       w_ingress_addr;
 
 wire [31:0]                       w_data_size;
@@ -373,10 +381,23 @@ wire                              dbg_ur_pois_cfg_wr;
 wire                              dbg_ur_status;
 wire                              dbg_ur_unsup_msg;
 
-reg [31:0]                        r_dbg_reg;
+reg   [31:0]                      r_dbg_reg;
 reg                               r_rst_dbg;
 reg                               r_egress_fifo_send_en;
 
+wire  [5:0]                       tx_buf_av;
+wire                              tx_err_drop;
+
+wire  [15:0]                      dbg_tag_ingress_fin;
+wire  [15:0]                      dbg_tag_en;
+wire                              w_dbg_reenable_stb;
+wire                              w_dbg_reenable_nzero_stb;
+wire                              dbg_rerrfwd;
+wire                              dbg_ready_drop;
+
+wire   [2:0]                      w_cplt_sts;
+wire                              w_unknown_tlp_stb;
+wire                              w_unexpected_end_stb;
 
 //Submodules
 //artemis_pcie_interface #(
@@ -459,6 +480,8 @@ artemis_pcie_controller #(
   .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
 
   .cfg_ltssm_state                   (cfg_ltssm_state              ),
+  .tx_buf_av                         (tx_buf_av                    ),
+  .tx_err_drop                       (tx_err_drop                  ),
 
   .o_bar_hit                         (w_bar_hit                    ),
   .o_receive_axi_ready               (w_receive_axi_ready          ),
@@ -489,6 +512,14 @@ artemis_pcie_controller #(
   .dbg_ur_status                     (dbg_ur_status                ),
   .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg             ),
 
+  .dbg_tag_ingress_fin               (dbg_tag_ingress_fin          ),
+  .dbg_tag_en                        (dbg_tag_en                   ),
+  .o_dbg_reenable_stb                (w_dbg_reenable_stb           ),
+  .o_dbg_reenable_nzero_stb          (w_dbg_reenable_nzero_stb     ),
+
+  .dbg_rerrfwd                       (dbg_rerrfwd                  ),
+  .dbg_ready_drop                    (dbg_ready_drop               ),
+
   //Extra Info
   .o_cfg_read_exec                   (w_cfg_read_exec              ),
   .o_cfg_sm_state                    (w_cfg_sm_state               ),
@@ -516,6 +547,10 @@ artemis_pcie_controller #(
   .cfg_err_locked                    (cfg_err_locked               ),
   .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
   .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
+
+  .o_cplt_sts                        (w_cplt_sts                   ),
+  .o_unknown_tlp_stb                 (w_unknown_tlp_stb            ),
+  .o_unexpected_end_stb              (w_unexpected_end_stb         ),
 
   //Debug Info
   .o_ingress_count                   (w_ingress_count              ),
@@ -569,7 +604,7 @@ cross_clock_strobe clk_stb (
 );
 
 //Asynchronous Logic
-assign  fc_sel                 = 3'h0;
+//assign  fc_sel                 = 3'h0;
 
 //assign  cfg_dwaddr             = 10'h0;
 //assign  cfg_rd_en              = 1'b0;
@@ -617,93 +652,122 @@ always @ (posedge clk_62p5) begin
     r_dbg_reg                    <= 0;
   end
   else begin
-    r_clock_count   <=  r_clock_count + 1;
+    r_clock_count                             <=  r_clock_count + 1;
     if (w_1sec_stb_65mhz) begin
-      r_clock_1_sec   <=  r_clock_count;
-      r_clock_count   <=  0;
+      r_clock_1_sec                           <=  r_clock_count;
+      r_clock_count                           <=  0;
     end
 
     //Power Controller
     if (cfg_to_turnoff && !trn_pending) begin
-      cfg_turnoff_ok    <=  1;
+      cfg_turnoff_ok                          <=  1;
     end
     else begin
-      cfg_turnoff_ok              <=  0;
+      cfg_turnoff_ok                          <=  0;
     end
 
     if(dbg_reg_detected_correctable) begin
-        r_dbg_reg[`DBG_DTCT_CRCT]            <= 1;
+        r_dbg_reg[`DBG_DTCT_CRCT]             <= 1;
     end
     if(dbg_reg_detected_fatal) begin
-        r_dbg_reg[`DBG_DTCT_FATL]            <= 1;
+        r_dbg_reg[`DBG_DTCT_FATL]             <= 1;
     end
     if(dbg_reg_detected_non_fatal) begin
-        r_dbg_reg[`DBG_DTCT_NFTL]            <= 1;
+        r_dbg_reg[`DBG_DTCT_NFTL]             <= 1;
     end
     if(dbg_reg_detected_unsupported) begin
-        r_dbg_reg[`DBG_DTCT_UNSP]            <= 1;
+        r_dbg_reg[`DBG_DTCT_UNSP]             <= 1;
     end
 
     if(dbg_bad_dllp_status) begin
-        r_dbg_reg[`DBG_DLLP_STS]             <= 1;
+        r_dbg_reg[`DBG_DLLP_STS]              <= 1;
     end
     if(dbg_bad_tlp_lcrc) begin
-        r_dbg_reg[`DBG_BD_TLP_LCRC]          <= 1;
+        r_dbg_reg[`DBG_BD_TLP_LCRC]           <= 1;
     end
     if(dbg_bad_tlp_seq_num) begin
-        r_dbg_reg[`DBG_BD_TLP_SQNM]          <= 1;
+        r_dbg_reg[`DBG_BD_TLP_SQNM]           <= 1;
     end
     if(dbg_bad_tlp_status) begin
-        r_dbg_reg[`DBG_BD_TLP_STS]           <= 1;
+        r_dbg_reg[`DBG_BD_TLP_STS]            <= 1;
     end
     if(dbg_dl_protocol_status) begin
-        r_dbg_reg[`DBG_DL_PTCL_STS]          <= 1;
+        r_dbg_reg[`DBG_DL_PTCL_STS]           <= 1;
     end
     if(dbg_fc_protocol_err_status) begin
-        r_dbg_reg[`DBG_FC_PTCL_STS]          <= 1;
+        r_dbg_reg[`DBG_FC_PTCL_STS]           <= 1;
     end
     if(dbg_mlfrmd_length) begin
-        r_dbg_reg[`DBG_MLFM_LEN]             <= 1;
+        r_dbg_reg[`DBG_MLFM_LEN]              <= 1;
     end
     if(dbg_mlfrmd_mps) begin
-        r_dbg_reg[`DBG_MLFM_MPS]             <= 1;
+        r_dbg_reg[`DBG_MLFM_MPS]              <= 1;
     end
     if(dbg_mlfrmd_tcvc) begin
-        r_dbg_reg[`DBG_MLFM_TCVC]            <= 1;
+        r_dbg_reg[`DBG_MLFM_TCVC]             <= 1;
     end
     if(dbg_mlfrmd_tlp_status) begin
-        r_dbg_reg[`DBG_MLFM_TLP_STS]         <= 1;
+        r_dbg_reg[`DBG_MLFM_TLP_STS]          <= 1;
     end
     if(dbg_mlfrmd_unrec_type) begin
-        r_dbg_reg[`DBG_MLFM_TLP_UNREC]       <= 1;
+        r_dbg_reg[`DBG_MLFM_TLP_UNREC]        <= 1;
     end
     if(dbg_poistlpstatus) begin
-        r_dbg_reg[`DBG_PLP_STS]              <= 1;
+        r_dbg_reg[`DBG_PLP_STS]               <= 1;
     end
     if(dbg_rcvr_overflow_status) begin
-        r_dbg_reg[`DBG_RCVR_OVFL_STS]        <= 1;
+        r_dbg_reg[`DBG_RCVR_OVFL_STS]         <= 1;
     end
     if(dbg_rply_rollover_status) begin
-        r_dbg_reg[`DBG_RCVR_RLVR_STS]        <= 1;
+        r_dbg_reg[`DBG_RCVR_RLVR_STS]         <= 1;
     end
     if(dbg_rply_timeout_status) begin
-        r_dbg_reg[`DBG_RCVR_TMT_STS]         <= 1;
+        r_dbg_reg[`DBG_RCVR_TMT_STS]          <= 1;
     end
     if(dbg_ur_no_bar_hit) begin
-        r_dbg_reg[`DBG_UR_NO_BAR]            <= 1;
+        r_dbg_reg[`DBG_UR_NO_BAR]             <= 1;
     end
     if(dbg_ur_pois_cfg_wr) begin
-        r_dbg_reg[`DBG_UR_POIS]              <= 1;
+        r_dbg_reg[`DBG_UR_POIS]               <= 1;
     end
     if(dbg_ur_status) begin
-        r_dbg_reg[`DBG_UR_STS]               <= 1;
+        r_dbg_reg[`DBG_UR_STS]                <= 1;
     end
     if(dbg_ur_unsup_msg) begin
-        r_dbg_reg[`DBG_UR_UNSUP_MSG]         <= 1;
+        r_dbg_reg[`DBG_UR_UNSUP_MSG]          <= 1;
     end
+    if (tx_buf_av == 6'b0) begin
+        r_dbg_reg[`DBG_TX_BUF_EMPTY]          <= 1;
+    end
+    if (tx_err_drop) begin
+        r_dbg_reg[`DBG_TX_ERR_DROP]           <= 1;
+    end
+    if (dbg_rerrfwd) begin
+        r_dbg_reg[`DBG_RX_ERR_FWD]            <= 1;
+    end
+    if (dbg_ready_drop) begin
+        r_dbg_reg[`DBG_READY_DROP]            <= 1;
+    end
+    if (w_unknown_tlp_stb) begin
+        r_dbg_reg[`DBG_UNKNOWN_TLP]           <= 1;
+    end
+    if (w_unexpected_end_stb) begin
+        r_dbg_reg[`DBG_UNEXPECTED_END]        <= 1;
+    end
+    if (w_dbg_reenable_stb) begin
+        r_dbg_reg[`DBG_REENABLE]              <= 1;
+    end
+    if (w_dbg_reenable_nzero_stb) begin
+        r_dbg_reg[`DBG_REENABLE_NZERO]        <= 1;
+    end
+
+
+
+
     if (r_rst_dbg) begin
-      r_dbg_reg                              <= 0;
+      r_dbg_reg                               <= 0;
     end
+
   end
 end
 
@@ -739,6 +803,7 @@ always @ (posedge clk) begin
     r_bar_hit_temp              <=  0;
     r_rst_dbg                   <=  0;
     r_egress_fifo_send_en       <=  0;
+
   end
   else begin
     if (r_dbg_reg == 0) begin
@@ -873,7 +938,7 @@ always @ (posedge clk) begin
               o_wbs_dat       <=  w_data_address;
             end
 
-/*
+
             CONFIG_COMMAND: begin
               o_wbs_dat       <=  0;
               o_wbs_dat                       <=  {16'h0000, cfg_command};
@@ -898,7 +963,9 @@ always @ (posedge clk) begin
               o_wbs_dat       <=  0;
               o_wbs_dat                       <=  {16'h0000, cfg_lcommand};
             end
-*/
+
+
+
             DBG_FLAGS: begin
               o_wbs_dat                         <=  r_dbg_reg;
             end
@@ -947,10 +1014,19 @@ always @ (posedge clk) begin
               o_wbs_dat                         <=  {24'h00, w_ingress_ci_count};
             end
             INGRESS_CMPLT_COUNT: begin
-              o_wbs_dat                         <=  {24'h00, w_ingress_cmplt_count};
+              o_wbs_dat                         <=  w_ingress_cmplt_count;
             end
             INGRESS_ADDR: begin
               o_wbs_dat                         <=  w_ingress_addr;
+            end
+            INGRESS_TAG_DONE: begin
+              o_wbs_dat                         <=  {16'h0, dbg_tag_ingress_fin};
+            end
+            INGRESS_TAG_EN: begin
+              o_wbs_dat                         <=  {16'h0, dbg_tag_en};
+            end
+            CMPLT_STS: begin
+              o_wbs_dat                         <=  {28'h0, w_cplt_sts};
             end
             default: begin
               if (w_lcl_mem_en) begin

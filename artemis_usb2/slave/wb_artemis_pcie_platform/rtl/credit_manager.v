@@ -1,4 +1,4 @@
-/*
+/*l
 Distributed under the MIT license.
 Copyright (c) 2016 Dave McCoy (dave.mccoy@cospandesign.com)
 
@@ -53,7 +53,10 @@ SOFTWARE.
 `define RCB_128_SIZE  (128 / 4)
 `define RCB_64_SIZE   ( 64 / 4)
 
-module credit_manager (
+module credit_manager #(
+  //parameter                 MAX_PKTS = 1
+  parameter                 MAX_PKTS = 0
+)(
   input                     clk,
   input                     rst,
 
@@ -154,8 +157,9 @@ assign  w_dat_rdy               = (w_dat_avail > w_data_credit_req_size);
 
 assign  o_fc_sel                = 3'h0;
 
-
-assign  o_ready                 = (w_hdr_rdy & w_dat_rdy);
+assign  o_ready                 = (MAX_PKTS == 0) ?
+                                     (w_hdr_rdy & w_dat_rdy) :
+                                    ((w_hdr_rdy & w_dat_rdy) && ((r_hdr_in_flt >> 3) <= MAX_PKTS));
 
 //synchronous logic
 always  @ (posedge clk) begin
@@ -180,6 +184,5 @@ always  @ (posedge clk) begin
     end
   end
 end
-
 
 endmodule

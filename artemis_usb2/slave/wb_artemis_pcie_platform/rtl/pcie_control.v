@@ -30,9 +30,7 @@ SOFTWARE.
 `include "pcie_defines.v"
 `include "nysa_pcie_defines.v"
 
-module pcie_control #(
-  parameter                 MAX_REQUEST_PAYLOAD_SIZE  = 512
-)(
+module pcie_control (
   input                     clk,
   input                     rst,
 
@@ -124,9 +122,9 @@ module pcie_control #(
   //Ingress Buffer Interface
   input                     i_ibm_buf_fin_stb,    // ingress buffer manager (Buffer Finished Strobe)
   input       [1:0]         i_ibm_buf_fin,        // ingress buffer manager (Buffer Finished)
-  output  reg               o_ibm_buf_fin_ack_stb,// ingress buffer manager (Buffer Finished ack)
   output  reg               o_ibm_en,             // ingress buffer manager (Enable Buffer Manager)
   output  reg               o_ibm_req_stb,        // ingress buffer manager (Request Buffer Strobe)
+  output  reg               o_ibm_dat_fin,
   input       [7:0]         i_ibm_tag,            // ingress buffer manager (Tag to use)
   input                     i_ibm_tag_rdy,        // ingress buffer manager (Tag is ready)
   input       [9:0]         i_ibm_dword_cnt,      // ingress buffer manager (Dword Count)
@@ -140,7 +138,6 @@ module pcie_control #(
   output  reg [7:0]         o_cfg_read_exec,
   output      [3:0]         o_cfg_sm_state,
   output      [3:0]         o_sm_state
-
 );
 
 
@@ -193,7 +190,8 @@ reg                         r_sts_cmd_err;
 reg                         r_sts_reset;
 reg                         r_sts_done;
 
-reg   [31:0]                r_index_value;
+reg   [31:0]                r_index_valuea;
+reg   [31:0]                r_index_valueb;
 
 
 reg   [31:0]                r_data_count;
@@ -205,8 +203,10 @@ reg                         r_buf_sel;
 //reg                         r_buf_next_sel;
 reg   [1:0]                 r_buf_rdy;
 reg   [1:0]                 r_buf_done;
+reg   [1:0]                 r_tmp_done;
 
 reg                         r_send_data_en;
+reg                         r_delay_stb;
 
 reg   [7:0]                 r_tlp_command;          //XXX: When send to host MWR, when get from host MRD
 reg   [13:0]                r_tlp_flags;
@@ -270,7 +270,8 @@ assign  register_map [`HDR_READ_BUF_A_ADDR      ] = i_read_a_addr;
 assign  register_map [`HDR_READ_BUF_B_ADDR      ] = i_read_b_addr;
 assign  register_map [`HDR_BUFFER_SIZE          ] = i_buffer_size;
 //assign  register_map [`HDR_PING_VALUE           ] = i_ping_value;
-assign  register_map [`HDR_INDEX_VALUE          ] = r_index_value;
+assign  register_map [`HDR_INDEX_VALUEA         ] = r_index_valuea;
+assign  register_map [`HDR_INDEX_VALUEB         ] = r_index_valueb;
 assign  register_map [`HDR_DEV_ADDR             ] = i_dev_addr;
 assign  register_map [`STS_DEV_STATUS           ] = w_comm_status;
 //assign  register_map [`STS_BUF_RDY              ] = {29'h00, r_buf_done[1] , r_buf_done[0] };
@@ -337,9 +338,8 @@ assign  w_cfg_req                           = (r_sts_unknown_cmd || r_sts_ping |
 //synchronous logic
 always @ (posedge clk) begin
   o_fc_cmt_stb          <=  0;
-
   o_ibm_req_stb         <=  0;
-  o_ibm_buf_fin_ack_stb <=  0;
+  r_delay_stb           <=  0;
 
   if (rst || i_cmd_rst_stb) begin
     state               <=  IDLE;
@@ -349,9 +349,11 @@ always @ (posedge clk) begin
     r_tlp_address       <=  0;
     r_tlp_requester_id  <=  0;
     r_tlp_tag           <=  0;
-    r_index_value       <=  0;
+    r_index_valuea      <=  0;
+    r_index_valueb      <=  0;
 
     r_buf_done          <=  2'b00;
+    r_tmp_done          <=  2'b00;
 
     o_data_write_flg    <=  0;
     o_data_read_flg     <=  0;
@@ -377,6 +379,7 @@ always @ (posedge clk) begin
     o_dword_req_cnt     <=  0;
 
     o_ibm_en            <=  0;
+    o_ibm_dat_fin       <=  0;
 
     r_send_cfg_en       <=  0;
     r_send_data_en      <=  0;
@@ -420,6 +423,7 @@ always @ (posedge clk) begin
         r_tlp_tag           <= 0;
         r_buf_rdy           <= 0;
         r_buf_done          <= 2'b00;
+        r_tmp_done          <= 2'b00;
 
         r_data_count        <= 0;
         r_data_pos          <= 0;
@@ -428,8 +432,8 @@ always @ (posedge clk) begin
         //r_buf_next_sel      <= 0;
         r_send_cfg_en       <=  0;
         r_send_data_en      <=  0;
-        r_index_value       <=  0;
-
+        r_index_valuea      <=  0;
+        r_index_valueb      <=  0;
 
         o_data_address      <= i_cmd_data_address;
         o_data_size         <= i_cmd_data_count;
@@ -473,7 +477,6 @@ always @ (posedge clk) begin
           o_dma_sel         <=  1;
         end
       end
-
 
 
 
@@ -550,31 +553,28 @@ always @ (posedge clk) begin
           r_buf_done                    <=  0;
           r_data_pos                    <=  r_data_count;
           state                         <=  EGRESS_DATA_FLOW;
-          r_index_value                 <=  r_index_value + 1;
+          r_index_valuea                 <=  r_index_valuea + 1;
         end
       end
 
 
 
-
-
-
-
-
       //Ingress Flow
       INGRESS_DATA_FLOW: begin
-        o_ibm_en                        <=  1;
-        r_tlp_command                   <=  `PCIE_MRD_32B;
-        r_tlp_flags                     <=  (`FLAG_NORMAL);
-        o_dword_req_cnt                 <=  (MAX_REQUEST_PAYLOAD_SIZE >> 2);
+        o_ibm_en                        <= 1;
+        r_tlp_command                   <= `PCIE_MRD_32B;
+        r_tlp_flags                     <= `FLAG_NORMAL;
         if (r_data_count < o_data_size) begin
           //More data to send
-          state                         <=  WAIT_FOR_HOST_INGRESS_TAG;
+          state                         <= WAIT_FOR_HOST_INGRESS_TAG;
         end
-        else if (i_ibm_idle) begin
-          r_sts_done                    <=  1;
-          state                         <=  SEND_CONFIG;
-          //state                         <=  IDLE;
+        else begin
+          o_ibm_dat_fin                 <= 1;
+          if (i_ibm_idle) begin
+            o_ibm_dat_fin               <= 0;
+            r_sts_done                  <= 1;
+            state                       <= SEND_CONFIG;
+          end
         end
       end
       WAIT_FOR_HOST_INGRESS_TAG: begin
@@ -582,14 +582,22 @@ always @ (posedge clk) begin
         //Buffer Controller Is good
         //Host has populated a buffer
         if (i_ibm_tag_rdy) begin
-          r_tlp_tag                     <=  i_ibm_tag;
-          r_tlp_address                 <=  write_buf_map[i_ibm_buf_sel] + i_ibm_start_addr[11:0];
-          o_dword_req_cnt               <=  i_ibm_dword_cnt;
-          o_ibm_req_stb                 <=  1;
-          state                         <=  WAIT_FOR_FLOW_CONTROL;
+          r_tlp_tag                     <= i_ibm_tag;
+          r_tlp_address                 <= write_buf_map[i_ibm_buf_sel] + i_ibm_start_addr[11:0];
+          o_dword_req_cnt               <= i_ibm_dword_cnt;
+          o_ibm_req_stb                 <= 1;
+          state                         <= WAIT_FOR_FLOW_CONTROL;
         end
-        else if (r_buf_done > 0) begin
-          state                         <=  SEND_INGRESS_STATUS;
+        else if ((r_tmp_done > 0) && !i_ibm_buf_fin_stb && !r_delay_stb) begin
+          r_buf_done                    <= r_tmp_done;
+          if (r_tmp_done[0]) begin
+            r_index_valuea              <= r_index_valuea + 1;
+          end
+          if (r_tmp_done[1]) begin
+            r_index_valueb              <= r_index_valueb + 1;
+          end
+          r_tmp_done                    <=  0;
+          state                         <= SEND_INGRESS_STATUS;
         end
       end
       WAIT_FOR_FLOW_CONTROL: begin
@@ -610,30 +618,30 @@ always @ (posedge clk) begin
         end
       end
       SEND_INGRESS_STATUS: begin
-        r_send_cfg_en                   <=  1;
-        if (r_send_cfg_fin && !i_ibm_buf_fin_stb)begin
-          r_send_cfg_en                 <=  0;
-          r_buf_done                    <=  0;
-          o_ibm_buf_fin_ack_stb         <=  1;
-          state                         <=  INGRESS_DATA_FLOW;
+        r_send_cfg_en                   <= 1;
+        if (r_send_cfg_fin)begin
+          r_send_cfg_en                 <= 0;
+          r_buf_done                    <= 0;
+          state                         <= INGRESS_DATA_FLOW;
         end
       end
 
 
 
 
+
       //At the end of a transaction send the final status
       SEND_CONFIG: begin
-        r_send_cfg_en         <=  1;
+        r_send_cfg_en                   <=  1;
         if (r_send_cfg_fin) begin
-          r_send_cfg_en       <=  0;
-          r_sts_cmd_err       <=  0;
-          r_sts_reset         <=  0;
-          r_sts_ping          <=  0;
-          r_sts_read_cfg      <=  0;
-          r_sts_interrupt     <=  0;
-          r_sts_unknown_cmd   <=  0;
-          state               <=  IDLE;
+          r_send_cfg_en                 <=  0;
+          r_sts_cmd_err                 <=  0;
+          r_sts_reset                   <=  0;
+          r_sts_ping                    <=  0;
+          r_sts_read_cfg                <=  0;
+          r_sts_interrupt               <=  0;
+          r_sts_unknown_cmd             <=  0;
+          state                         <=  IDLE;
         end
       end
       default: begin
@@ -641,11 +649,12 @@ always @ (posedge clk) begin
     endcase
 
     if (i_update_buf_stb) begin
-      r_buf_rdy               <=  r_buf_rdy | i_update_buf;
+      r_buf_rdy                         <=  r_buf_rdy | i_update_buf;
     end
 
     if (i_ibm_buf_fin_stb) begin
-      r_buf_done              <=  i_ibm_buf_fin;
+      r_tmp_done                        <=  r_tmp_done | i_ibm_buf_fin;
+      r_delay_stb                       <=  1;
     end
   end
 end
@@ -655,7 +664,6 @@ always @ (posedge clk) begin
   //Strobes
   r_fifo_stb                            <=  0;
   //o_interrupt_stb                       <=  0;
-  r_send_cfg_fin                        <=  0;
 
   if (rst || i_cmd_rst_stb) begin
     cfg_state                           <=  IDLE;
@@ -667,12 +675,13 @@ always @ (posedge clk) begin
     o_interrupt_msi_value               <=  `NYSA_INTERRUPT_CONFIG;
     o_cfg_read_exec                     <=  0;
     o_interrupt_send_en                 <=  0;
+    r_send_cfg_fin                      <=  0;
 
   end
   else begin
     case (cfg_state)
       IDLE: begin
-
+        r_send_cfg_fin                  <=  0;
         r_fifo_count                    <=  0;
         o_ctr_sel                       <=  0;
         if (r_send_cfg_en) begin
@@ -722,6 +731,7 @@ always @ (posedge clk) begin
       FINISH: begin
         r_send_cfg_fin                  <=  1;
         if (!r_send_cfg_en) begin
+          r_send_cfg_fin                <=  0;
           cfg_state                     <=  IDLE;
         end
       end

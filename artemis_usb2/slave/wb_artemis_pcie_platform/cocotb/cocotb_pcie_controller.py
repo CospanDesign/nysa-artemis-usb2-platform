@@ -74,12 +74,14 @@ HDR_WRITE_BUF_B_ADDR      = "write_buffer_b"
 HDR_READ_BUF_A_ADDR       = "read_buffer_a"
 HDR_READ_BUF_B_ADDR       = "read_buffer_b"
 HDR_BUFFER_SIZE           = "dword_buffer_size"
-HDR_PING_VALUE            = "ping value"
+HDR_INDEX_VALUEA          = "index value a"
+HDR_INDEX_VALUEB          = "index value b"
 HDR_DEV_ADDR              = "device_addr"
 STS_DEV_STATUS            = "device_status"
 STS_BUF_RDY               = "dev_buffer_rdy"
 STS_BUF_POS               = "hst_buf_addr"
 STS_INTERRUPT             = "interrupt"
+HDR_AUX_BUFFER_READY      = "hst_buffer_rdy"
 
 REGISTERS = OrderedDict([
     (HDR_STATUS_BUF_ADDR  , "Address of the Status Buffer on host computer" ),
@@ -89,12 +91,14 @@ REGISTERS = OrderedDict([
     (HDR_READ_BUF_A_ADDR  , "Address of Read Buffer 0 on host computer"     ),
     (HDR_READ_BUF_B_ADDR  , "Address of Read Buffer 1 on host computer"     ),
     (HDR_BUFFER_SIZE      , "Size of the buffer on host computer"           ),
-    (HDR_PING_VALUE       , "Value of Ping command"                         ),
+    (HDR_INDEX_VALUEA     , "Value of Index A"                              ),
+    (HDR_INDEX_VALUEB     , "Value of Index B"                              ),
     (HDR_DEV_ADDR         , "Address to read from or write to on device"    ),
     (STS_DEV_STATUS       , "Device Status"                                 ),
     (STS_BUF_RDY          , "Buffer Ready Status (Controller from device)"  ),
     (STS_BUF_POS          , "Address on Host"                               ),
-    (STS_INTERRUPT        , "Interrupt Status"                              )
+    (STS_INTERRUPT        , "Interrupt Status"                              ),
+    (HDR_AUX_BUFFER_READY , "Buffer Ready (Controlled by host)"             )
 ])
 
 SB_READY          = "ready"

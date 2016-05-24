@@ -42,6 +42,7 @@ module sim_pcie_axi_bridge #(
   parameter  [10:0] VC0_TOTAL_CREDITS_PD              = 211,
   parameter   [6:0] VC0_TOTAL_CREDITS_NPH             = 8,
   parameter   [6:0] VC0_TOTAL_CREDITS_CH              = 40,
+  //parameter   [6:0] VC0_TOTAL_CREDITS_CH              = 9,
   parameter  [10:0] VC0_TOTAL_CREDITS_CD              = 211
 )(
 
@@ -244,12 +245,12 @@ assign  w_func_size               = w_func_size_map[cfg_function_number];
 assign  received_hot_reset        = 0;
 
 //  input       [2:0]         fc_sel,
-assign  fc_nph      = 8'h8;
-assign  fc_npd      = 12'h211;
-assign  fc_ph       = 8'h32;
-assign  fc_pd       = 12'h211;
-assign  fc_cplh     = 8'h40;
-assign  fc_cpld     = 12'h211;
+assign  fc_nph      = VC0_TOTAL_CREDITS_NPH;
+assign  fc_npd      = VC0_TOTAL_CREDITS_NPD;
+assign  fc_ph       = VC0_TOTAL_CREDITS_PH;
+assign  fc_pd       = 100;
+assign  fc_cplh     = VC0_TOTAL_CREDITS_CH;
+assign  fc_cpld     = VC0_TOTAL_CREDITS_CD;
 
 
 

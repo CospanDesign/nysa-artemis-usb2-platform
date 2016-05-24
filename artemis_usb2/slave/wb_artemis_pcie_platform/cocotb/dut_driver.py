@@ -38,13 +38,11 @@ RX_EQUALIZER_CTRL               =   7
 LTSSM_STATE                     =   8
 TX_PRE_EMPH                     =   9
 DBG_DATA                        =   10
-CONFIG_COMMAND                  =   11
-CONFIG_STATUS                   =   12
-CONFIG_DCOMMAND                 =   13
-CONFIG_DSTATUS                  =   14
-CONFIG_LCOMMAND                 =   15
-CONFIG_LSTATUS                  =   16
 DBG_FLAGS                       =   17
+
+INGRESS_TAG_DONE                =   14
+INGRESS_TAG_EN                  =   15
+COMPLETE_STATUS                 =   16
 BAR_SELECT                      =   18
 BAR_ADDR0                       =   19
 BAR_ADDR1                       =   20
@@ -62,6 +60,14 @@ INGRESS_RI_COUNT                =   31
 INGRESS_CI_COUNT                =   32
 INGRESS_ADDR                    =   33
 INGRESS_CMPLT_COUNT             =   34
+
+CONFIG_COMMAND                  =   35
+CONFIG_STATUS                   =   36
+CONFIG_DCOMMAND                 =   37
+CONFIG_DSTATUS                  =   38
+CONFIG_LCOMMAND                 =   39
+CONFIG_LSTATUS                  =   40
+
 
 
 BAR_ADDR_BASE                   =   19
@@ -122,6 +128,14 @@ DBG_UR_NO_BAR                   =   19
 DBG_UR_POIS                     =   20
 DBG_UR_STS                      =   21
 DBG_UR_UNSUP_MSG                =   22
+DBG_TX_BUF_EMPTY                =   23
+DBG_TX_ERR_DROP                 =   24
+DBG_RX_ERR_FWD                  =   25
+DBG_READY_DROP                  =   26
+DBG_UNKNOWN_TLP                 =   27
+DBG_UNEXPECTED_END              =   28
+DBG_REENABLE                    =   29
+DBG_REENABLE_NZERO              =   30
 
 
 
@@ -382,7 +396,7 @@ class ArtemisPCIEDriver(driver.Driver):
         if (flags & (1 << DBG_DLLP_STS)) > 0:
             print "\tBad DLLP CRC Error"
         if (flags & (1 << DBG_BD_TLP_LCRC)) > 0:
-            print "\tLCP with an LCRC Error detected"
+            print "\tTCP with an LCRC Error detected"
         if (flags & (1 << DBG_BD_TLP_SQNM)) > 0:
             print "\tTLP with an invalid sequence number"
         if (flags & (1 << DBG_BD_TLP_STS)) > 0:
@@ -417,6 +431,24 @@ class ArtemisPCIEDriver(driver.Driver):
             print "\tUnsupported request is recieved"
         if (flags & (1 << DBG_UR_UNSUP_MSG)) > 0:
             print "\tMSG or MSGD TLP with unsupported type was received"
+        if (flags & (1 << DBG_TX_BUF_EMPTY)) > 0:
+            print "\tTransmit Buffer empty"
+        if (flags & (1 << DBG_TX_ERR_DROP)) > 0:
+            print "\tTransmit Buffer Overflow!"
+        if (flags & (1 << DBG_RX_ERR_FWD)) > 0:
+            print "\tReceive Error Forward"
+        if (flags & (1 << DBG_READY_DROP)) > 0:
+            print "\tReady Signal Dropped While Transmitting!"
+        if (flags & (1 << DBG_UNKNOWN_TLP)) > 0:
+            print "\tDetected Unkown Incomming Packet on PCIE Ingress, packet isn't MWR or CMPLT"
+        if (flags & (1 << DBG_UNEXPECTED_END)) > 0:
+            print "\tComplete TLP Ended Unexpectedly"
+        if (flags & (1 << DBG_REENABLE)) > 0:
+            print "\tTag was enable when it already was enabled!?"
+        if (flags & (1 << DBG_REENABLE_NZERO)) > 0:
+            print "\t\tAnd Count was greatr than zero (Means some of the data came through)"
+ 
+       
 
     def get_debug_flags(self):
         return self.read_register(DBG_FLAGS)
@@ -485,6 +517,14 @@ class ArtemisPCIEDriver(driver.Driver):
     def get_ingress_cmplt_count(self):
         return self.read_register(INGRESS_CMPLT_COUNT)
 
+    def get_ibm_tag_ingress_en(self):
+        return self.read_register(INGRESS_TAG_EN)
+
+    def get_ibm_tag_ingress_done(self):
+        return self.read_register(INGRESS_TAG_DONE)
+
+    def get_complete_status(self):
+        return self.read_register(COMPLETE_STATUS)
 
     def get_ingress_addr(self):
         return self.read_register(INGRESS_ADDR)

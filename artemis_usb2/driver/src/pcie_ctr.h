@@ -11,7 +11,7 @@
 
 
 //The total number of items in the configuration registers
-#define CONFIG_REGISTER_COUNT 13
+#define CONFIG_REGISTER_COUNT 15
 #define CMD_OFFSET            0x080
 #define NUM_BUFFERS           2
 
@@ -32,7 +32,8 @@ typedef struct
 {
   unsigned int buf_index;
   unsigned int pos;
-  unsigned int index;
+  unsigned int indexa;
+  unsigned int indexb;
   bool waiting;
   bool done;
   atomic_t kill;

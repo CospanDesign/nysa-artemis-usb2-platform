@@ -79,8 +79,7 @@ SOFTWARE.
 module artemis_pcie_controller #(
   parameter SERIAL_NUMBER             = 64'h000000000000C594,
   parameter DATA_INGRESS_FIFO_DEPTH   = 10,   //4096
-  parameter DATA_EGRESS_FIFO_DEPTH    = 6,    //256
-  parameter MAX_REQUEST_PAYLOAD_SIZE  = 512
+  parameter DATA_EGRESS_FIFO_DEPTH    = 6     //256
 )(
   input                     clk,
   input                     rst,
@@ -129,6 +128,8 @@ module artemis_pcie_controller #(
 
   output      [4:0]         cfg_ltssm_state,
 
+  output      [5:0]         tx_buf_av,
+  output                    tx_err_drop,
 
   //Extra Info
   output      [6:0]         o_bar_hit,
@@ -168,7 +169,7 @@ module artemis_pcie_controller #(
   output      [3:0]         o_ingress_state,
   output      [7:0]         o_ingress_ri_count,
   output      [7:0]         o_ingress_ci_count,
-  output      [7:0]         o_ingress_cmplt_count,
+  output      [31:0]        o_ingress_cmplt_count,
   output      [31:0]        o_ingress_addr,
 
   output                    dbg_reg_detected_correctable,
@@ -195,6 +196,12 @@ module artemis_pcie_controller #(
   output                    dbg_ur_pois_cfg_wr,
   output                    dbg_ur_status,
   output                    dbg_ur_unsup_msg,
+  output        [15:0]      dbg_tag_ingress_fin,
+  output        [15:0]      dbg_tag_en,
+  output                    dbg_rerrfwd,
+  output                    dbg_ready_drop,
+  output                    o_dbg_reenable_stb,
+  output                    o_dbg_reenable_nzero_stb, //If the host responded a bit then this will be greater than zero
 
   //User Interfaces
   output                    o_per_fifo_sel,
@@ -210,6 +217,9 @@ module artemis_pcie_controller #(
   input                     i_usr_interrupt_stb,
   input       [31:0]        i_usr_interrupt_value,
 
+  output      [2:0]         o_cplt_sts,
+  output                    o_unknown_tlp_stb,
+  output                    o_unexpected_end_stb,
 
   //Ingress FIFO
   input                     i_data_clk,
@@ -445,10 +455,10 @@ wire  [9:0]                 w_pcie_ing_fc_rcv_cnt;
 //Buffer Manager
 wire                        w_hst_buf_fin_stb;
 wire  [1:0]                 w_hst_buf_fin;
-wire                        w_hst_buf_fin_ack_stb;
 
 wire                        w_ctr_en;
 wire                        w_ctr_mem_rd_req_stb;
+wire                        w_ctr_dat_fin;
 wire                        w_ctr_tag_rdy;
 wire  [7:0]                 w_ctr_tag;
 wire  [9:0]                 w_ctr_dword_size;
@@ -457,7 +467,6 @@ wire                        w_ctr_idle;
 wire  [11:0]                w_ctr_start_addr;
 
 wire  [7:0]                 w_ing_cplt_tag;
-wire  [11:0]                w_ing_cplt_byte_count;
 wire  [6:0]                 w_ing_cplt_lwr_addr;
 
 wire  [1:0]                 w_bld_buf_en;
@@ -489,12 +498,6 @@ pcie_axi_bridge pcie_interface
   .s_axis_tx_tlast                   (s_axis_tx_tlast               ),
   .s_axis_tx_tvalid                  (s_axis_tx_tvalid              ),
 
-/*
-//TODO
-  output  reg [5:0]   tx_buf_av,
-  output  reg         tx_err_drop,
-  output  reg         tx_cfg_req,
-*/
   .tx_cfg_gnt                        (tx_cfg_gnt                    ),
   .user_enable_comm                  (user_enable_comm              ),
 
@@ -583,6 +586,8 @@ pcie_axi_bridge pcie_interface
   .tx_diff_ctrl                      (tx_diff_ctrl                  ),
   .tx_pre_emphasis                   (tx_pre_emphasis               ),
   .cfg_ltssm_state                   (cfg_ltssm_state               ),
+  .tx_buf_av                         (tx_buf_av                     ),
+  .tx_err_drop                       (tx_err_drop                   ),
 
   .o_bar_hit                         (w_bar_hit                     ),
   .dbg_reg_detected_correctable      (dbg_reg_detected_correctable  ),
@@ -689,11 +694,11 @@ ingress_buffer_manager buf_man (
   .i_hst_buf_rdy              (w_update_buf               ),
   .o_hst_buf_fin_stb          (w_hst_buf_fin_stb          ),
   .o_hst_buf_fin              (w_hst_buf_fin              ),
-  .i_hst_buf_fin_ack_stb      (w_hst_buf_fin_ack_stb      ),
 
   //PCIE Control Interface
   .i_ctr_en                   (w_ctr_en                   ),
   .i_ctr_mem_rd_req_stb       (w_ctr_mem_rd_req_stb       ),
+  .i_ctr_dat_fin              (w_ctr_dat_fin              ),
   .o_ctr_tag_rdy              (w_ctr_tag_rdy              ),
   .o_ctr_tag                  (w_ctr_tag                  ),
   .o_ctr_dword_size           (w_ctr_dword_size           ),
@@ -705,19 +710,22 @@ ingress_buffer_manager buf_man (
   .i_ing_cplt_stb             (w_pcie_ing_fc_rcv_stb      ),
   .i_ing_cplt_tag             (w_ing_cplt_tag             ),
   .i_ing_cplt_pkt_cnt         (w_pcie_ing_fc_rcv_cnt      ),
-  .i_ing_cplt_byte_count      (w_ing_cplt_byte_count      ),
   .i_ing_cplt_lwr_addr        (w_ing_cplt_lwr_addr        ),
 
   //Buffer Block Interface
   .o_bld_mem_addr             (w_ibm_buf_offset           ),
   .o_bld_buf_en               (w_bld_buf_en               ),
-  .i_bld_buf_fin              (w_bld_buf_fin              )
+  .i_bld_buf_fin              (w_bld_buf_fin              ),
+
+  .o_dbg_tag_ingress_fin      (dbg_tag_ingress_fin        ),
+  .o_dbg_tag_en               (dbg_tag_en                 ),
+  .o_dbg_reenable_stb         (o_dbg_reenable_stb         ),
+  .o_dbg_reenable_nzero_stb   (o_dbg_reenable_nzero_stb   )
+
 );
 
 
-pcie_control #(
-  .MAX_REQUEST_PAYLOAD_SIZE   (MAX_REQUEST_PAYLOAD_SIZE   )
-) controller (
+pcie_control controller (
   .clk                        (clk_62p5                   ),
   .rst                        (pcie_reset                 ),
 
@@ -801,10 +809,10 @@ pcie_control #(
   //Ingress Buffer Interface
   .i_ibm_buf_fin_stb          (w_hst_buf_fin_stb          ),
   .i_ibm_buf_fin              (w_hst_buf_fin              ),
-  .o_ibm_buf_fin_ack_stb      (w_hst_buf_fin_ack_stb      ),
 
   .o_ibm_en                   (w_ctr_en                   ),
   .o_ibm_req_stb              (w_ctr_mem_rd_req_stb       ),
+  .o_ibm_dat_fin              (w_ctr_dat_fin              ),
   .i_ibm_tag_rdy              (w_ctr_tag_rdy              ),
   .i_ibm_tag                  (w_ctr_tag                  ),
   .i_ibm_dword_cnt            (w_ctr_dword_size           ),
@@ -937,9 +945,11 @@ pcie_ingress ingress (
   //Flow Control
   .o_cplt_pkt_stb             (w_pcie_ing_fc_rcv_stb      ),
   .o_cplt_pkt_cnt             (w_pcie_ing_fc_rcv_cnt      ),
+  .o_cplt_sts                 (o_cplt_sts                 ),
+  .o_unknown_tlp_stb          (o_unknown_tlp_stb          ),
+  .o_unexpected_end_stb       (o_unexpected_end_stb       ),
 
   .o_cplt_pkt_tag             (w_ing_cplt_tag             ),
-  .o_cplt_pkt_byte_count      (w_ing_cplt_byte_count      ),
   .o_cplt_pkt_lwr_addr        (w_ing_cplt_lwr_addr        ),
 
   //Buffer interface, the buffer controller will manage this
@@ -981,7 +991,8 @@ pcie_egress egress (
   .o_fifo_act                 (w_egress_fifo_act          ),
   .i_fifo_size                (w_egress_fifo_size         ),
   .i_fifo_data                (w_egress_fifo_data         ),
-  .o_fifo_stb                 (w_egress_fifo_stb          )
+  .o_fifo_stb                 (w_egress_fifo_stb          ),
+  .dbg_ready_drop             (dbg_ready_drop             )
 );
 
 /****************************************************************************
@@ -1033,6 +1044,7 @@ assign  s_axis_tx_tuser       = {s_axis_tx_discont,
 
 //Use this BAR Hist because it is buffered with the AXI transaction
 assign  o_bar_hit             = m_axis_rx_tuser[8:2];
+assign  dbg_rerrfwd           = m_axis_rx_tuser[1];
 
 /****************************************************************************
  * The Following Signals Need to be integrated into the core

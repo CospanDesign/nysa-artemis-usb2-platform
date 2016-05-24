@@ -21,7 +21,6 @@ from cocotb_pcie_controller import HDR_WRITE_BUF_B_ADDR
 from cocotb_pcie_controller import HDR_READ_BUF_A_ADDR
 from cocotb_pcie_controller import HDR_READ_BUF_B_ADDR
 from cocotb_pcie_controller import HDR_BUFFER_SIZE
-from cocotb_pcie_controller import HDR_PING_VALUE
 from cocotb_pcie_controller import HDR_DEV_ADDR
 from cocotb_pcie_controller import STS_DEV_STATUS
 from cocotb_pcie_controller import STS_BUF_RDY
@@ -308,7 +307,7 @@ def test_pcie_read_two_block_command(dut):
     yield (nysa.wait_clocks(50))
 
 
-@cocotb.test(skip = True)
+@cocotb.test(skip = False)
 def test_pcie_write_command(dut):
     """
     Description:
@@ -527,16 +526,12 @@ def test_pcie_write_three_buffers(dut):
     c = CocotbPCIE(dut, debug = False)
 
     BUFFER_SIZE = 4096
-    BYTE_COUNT = BUFFER_SIZE * 3
+    BYTE_COUNT = BUFFER_SIZE * 4
     ADDRESS = 0x00
 
     data = Array('B')
-    for i in range(BYTE_COUNT / 4):
-        v = i * 4
-        data.append((v + 0) % 256)
-        data.append((v + 1) % 256)
-        data.append((v + 2) % 256)
-        data.append((v + 3) % 256)
+    for i in range(BYTE_COUNT):
+        data.append(i % 256)
 
     v = yield cocotb.external(driver.get_control)()
 

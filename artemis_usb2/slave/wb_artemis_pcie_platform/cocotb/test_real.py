@@ -183,6 +183,9 @@ class Test (unittest.TestCase):
         print ""
         self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
         print ""
+        self.s.Info("IBG Tags En:            0x%04X" % self.driver.get_ibm_tag_ingress_en())
+        self.s.Info("IBG Ingress Tags Done:  0x%04X" % self.driver.get_ibm_tag_ingress_done())
+        self.s.Info("Complete Status:        0x%04X" % self.driver.get_complete_status())
 
         self.driver.get_config_data()
         buffer_size = self.driver.get_local_buffer_size()
@@ -201,7 +204,8 @@ class Test (unittest.TestCase):
         print "Buffer:"
         print "%s" % list_to_hex_string(self.driver.read_local_buffer())
 
-        self.driver.enable_egress_fifo_send(True)
+        #self.driver.enable_egress_fifo_send(True)
+        self.driver.enable_egress_fifo_send(False)
 
 if __name__ == "__main__":
     unittest.main()

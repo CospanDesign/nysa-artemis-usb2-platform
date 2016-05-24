@@ -139,7 +139,6 @@ module pcie_axi_bridge #(
   parameter   [1:0] PM_DATA_SCALE7                    = 2'h0,
 
   parameter  [11:0] PCIE_GENERIC                      = 12'b000001101111,
-
   parameter   [0:0] GTP_SEL                           = 1'b1,
 
   parameter  [15:0] CFG_VEN_ID                        = 16'h10EE,
@@ -673,6 +672,7 @@ axi_basic_top #(
 .C_FAMILY                 ("S6"    ),           // Targeted FPGA family
 .C_ROOT_PORT              ("FALSE" ),           // PCIe block is in root port mode
 .C_PM_PRIORITY            ("TRUE"  )            // Disable TX packet boundary thrtl
+//.C_PM_PRIORITY            ("FALSE"  )            // Disable TX packet boundary thrtl
 
 ) axi_top (
 //---------------------------------------------//

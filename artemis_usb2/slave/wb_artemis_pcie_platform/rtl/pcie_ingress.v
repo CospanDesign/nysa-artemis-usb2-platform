@@ -85,9 +85,9 @@ module pcie_ingress (
   output  reg [9:0]         o_cplt_pkt_cnt,
 
   //Buffer Manager
-  output      [7:0]         o_cplt_pkt_tag,
-  output      [11:0]        o_cplt_pkt_byte_count,
-  output      [6:0]         o_cplt_pkt_lwr_addr,
+  output  reg [7:0]         o_cplt_pkt_tag,
+//  output      [11:0]        o_cplt_pkt_byte_count,
+  output  reg [6:0]         o_cplt_pkt_lwr_addr,
 
   //Buffer Interface
   input       [12:0]        i_buf_offset,
@@ -100,7 +100,11 @@ module pcie_ingress (
   output  reg [7:0]         o_ingress_ri_count,
   output  reg [7:0]         o_ingress_ci_count,
   output  reg [31:0]        o_ingress_addr,
-  output  reg [7:0]         o_ingress_cmplt_count
+  output  reg [31:0]        o_ingress_cmplt_count,
+
+  output  reg [2:0]         o_cplt_sts,
+  output  reg               o_unknown_tlp_stb,
+  output  reg               o_unexpected_end_stb
 );
 
 //local parameters
@@ -110,9 +114,10 @@ localparam  READ_HDR                = 4'h2;
 localparam  WRITE_REG_CMD           = 4'h3;
 localparam  READ_ADDR               = 4'h4;
 localparam  READ_CMPLT              = 4'h5;
-localparam  SEND_DATA               = 4'h6;
-localparam  READ_BAR_ADDR           = 4'h7;
-localparam  FLUSH                   = 4'h8;
+localparam  READ_CMPLT_DATA         = 4'h6;
+localparam  SEND_DATA               = 4'h7;
+localparam  READ_BAR_ADDR           = 4'h8;
+localparam  FLUSH                   = 4'h9;
 
 //Commands
 localparam  CMD_MEM_READ            = 8'h00;
@@ -158,6 +163,9 @@ reg   [31:0]                r_buf_cnt;
 wire  [6:0]                 w_cmplt_lower_addr;
 
 reg                         r_config_space_done;
+
+wire  [7:0]                 w_cplt_pkt_tag;
+wire  [6:0]                 w_cplt_pkt_lwr_addr;
 
 wire  [31:0]                w_hdr0;
 wire  [31:0]                w_hdr1;
@@ -213,17 +221,18 @@ end
 
 assign  w_pkt_data_size       = r_hdr[0][`PCIE_DWORD_PKT_CNT_RANGE];
 assign  w_pkt_addr            = {r_hdr[2][31:2], 2'b00};
-assign  w_cmplt_lower_addr    = r_hdr[3][`CMPLT_LOWER_ADDR_RANGE];
+assign  w_cmplt_lower_addr    = r_hdr[2][`CMPLT_LOWER_ADDR_RANGE];
 
 assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
 assign  w_cmd_en              = (w_reg_addr >= `CMD_OFFSET);
 //assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
 assign  w_buf_pkt_addr_base   = i_buf_offset - w_cmplt_lower_addr;
 
+assign  w_cplt_pkt_tag        = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][15:8] : 8'h00;
+//assign  o_cplt_pkt_byte_count = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[1][11:0] : 12'h00;
+assign  w_cplt_pkt_lwr_addr   = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][6:0]  : 7'h0;
 
-assign  o_cplt_pkt_tag        = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][15:8] : 8'h00;
-assign  o_cplt_pkt_byte_count = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[1][11:0] : 12'h00;
-assign  o_cplt_pkt_lwr_addr   = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][6:0]  : 7'h0;
+assign  w_cplt_sts            = r_hdr[1][15:13];
 
 integer i;
 //synchronous logic
@@ -245,6 +254,8 @@ always @ (posedge clk) begin
   o_update_buf_stb            <=  0;
 
   o_cplt_pkt_stb              <=  0;
+  o_unknown_tlp_stb           <=  0;
+  o_unexpected_end_stb        <=  0;
 
   if (rst) begin
     state                     <=  IDLE;
@@ -280,9 +291,12 @@ always @ (posedge clk) begin
     o_ingress_ci_count        <=  0;
     o_ingress_cmplt_count     <=  0;
     o_ingress_addr            <=  0;
+    o_cplt_pkt_tag            <=  0;
+    o_cplt_pkt_lwr_addr       <=  0;
 
     //Complete
     o_cplt_pkt_cnt            <=  0;
+    o_cplt_sts                <=  0;
 
     for (i = 0; i < 4; i = i + 1) begin
       r_hdr[i]                <=  0;
@@ -322,11 +336,15 @@ always @ (posedge clk) begin
             CMD_MEM_WRITE: begin
               state                   <=  WRITE_REG_CMD;
             end
-            CMD_COMPLETE_DATA: begin
-              o_cplt_pkt_cnt          <=  w_pkt_data_size;
+            CMD_COMPLETE: begin
               state                   <=  READ_CMPLT;
             end
+            CMD_COMPLETE_DATA: begin
+              o_cplt_pkt_cnt          <=  w_pkt_data_size;
+              state                   <=  READ_CMPLT_DATA;
+            end
             default: begin
+              o_unknown_tlp_stb       <=  1;
               state                   <=  FLUSH;
             end
           endcase
@@ -348,6 +366,8 @@ always @ (posedge clk) begin
               o_cmd_rst_stb                   <=  1;
             end
             `PERIPHERAL_WRITE: begin
+              o_ingress_cmplt_count           <=  0;
+              o_cplt_sts                      <=  0;
               o_cmd_flg_sel_per_stb           <=  1;
               o_cmd_wr_stb                    <=  1;
             end
@@ -393,8 +413,6 @@ always @ (posedge clk) begin
               o_ingress_ci_count              <=  o_ingress_ci_count + 1;
             end
           endcase
-          //state                               <=  READ_ADDR;
-          state                               <=  FLUSH;
         end
         else begin
           case (w_reg_addr)
@@ -402,6 +420,10 @@ always @ (posedge clk) begin
               o_status_addr           <=  i_axi_ingress_data;
             end
             `HDR_BUFFER_READY: begin
+              o_update_buf            <=  i_axi_ingress_data[1:0];
+              o_update_buf_stb        <=  1;
+            end
+            `HDR_AUX_BUFFER_READY: begin
               o_update_buf            <=  i_axi_ingress_data[1:0];
               o_update_buf_stb        <=  1;
             end
@@ -428,19 +450,30 @@ always @ (posedge clk) begin
             end
           endcase
           o_reg_write_stb             <=  1;
-          state                       <=  FLUSH;
         end
+        state                         <=  FLUSH;
       end
       READ_ADDR: begin
         o_cmd_data_address            <=  i_axi_ingress_data;
         state                         <=  FLUSH;
       end
       READ_CMPLT: begin
+        if (w_cplt_sts != 0) begin
+          o_cplt_sts                  <=  w_cplt_sts;
+        end
+        state                         <=  FLUSH;
+      end
+      READ_CMPLT_DATA: begin
         o_buf_addr                    <=  w_buf_pkt_addr_base;
+        if (w_cplt_sts != 0) begin
+          o_cplt_sts                  <=  w_cplt_sts;
+        end
         o_buf_we                      <=  1;
         o_buf_data                    <=  i_axi_ingress_data;
         r_buf_cnt                     <=  r_buf_cnt + 1;
         o_ingress_cmplt_count         <=  o_ingress_cmplt_count + 1;
+        o_cplt_pkt_tag                <=  w_cplt_pkt_tag;
+        o_cplt_pkt_lwr_addr           <=  w_cplt_pkt_lwr_addr;
         state                         <=  SEND_DATA;
       end
       SEND_DATA: begin
@@ -457,10 +490,14 @@ always @ (posedge clk) begin
           state                       <=  FLUSH;
         end
 
+//Sort of an out of band signal... but need to see if this is a problem
+        if ((r_buf_cnt < w_pkt_data_size) && !o_axi_ingress_ready) begin
+          o_unexpected_end_stb        <=  1;
+          state                       <=  IDLE;
+        end
       end
       FLUSH: begin
-        if (!i_axi_ingress_valid) begin
-          o_axi_ingress_ready         <=  0;
+        if (!o_axi_ingress_ready) begin
           state                       <=  IDLE;
         end
       end
@@ -473,15 +510,14 @@ always @ (posedge clk) begin
         end
       end
       default: begin
-        if (!i_axi_ingress_valid) begin
-          o_axi_ingress_ready         <=  0;
-          state                       <=  IDLE;
-        end
+        state                         <=  IDLE;
       end
     endcase
+
+    if (i_axi_ingress_last) begin
+      o_axi_ingress_ready             <=  0;
+    end
   end
 end
-
-
 
 endmodule

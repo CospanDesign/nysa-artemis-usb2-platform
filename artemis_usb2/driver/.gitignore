@@ -1,0 +1,11 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+*.cmd
+
+.tmp_versions
+*.symvers
+*.order
+*.mod.c

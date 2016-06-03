@@ -21,9 +21,9 @@ class AXIStreamMaster(BusDriver):
 
         #Drive default values onto bus
         self.bus.tvalid <= 0
-        self.bus.tlast  <= 0;
-        self.bus.tdata  <= 0;
-        self.bus.tkeep  <= 0;
+        self.bus.tlast  <= 0
+        self.bus.tdata  <= 0
+        self.bus.tkeep  <= 0
 
         self.write_data_busy = Lock("%s_wbusy" % name)
 
@@ -109,7 +109,6 @@ class AXIStreamSlave(BusDriver):
                 self.data.extend(self.word_to_array(self.bus.tdata.value))
                 if self.bus.tlast.value:
                     break
-
 
         else:
             self.bus.tready <= 1

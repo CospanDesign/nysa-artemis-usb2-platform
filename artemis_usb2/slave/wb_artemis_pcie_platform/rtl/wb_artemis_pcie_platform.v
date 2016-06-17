@@ -64,82 +64,26 @@ SOFTWARE.
 */
 `include "project_defines.v"
 
-`define CTRL_BIT_ENABLE               0
-`define CTRL_BIT_SEND_CONTROL_BLOCK   1
-`define CTRL_BIT_CANCEL_SEND_BLOCK    2
-`define CTRL_BIT_ENABLE_LOCAL_READ    3
-`define CTRL_BIT_ENABLE_EXT_RESET     4
-`define CTRL_BIT_MANUAL_USER_RESET    5
-`define CTRL_BIT_RESET_DBG_REGS       6
-`define CTRL_BIT_READ_BAR_ADDR_STB    7
-`define CTRL_BIT_SEND_IRQ             8
-`define CTRL_BIT_SEND_TO_HOST_EN      9
-
-`define STS_BIT_PCIE_RESET            0
-`define STS_BIT_LINKUP                1
-`define STS_BIT_RECEIVED_HOT_RESET    2
-`define STS_BITS_PCIE_LINK_STATE      6:4
-`define STS_BITS_PCIE_BUS_NUM         15:8
-`define STS_BITS_PCIE_DEV_NUM         19:16
-`define STS_BITS_PCIE_FUNC_NUM        22:20
-`define STS_BITS_LOCAL_MEM_IDLE       24
-`define STS_BIT_GTP_PLL_LOCK_DETECT   25
-`define STS_BIT_PLL_LOCK_DETECT       26
-`define STS_BIT_GTP_RESET_DONE        27
-`define STS_BIT_RX_ELEC_IDLE          28
-`define STS_BIT_CFG_TO_TURNOFF        29
-`define STS_BIT_PCIE_EXT_RESET        30
-`define STS_BIT_AXI_RECEIVE_READY     31
+`define CTRL_BIT_SOURCE_EN      0
+`define CTRL_BIT_CANCEL_WRITE   1
+`define CTRL_BIT_SINK_EN        2
 
 
-`define DBG_DTCT_CRCT                 0
-`define DBG_DTCT_FATL                 1
-`define DBG_DTCT_NFTL                 2
-`define DBG_DTCT_UNSP                 3
-`define DBG_DLLP_STS                  4
-`define DBG_BD_TLP_LCRC               5
-`define DBG_BD_TLP_SQNM               6
-`define DBG_BD_TLP_STS                7
-`define DBG_DL_PTCL_STS               8
-`define DBG_FC_PTCL_STS               9
-`define DBG_MLFM_LEN                  10
-`define DBG_MLFM_MPS                  11
-`define DBG_MLFM_TCVC                 12
-`define DBG_MLFM_TLP_STS              13
-`define DBG_MLFM_TLP_UNREC            14
-`define DBG_PLP_STS                   15
-`define DBG_RCVR_OVFL_STS             16
-`define DBG_RCVR_RLVR_STS             17
-`define DBG_RCVR_TMT_STS              18
-`define DBG_UR_NO_BAR                 19
-`define DBG_UR_POIS                   20
-`define DBG_UR_STS                    21
-`define DBG_UR_UNSUP_MSG              22
-`define DBG_TX_BUF_EMPTY              23
-`define DBG_TX_ERR_DROP               24
-`define DBG_RX_ERR_FWD                25
-`define DBG_READY_DROP                26
-`define DBG_UNKNOWN_TLP               27
-`define DBG_UNEXPECTED_END            28
-`define DBG_REENABLE                  29
-`define DBG_REENABLE_NZERO            30
-
-
-
-`define USR_IF_BIT_PER_BUS_SEL        0
-`define USR_IF_BIT_MEM_BUS_SEL        1
-`define USR_IF_BIT_DMA_BUS_SEL        2
-`define USR_IF_BIT_WR_FLAG            3
-`define USR_IF_BIT_RD_FLAG            4
-`define USR_IF_BIT_FIFO_FLAG          5
+`define STS_BIT_LINKUP          0
+`define STS_BIT_READ_IDLE       1
+`define STS_PER_FIFO_SEL        2
+`define STS_MEM_FIFO_SEL        3
+`define STS_DMA_FIFO_SEL        4
+`define STS_WRITE_EN            5
+`define STS_READ_EN             6
 
 
 `define LOCAL_BUFFER_OFFSET         24'h000100
 
-
 module wb_artemis_pcie_platform #(
   parameter           DATA_INGRESS_FIFO_DEPTH = 10,
-  parameter           DATA_EGRESS_FIFO_DEPTH  = 6
+  parameter           DATA_EGRESS_FIFO_DEPTH  = 6,
+  parameter           CONTROL_FIFO_DEPTH = 7
 ) (
   input               clk,
   input               rst,
@@ -156,6 +100,7 @@ module wb_artemis_pcie_platform #(
   output  reg [31:0]  o_wbs_dat,
   input       [31:0]  i_wbs_adr,
 
+  output      [31:0]  o_debug_data,
   //This interrupt can be controlled from this module or a submodule
   output  reg         o_wbs_int,
 
@@ -170,653 +115,414 @@ module wb_artemis_pcie_platform #(
   input               i_pcie_phy_rx_n,
 
   input               i_pcie_reset_n,
-  output              o_pcie_wake_n,
-
-  output              o_62p5_clk,
-  output      [31:0]  o_debug_data
-
+  output              o_pcie_wake_n
 );
 
 //Local Parameters
-localparam    DATA_BUFFER_SIZE = 2 ** DATA_EGRESS_FIFO_DEPTH;
+localparam  CONTROL             = 32'h00;
+localparam  STATUS              = 32'h01;
+localparam  CFG_READ_EXEC       = 32'h02;
+localparam  CFG_SM_STATE        = 32'h03;
+localparam  CTR_SM_STATE        = 32'h04;
+localparam  INGRESS_COUNT       = 32'h05;
+localparam  INGRESS_STATE       = 32'h06;
+localparam  INGRESS_RI_COUNT    = 32'h07;
+localparam  INGRESS_CI_COUNT    = 32'h08;
+localparam  INGRESS_ADDR        = 32'h09;
+localparam  INGRESS_CMPLT_COUNT = 32'h0A;
+localparam  IH_STATE            = 32'h0B;
+localparam  OH_STATE            = 32'h0C;
+localparam  BRAM_NUM_READS      = 32'h0D;
+localparam  LOCAL_BUFFER_SIZE   = 32'h0E;
+localparam  DBG_ID_VALUE        = 32'h0F;
+localparam  DBG_COMMAND_VALUE   = 32'h10;
+localparam  DBG_COUNT_VALUE     = 32'h11;
+localparam  DBG_ADDRESS_VALUE   = 32'h12;
 
-localparam    CONTROL             = 0;
-localparam    STATUS              = 1;
-localparam    NUM_BLOCK_READ      = 2;
-localparam    LOCAL_BUFFER_SIZE   = 3;
-localparam    PCIE_CLOCK_CNT      = 4;
-localparam    TEST_CLOCK          = 5;
-localparam    TX_DIFF_CTRL        = 6;
-localparam    RX_EQUALIZER_CTRL   = 7;
-localparam    LTSSM_STATE         = 8;
-localparam    TX_PRE_EMPH         = 9;
-localparam    DBG_DATA            = 10;
-
-localparam    USR_IF_FLAGS        = 11;
-localparam    USR_IF_SIZE         = 12;
-localparam    USR_IF_ADDRESS      = 13;
-
-localparam    INGRESS_TAG_DONE    = 14;
-localparam    INGRESS_TAG_EN      = 15;
-localparam    CMPLT_STS           = 16;
-
-localparam    DBG_FLAGS           = 17;
-localparam    BAR_SELECT          = 18;
-localparam    BAR_ADDR0           = 19;
-localparam    BAR_ADDR1           = 20;
-localparam    BAR_ADDR2           = 21;
-localparam    BAR_ADDR3           = 22;
-localparam    BAR_ADDR4           = 23;
-localparam    BAR_ADDR5           = 24;
-localparam    IRQ_CHANNEL_SELECT  = 25;
-localparam    CFG_READ_EXEC       = 26;
-localparam    CFG_SM_STATE        = 27;
-localparam    CTR_SM_STATE        = 28;
-localparam    INGRESS_COUNT       = 29;
-localparam    INGRESS_STATE       = 30;
-localparam    INGRESS_RI_COUNT    = 31;
-localparam    INGRESS_CI_COUNT    = 32;
-localparam    INGRESS_ADDR        = 33;
-localparam    INGRESS_CMPLT_COUNT = 34;
-
-localparam    CONFIG_COMMAND      = 35;
-localparam    CONFIG_STATUS       = 36;
-localparam    CONFIG_DCOMMAND     = 37;
-localparam    CONFIG_DSTATUS      = 38;
-localparam    CONFIG_LCOMMAND     = 39;
-localparam    CONFIG_LSTATUS      = 40;
-
+localparam    CONTROL_BUFFER_SIZE = 2 ** CONTROL_FIFO_DEPTH;
 
 //Local Registers/Wires
-wire      [31:0]                status;
+reg               r_mem_2_ppfifo_stb;
+reg               r_snk_en;
 
-reg                             r_enable_pcie = 1;
-//reg                             r_enable_ext_reset;
-//reg                             r_manual_pcie_reset;
-reg       [31:0]                r_clock_1_sec;
-reg       [31:0]                r_clock_count;
-reg       [31:0]                r_host_clock_count;
-reg                             r_1sec_stb_100mhz;
-wire                            w_1sec_stb_65mhz;
-reg                             r_irq_stb = 0;
+wire  [1:0]       w_mem_gen_rdy;
+wire  [23:0]      w_mem_gen_size;
+wire  [1:0]       w_mem_gen_act;
+wire              w_mem_gen_stb;
+wire  [31:0]      w_mem_gen_data;
 
-// Transaction (TRN) Interface
-wire                            user_lnk_up;
+wire              w_mem_sink_rdy;
+wire  [23:0]      w_mem_sink_size;
+wire              w_mem_sink_act;
+wire              w_mem_sink_stb;
+wire  [31:0]      w_mem_sink_data;
 
-// Configuration: Error
-wire                             cfg_err_ur;
-wire                             cfg_err_cor;
-wire                             cfg_err_ecrc;
-wire                             cfg_err_cpl_timeout;
-wire                             cfg_err_cpl_abort;
-wire                             cfg_err_posted;
-wire                             cfg_err_locked;
-wire      [47:0]                 cfg_err_tlp_cpl_header;
-wire                             cfg_err_cpl_rdy;
+wire              w_odma_flush;
+wire              w_idma_flush;
 
-// Configuration: Power Management
-reg                              cfg_turnoff_ok = 0;
-reg                              trn_pending = 0;
-wire                             cfg_to_turnoff;
-wire                             cfg_pm_wake;
+wire  [1:0]       w_dma_gen_rdy;
+wire  [23:0]      w_dma_gen_size;
+wire  [1:0]       w_dma_gen_act;
+wire              w_dma_gen_stb;
+wire  [31:0]      w_dma_gen_data;
 
-// Configuration: System/Status
-wire      [2:0]                  cfg_pcie_link_state;
-//reg                              r_cfg_trn_pending;
-wire      [7:0]                  cfg_bus_number;
-wire      [4:0]                  cfg_device_number;
-wire      [2:0]                  cfg_function_number;
-
-wire      [15:0]                 cfg_status;
-wire      [15:0]                 cfg_command;
-wire      [15:0]                 cfg_dstatus;
-wire      [15:0]                 cfg_dcommand;
-wire      [15:0]                 cfg_lstatus;
-wire      [15:0]                 cfg_lcommand;
-
-// System Interface
-wire                              pcie_reset;
-wire                              clk_62p5;
-wire                              received_hot_reset;
-
-reg                               r_ppfifo_2_mem_en;
-reg                               r_mem_2_ppfifo_stb;
-reg                               r_cancel_write_stb;
-wire  [31:0]                      w_num_reads;
-wire                              w_idle;
-wire                              pll_lock_detect;
-wire                              rx_elec_idle;
-wire                              gtp_pll_lock_detect;
-wire                              gtp_reset_done;
-
-//User Memory Interface
-reg                               r_lcl_mem_we;
-wire  [DATA_EGRESS_FIFO_DEPTH -1: 0]     w_lcl_mem_addr;
-reg   [31:0]                      r_lcl_mem_din;
-wire  [31:0]                      w_lcl_mem_dout;
-wire                              w_lcl_mem_valid;
-
-wire                              w_lcl_mem_en;
+wire              w_dma_sink_rdy;
+wire  [23:0]      w_dma_sink_size;
+wire              w_dma_sink_act;
+wire              w_dma_sink_stb;
+wire  [31:0]      w_dma_sink_data;
 
 
-wire                              w_fifo_ingress_rd_stb;
-wire                              w_fifo_ingress_rd_ready;
-wire                              w_fifo_ingress_rd_activate;
-wire  [23:0]                      w_fifo_ingress_rd_size;
-wire  [31:0]                      w_fifo_ingress_rd_data;
+wire              out_en;
+wire  [31:0]      out_status;
+wire  [31:0]      out_address;
+wire  [31:0]      out_data;
+wire  [27:0]      out_data_count;
+wire              master_ready;
 
-wire  [1:0]                       w_fifo_egress_wr_ready;
-wire  [1:0]                       w_fifo_egress_wr_activate;
-wire  [23:0]                      w_fifo_egress_wr_size;
-wire                              w_fifo_egress_wr_stb;
-wire  [31:0]                      w_fifo_egress_wr_data;
+wire              w_in_ready;
+wire  [31:0]      w_in_command;
+wire  [31:0]      w_in_address;
+wire  [31:0]      w_in_data;
+wire  [27:0]      w_in_data_count;
+wire              w_out_ready;
+wire              w_ih_reset;
 
-
-
-reg   [1:0]                       r_rx_equalizer_ctrl = 2'b11;
-reg   [3:0]                       r_tx_diff_ctrl      = 4'h9;
-reg   [2:0]                       r_tx_pre_emphasis   = 3'b00;
-wire  [4:0]                       cfg_ltssm_state;
-
-wire [6:0]                        w_bar_hit;
-wire                              w_receive_axi_ready;
-reg  [6:0]                        r_unrecognized_bar;
-
-wire                              w_rx_data_valid;
-
-reg  [6:0]                        r_bar_hit_temp;
-
-wire [31:0]                       w_bar_addr0;
-wire [31:0]                       w_bar_addr1;
-wire [31:0]                       w_bar_addr2;
-wire [31:0]                       w_bar_addr3;
-wire [31:0]                       w_bar_addr4;
-wire [31:0]                       w_bar_addr5;
-
-wire [7:0]                        w_cfg_read_exec;
-wire [3:0]                        w_cfg_sm_state;
-wire [3:0]                        w_sm_state;
-wire [7:0]                        w_ingress_count;
-wire [3:0]                        w_ingress_state;
-wire [7:0]                        w_ingress_ri_count;
-wire [7:0]                        w_ingress_ci_count;
-wire [31:0]                       w_ingress_cmplt_count;
-wire [31:0]                       w_ingress_addr;
-
-wire [31:0]                       w_data_size;
-wire [31:0]                       w_data_address;
-
-wire                              w_per_fifo_sel;
-wire                              w_mem_fifo_sel;
-wire                              w_dma_fifo_sel;
-wire                              w_data_fifo_flg;
-wire                              w_data_read_flg;
-wire                              w_data_write_flg;
-
-wire                              w_usr_interrupt_stb;
-wire  [31:0]                      w_usr_interrupt_value;
-
-wire                              dbg_reg_detected_correctable;
-wire                              dbg_reg_detected_fatal;
-wire                              dbg_reg_detected_non_fatal;
-wire                              dbg_reg_detected_unsupported;
-
-wire                              dbg_bad_dllp_status;
-wire                              dbg_bad_tlp_lcrc;
-wire                              dbg_bad_tlp_seq_num;
-wire                              dbg_bad_tlp_status;
-wire                              dbg_dl_protocol_status;
-wire                              dbg_fc_protocol_err_status;
-wire                              dbg_mlfrmd_length;
-wire                              dbg_mlfrmd_mps;
-wire                              dbg_mlfrmd_tcvc;
-wire                              dbg_mlfrmd_tlp_status;
-wire                              dbg_mlfrmd_unrec_type;
-wire                              dbg_poistlpstatus;
-wire                              dbg_rcvr_overflow_status;
-wire                              dbg_rply_rollover_status;
-wire                              dbg_rply_timeout_status;
-wire                              dbg_ur_no_bar_hit;
-wire                              dbg_ur_pois_cfg_wr;
-wire                              dbg_ur_status;
-wire                              dbg_ur_unsup_msg;
-
-reg   [31:0]                      r_dbg_reg;
-reg                               r_rst_dbg;
-reg                               r_egress_fifo_send_en;
-
-wire  [5:0]                       tx_buf_av;
-wire                              tx_err_drop;
-
-wire  [15:0]                      dbg_tag_ingress_fin;
-wire  [15:0]                      dbg_tag_en;
-wire                              w_dbg_reenable_stb;
-wire                              w_dbg_reenable_nzero_stb;
-wire                              dbg_rerrfwd;
-wire                              dbg_ready_drop;
-
-wire   [2:0]                      w_cplt_sts;
-wire                              w_unknown_tlp_stb;
-wire                              w_unexpected_end_stb;
+wire              w_per_stb;
+wire              w_per_cyc;
+reg               r_per_ack;
+reg   [31:0]      r_per_data;
 
 //Submodules
-//artemis_pcie_interface #(
-artemis_pcie_controller #(
-  .DATA_INGRESS_FIFO_DEPTH           (DATA_INGRESS_FIFO_DEPTH      ),
-  .DATA_EGRESS_FIFO_DEPTH            (DATA_EGRESS_FIFO_DEPTH       ),
-  .SERIAL_NUMBER                     (64'h000000000000C594         )
-)api (
-  .clk                               (clk                          ),
-  //.rst                               (rst || !r_enable_pcie || !i_pcie_reset_n ),
-  .rst                               (!r_enable_pcie || !i_pcie_reset_n ),
+  //Memory Interface
+  //DDR3 Control Signals
+wire              o_ddr3_cmd_clk;
+wire              o_ddr3_cmd_en;
+wire  [2:0]       o_ddr3_cmd_instr;
+wire  [5:0]       o_ddr3_cmd_bl;
+wire  [29:0]      o_ddr3_cmd_byte_addr;
+wire              i_ddr3_cmd_empty;
+wire              i_ddr3_cmd_full;
 
-  .gtp_clk_p                         (i_clk_100mhz_gtp_p           ),
-  .gtp_clk_n                         (i_clk_100mhz_gtp_n           ),
+wire              o_ddr3_wr_clk;
+wire              o_ddr3_wr_en;
+wire  [3:0]       o_ddr3_wr_mask;
+wire  [31:0]      o_ddr3_wr_data;
+wire              i_ddr3_wr_full;
+wire              i_ddr3_wr_empty;
+wire  [6:0]       i_ddr3_wr_count;
+wire              i_ddr3_wr_underrun;
+wire              i_ddr3_wr_error;
 
-  .pci_exp_txp                       (o_pcie_phy_tx_p              ),
-  .pci_exp_txn                       (o_pcie_phy_tx_n              ),
-  .pci_exp_rxp                       (i_pcie_phy_rx_p              ),
-  .pci_exp_rxn                       (i_pcie_phy_rx_n              ),
+wire              o_ddr3_rd_clk;
+wire              o_ddr3_rd_en;
+wire  [31:0]      i_ddr3_rd_data;
+wire              i_ddr3_rd_full;
+wire              i_ddr3_rd_empty;
+wire  [6:0]       i_ddr3_rd_count;
+wire              i_ddr3_rd_overflow;
+wire              i_ddr3_rd_error;
+wire  [31:0]      w_usr_interrupt_value;
+wire              w_interrupt;
 
+wire      [7:0]   o_cfg_read_exec;
+wire      [3:0]   o_cfg_sm_state;
+wire      [3:0]   o_sm_state;
+wire      [7:0]   o_ingress_count;
+wire      [3:0]   o_ingress_state;
+wire      [7:0]   o_ingress_ri_count;
+wire      [7:0]   o_ingress_ci_count;
+wire      [31:0]  o_ingress_cmplt_count;
+wire      [31:0]  o_ingress_addr;
 
-  // Transaction (TRN) Interface
-  .user_lnk_up                       (user_lnk_up                  ),
-  .clk_62p5                          (clk_62p5                     ),
+assign  w_interrupt   = 0;
 
-
-  //User Interfaces
-  .o_per_fifo_sel                    (w_per_fifo_sel               ),
-  .o_mem_fifo_sel                    (w_mem_fifo_sel               ),
-  .o_dma_fifo_sel                    (w_dma_fifo_sel               ),
-
-  .i_usr_interrupt_stb               (w_usr_interrupt_stb          ),
-  .i_usr_interrupt_value             (w_usr_interrupt_value        ),
-
-  .o_data_size                       (w_data_size                  ),
-  .o_data_address                    (w_data_address               ),
-  .o_data_fifo_flg                   (w_data_fifo_flg              ),
-  .o_data_read_flg                   (w_data_read_flg              ),
-  .o_data_write_flg                  (w_data_write_flg             ),
-
-
-  //Ingress FIFO
-  .i_data_clk                        (clk                          ),
-  .o_ingress_fifo_rdy                (w_fifo_ingress_rd_ready      ),
-  .i_ingress_fifo_act                (w_fifo_ingress_rd_activate   ),
-  .o_ingress_fifo_size               (w_fifo_ingress_rd_size       ),
-  .i_ingress_fifo_stb                (w_fifo_ingress_rd_stb        ),
-  .o_ingress_fifo_data               (w_fifo_ingress_rd_data       ),
-
-  .o_egress_fifo_rdy                 (w_fifo_egress_wr_ready       ),
-  .i_egress_fifo_act                 (w_fifo_egress_wr_activate    ),
-  .o_egress_fifo_size                (w_fifo_egress_wr_size        ),
-  .i_egress_fifo_stb                 (w_fifo_egress_wr_stb         ),
-  .i_egress_fifo_data                (w_fifo_egress_wr_data        ),
-
-  .o_bar_addr0                       (w_bar_addr0                  ),
-  .o_bar_addr1                       (w_bar_addr1                  ),
-  .o_bar_addr2                       (w_bar_addr2                  ),
-  .o_bar_addr3                       (w_bar_addr3                  ),
-  .o_bar_addr4                       (w_bar_addr4                  ),
-  .o_bar_addr5                       (w_bar_addr5                  ),
+wire      [3:0]      w_ih_state;
+wire      [3:0]      w_oh_state;
 
 
-  // Configuration: Power Management
-  .cfg_turnoff_ok                    (cfg_turnoff_ok               ),
-  .cfg_to_turnoff                    (cfg_to_turnoff               ),
-  .cfg_pm_wake                       (cfg_pm_wake                  ),
-
-  // System Interface
-  .pcie_reset                        (pcie_reset                   ),
-  .received_hot_reset                (received_hot_reset           ),
-  .gtp_pll_lock_detect               (gtp_pll_lock_detect          ),
-  .gtp_reset_done                    (gtp_reset_done               ),
-  .pll_lock_detect                   (pll_lock_detect              ),
-
-  .rx_elec_idle                      (rx_elec_idle                 ),
-  .rx_equalizer_ctrl                 (r_rx_equalizer_ctrl          ),
-
-  .tx_diff_ctrl                      (r_tx_diff_ctrl               ),
-  .tx_pre_emphasis                   (r_tx_pre_emphasis            ),
-
-  .cfg_ltssm_state                   (cfg_ltssm_state              ),
-  .tx_buf_av                         (tx_buf_av                    ),
-  .tx_err_drop                       (tx_err_drop                  ),
-
-  .o_bar_hit                         (w_bar_hit                    ),
-  .o_receive_axi_ready               (w_receive_axi_ready          ),
+reg                   r_cancel_write_stb;
+wire      [31:0]      w_num_reads;
+wire                  w_read_idle;
 
 
-  .dbg_reg_detected_correctable      (dbg_reg_detected_correctable ),
-  .dbg_reg_detected_fatal            (dbg_reg_detected_fatal       ),
-  .dbg_reg_detected_non_fatal        (dbg_reg_detected_non_fatal   ),
-  .dbg_reg_detected_unsupported      (dbg_reg_detected_unsupported ),
+wire                  w_lcl_mem_en;
 
-  .dbg_bad_dllp_status               (dbg_bad_dllp_status          ),
-  .dbg_bad_tlp_lcrc                  (dbg_bad_tlp_lcrc             ),
-  .dbg_bad_tlp_seq_num               (dbg_bad_tlp_seq_num          ),
-  .dbg_bad_tlp_status                (dbg_bad_tlp_status           ),
-  .dbg_dl_protocol_status            (dbg_dl_protocol_status       ),
-  .dbg_fc_protocol_err_status        (dbg_fc_protocol_err_status   ),
-  .dbg_mlfrmd_length                 (dbg_mlfrmd_length            ),
-  .dbg_mlfrmd_mps                    (dbg_mlfrmd_mps               ),
-  .dbg_mlfrmd_tcvc                   (dbg_mlfrmd_tcvc              ),
-  .dbg_mlfrmd_tlp_status             (dbg_mlfrmd_tlp_status        ),
-  .dbg_mlfrmd_unrec_type             (dbg_mlfrmd_unrec_type        ),
-  .dbg_poistlpstatus                 (dbg_poistlpstatus            ),
-  .dbg_rcvr_overflow_status          (dbg_rcvr_overflow_status     ),
-  .dbg_rply_rollover_status          (dbg_rply_rollover_status     ),
-  .dbg_rply_timeout_status           (dbg_rply_timeout_status      ),
-  .dbg_ur_no_bar_hit                 (dbg_ur_no_bar_hit            ),
-  .dbg_ur_pois_cfg_wr                (dbg_ur_pois_cfg_wr           ),
-  .dbg_ur_status                     (dbg_ur_status                ),
-  .dbg_ur_unsup_msg                  (dbg_ur_unsup_msg             ),
+reg                   r_bram_we;
+wire      [6:0]       w_bram_addr;
+reg       [31:0]      r_bram_din;
+wire      [31:0]      w_bram_dout;
+wire                  w_bram_valid;
 
-  .dbg_tag_ingress_fin               (dbg_tag_ingress_fin          ),
-  .dbg_tag_en                        (dbg_tag_en                   ),
-  .o_dbg_reenable_stb                (w_dbg_reenable_stb           ),
-  .o_dbg_reenable_nzero_stb          (w_dbg_reenable_nzero_stb     ),
+wire      [31:0]      w_id_value;
+wire      [31:0]      w_command_value;
+wire      [31:0]      w_count_value;
+wire      [31:0]      w_address_value;
 
-  .dbg_rerrfwd                       (dbg_rerrfwd                  ),
-  .dbg_ready_drop                    (dbg_ready_drop               ),
+wire                  w_per_fifo_sel;
+wire                  w_mem_fifo_sel;
+wire                  w_dma_fifo_sel;
 
-  //Extra Info
-  .o_cfg_read_exec                   (w_cfg_read_exec              ),
-  .o_cfg_sm_state                    (w_cfg_sm_state               ),
-  .o_sm_state                        (w_sm_state                   ),
+wire                  w_write_flag;
+wire                  w_read_flag;
 
-  .cfg_pcie_link_state               (cfg_pcie_link_state          ),
-  .cfg_bus_number                    (cfg_bus_number               ),
-  .cfg_device_number                 (cfg_device_number            ),
-  .cfg_function_number               (cfg_function_number          ),
 
-  .cfg_status                        (cfg_status                   ),
-  .cfg_command                       (cfg_command                  ),
-  .cfg_dstatus                       (cfg_dstatus                  ),
-  .cfg_dcommand                      (cfg_dcommand                 ),
-  .cfg_lstatus                       (cfg_lstatus                  ),
-  .cfg_lcommand                      (cfg_lcommand                 ),
 
-  // Configuration: Error
-  .cfg_err_ur                        (cfg_err_ur                   ),
-  .cfg_err_cor                       (cfg_err_cor                  ),
-  .cfg_err_ecrc                      (cfg_err_ecrc                 ),
-  .cfg_err_cpl_timeout               (cfg_err_cpl_timeout          ),
-  .cfg_err_cpl_abort                 (cfg_err_cpl_abort            ),
-  .cfg_err_posted                    (cfg_err_posted               ),
-  .cfg_err_locked                    (cfg_err_locked               ),
-  .cfg_err_tlp_cpl_header            (cfg_err_tlp_cpl_header       ),
-  .cfg_err_cpl_rdy                   (cfg_err_cpl_rdy              ),
+artemis_pcie_host_interface host_interface (
 
-  .o_cplt_sts                        (w_cplt_sts                   ),
-  .o_unknown_tlp_stb                 (w_unknown_tlp_stb            ),
-  .o_unexpected_end_stb              (w_unexpected_end_stb         ),
+  .clk                  (clk                  ),
+  .rst                  (rst                  ),
 
-  //Debug Info
-  .o_ingress_count                   (w_ingress_count              ),
-  .o_ingress_state                   (w_ingress_state              ),
-  .o_ingress_ri_count                (w_ingress_ri_count           ),
-  .o_ingress_ci_count                (w_ingress_ci_count           ),
-  .o_ingress_cmplt_count             (w_ingress_cmplt_count        ),
-  .o_ingress_addr                    (w_ingress_addr               )
+  .i_interrupt          (w_interrupt          ),
+  .o_user_lnk_up        (w_user_lnk_up        ),
+  .o_pcie_rst_out       (w_pcie_rst_out       ),
+
+  .i_usr_interrupt_value(w_usr_interrupt_value),
+
+  //Master Interface
+  .i_master_ready       (master_ready         ),
+
+  .o_ih_reset           (w_ih_reset           ),
+  .o_ih_ready           (w_in_ready           ),
+
+  .o_in_command         (w_in_command         ),
+  .o_in_address         (w_in_address         ),
+  .o_in_data            (w_in_data            ),
+  .o_in_data_count      (w_in_data_count      ),
+
+  .o_oh_ready           (w_out_ready          ),
+  .i_oh_en              (out_en               ),
+
+  .i_out_status         (out_status           ),
+  .i_out_address        (out_address          ),
+  .i_out_data           (out_data             ),
+  .i_out_data_count     (out_data_count       ),
+
+  .o_ih_state           (w_ih_state           ),
+  .o_oh_state           (w_oh_state           ),
+
+
+  //Memory Interface
+  //DDR3 Control Signals
+  .o_ddr3_cmd_clk       (o_ddr3_cmd_clk       ),
+  .o_ddr3_cmd_en        (o_ddr3_cmd_en        ),
+  .o_ddr3_cmd_instr     (o_ddr3_cmd_instr     ),
+  .o_ddr3_cmd_bl        (o_ddr3_cmd_bl        ),
+  .o_ddr3_cmd_byte_addr (o_ddr3_cmd_byte_addr ),
+  .i_ddr3_cmd_empty     (i_ddr3_cmd_empty     ),
+  .i_ddr3_cmd_full      (i_ddr3_cmd_full      ),
+
+  .o_ddr3_wr_clk        (o_ddr3_wr_clk        ),
+  .o_ddr3_wr_en         (o_ddr3_wr_en         ),
+  .o_ddr3_wr_mask       (o_ddr3_wr_mask       ),
+  .o_ddr3_wr_data       (o_ddr3_wr_data       ),
+  .i_ddr3_wr_full       (i_ddr3_wr_full       ),
+  .i_ddr3_wr_empty      (i_ddr3_wr_empty      ),
+  .i_ddr3_wr_count      (i_ddr3_wr_count      ),
+  .i_ddr3_wr_underrun   (i_ddr3_wr_underrun   ),
+  .i_ddr3_wr_error      (i_ddr3_wr_error      ),
+
+  .o_ddr3_rd_clk        (o_ddr3_rd_clk        ),
+  .o_ddr3_rd_en         (o_ddr3_rd_en         ),
+  .i_ddr3_rd_data       (i_ddr3_rd_data       ),
+  .i_ddr3_rd_full       (i_ddr3_rd_full       ),
+  .i_ddr3_rd_empty      (i_ddr3_rd_empty      ),
+  .i_ddr3_rd_count      (i_ddr3_rd_count      ),
+  .i_ddr3_rd_overflow   (i_ddr3_rd_overflow   ),
+  .i_ddr3_rd_error      (i_ddr3_rd_error      ),
+
+  .i_idma_flush         (w_idma_flush         ),
+  .i_idma_activate      (w_dma_sink_act       ),
+  .o_idma_ready         (w_dma_sink_rdy       ),
+  .i_idma_stb           (w_dma_sink_stb       ),
+  .o_idma_size          (w_dma_sink_size      ),
+  .o_idma_data          (w_dma_sink_data      ),
+
+  .i_odma_flush         (w_odma_flush         ),
+  .o_odma_ready         (w_dma_gen_rdy        ),
+  .i_odma_activate      (w_dma_gen_act        ),
+  .i_odma_stb           (w_dma_gen_stb        ),
+  .o_odma_size          (w_dma_gen_size       ),
+  .i_odma_data          (w_dma_gen_data       ),
+
+  .o_cfg_read_exec      (o_cfg_read_exec      ),
+  .o_cfg_sm_state       (o_cfg_sm_state       ),
+  .o_sm_state           (o_sm_state           ),
+  .o_ingress_count      (o_ingress_count      ),
+  .o_ingress_state      (o_ingress_state      ),
+  .o_ingress_ri_count   (o_ingress_ri_count   ),
+  .o_ingress_ci_count   (o_ingress_ci_count   ),
+  .o_ingress_cmplt_count(o_ingress_cmplt_count),
+  .o_ingress_addr       (o_ingress_addr       ),
+
+  .o_id_value           (w_id_value           ),
+  .o_command_value      (w_command_value      ),
+  .o_count_value        (w_count_value        ),
+  .o_address_value      (w_address_value      ),
+
+  .o_per_fifo_sel       (w_per_fifo_sel       ),
+  .o_mem_fifo_sel       (w_mem_fifo_sel       ),
+  .o_dma_fifo_sel       (w_dma_fifo_sel       ),
+
+  .o_write_flag         (w_write_flag         ),
+  .o_read_flag          (w_read_flag          ),
+
+  .o_debug_data         (o_debug_data         ),
+
+  .i_pcie_phy_clk_p     (i_clk_100mhz_gtp_p   ),
+  .i_pcie_phy_clk_n     (i_clk_100mhz_gtp_n   ),
+
+  .o_pcie_phy_tx_p      (o_pcie_phy_tx_p      ),
+  .o_pcie_phy_tx_n      (o_pcie_phy_tx_n      ),
+
+  .i_pcie_phy_rx_p      (i_pcie_phy_rx_p      ),
+  .i_pcie_phy_rx_n      (i_pcie_phy_rx_n      ),
+
+  .i_pcie_reset         (!i_pcie_reset_n      ),
+  .o_pcie_wake_n        (o_pcie_wake_n        )
+
 );
 
+wishbone_master wm (
+  .clk                  (clk                  ),
+  .rst                  (rst                  ),
+
+  .i_ih_rst             (w_ih_reset           ),
+  .i_ready              (w_in_ready           ),
+  .i_command            (w_in_command         ),
+  .i_address            (w_in_address         ),
+  .i_data               (w_in_data            ),
+  .i_data_count         (w_in_data_count      ),
+  .i_out_ready          (w_out_ready          ),
+  .o_en                 (out_en               ),
+  .o_status             (out_status           ),
+  .o_address            (out_address          ),
+  .o_data               (out_data             ),
+  .o_data_count         (out_data_count       ),
+  .o_master_ready       (master_ready         ),
+
+//  .o_per_we             (w_wbp_we               ),
+//  .o_per_adr            (w_wbp_adr              ),
+//  .o_per_dat            (w_wbp_dat_i            ),
+  .i_per_dat            (r_per_data             ),
+  .o_per_stb            (w_per_stb              ),
+  .o_per_cyc            (w_per_cyc              ),
+//  .o_per_msk            (w_wbp_msk              ),
+//  .o_per_sel            (w_wbp_sel              ),
+  .i_per_ack            (r_per_ack              ),
+  .i_per_int            (1'b0                   ),  //Try this out later on
+
+  //memory interconnect signals
+//  .o_mem_we             (w_mem_we_o             ),
+//  .o_mem_adr            (w_mem_adr_o            ),
+//  .o_mem_dat            (w_mem_dat_o            ),
+//  .i_mem_dat            (w_mem_dat_i            ),
+//  .o_mem_stb            (w_mem_stb_o            ),
+//  .o_mem_cyc            (w_mem_cyc_o            ),
+//  .o_mem_sel            (w_mem_sel_o            ),
+  .i_mem_ack            (1'b0                   ),  //Nothing should be on the memory bus
+  .i_mem_int            (1'b0                   )
+
+);
+
+//DMA Sink and Source
 adapter_dpb_ppfifo #(
-  .MEM_DEPTH                          (DATA_EGRESS_FIFO_DEPTH      ),
-  .DATA_WIDTH                         (32                          )
-)dpb_bridge (
-  .clk                                (clk                         ),
-  .rst                                (rst                         ),
-  .i_ppfifo_2_mem_en                  (r_ppfifo_2_mem_en           ),
-  .i_mem_2_ppfifo_stb                 (r_mem_2_ppfifo_stb || r_egress_fifo_send_en  ),
-  .i_cancel_write_stb                 (r_cancel_write_stb          ),
-  .o_num_reads                        (w_num_reads                 ),
-  .o_idle                             (w_idle                      ),
+  .MEM_DEPTH                  (CONTROL_FIFO_DEPTH     ),
+  .DATA_WIDTH                 (32                     )
+) dma_bram (
+  .clk                        (clk                    ),
+  .rst                        (rst                    ),
+  .i_ppfifo_2_mem_en          (r_snk_en               ),
+  .i_mem_2_ppfifo_stb         (r_mem_2_ppfifo_stb     ),
+  .i_cancel_write_stb         (r_cancel_write_stb     ),
+  .o_num_reads                (w_num_reads            ),
+  .o_idle                     (w_read_idle            ),
 
-  .i_bram_we                          (r_lcl_mem_we                ),
-  .i_bram_addr                        (w_lcl_mem_addr              ),
-  .i_bram_din                         (r_lcl_mem_din               ),
-  .o_bram_dout                        (w_lcl_mem_dout              ),
-  .o_bram_valid                       (w_lcl_mem_valid             ),
+  //User Memory Interface
+  .i_bram_we                  (r_bram_we              ),
+  .i_bram_addr                (w_bram_addr            ),
+  .i_bram_din                 (r_bram_din             ),
+  .o_bram_dout                (w_bram_dout            ),
+  .o_bram_valid               (w_bram_valid           ),
 
-  .ppfifo_clk                         (clk                         ),
+  //Ping Pong FIFO Interface
+  .ppfifo_clk                 (clk                    ),
 
-  .i_write_ready                      (w_fifo_egress_wr_ready      ),
-  .o_write_activate                   (w_fifo_egress_wr_activate   ),
-  .i_write_size                       (w_fifo_egress_wr_size       ),
-  .o_write_stb                        (w_fifo_egress_wr_stb        ),
-  .o_write_data                       (w_fifo_egress_wr_data       ),
+  .i_write_ready              (w_dma_gen_rdy          ),
+  .o_write_activate           (w_dma_gen_act          ),
+  .i_write_size               (w_dma_gen_size         ),
+  .o_write_stb                (w_dma_gen_stb          ),
+  .o_write_data               (w_dma_gen_data         ),
 
-  .i_read_ready                       (w_fifo_ingress_rd_ready     ),
-  .o_read_activate                    (w_fifo_ingress_rd_activate  ),
-  .i_read_size                        (w_fifo_ingress_rd_size      ),
-  .i_read_data                        (w_fifo_ingress_rd_data      ),
-  .o_read_stb                         (w_fifo_ingress_rd_stb       )
+  .i_read_ready               (w_dma_sink_rdy         ),
+  .o_read_activate            (w_dma_sink_act         ),
+  .i_read_size                (w_dma_sink_size        ),
+  .o_read_stb                 (w_dma_sink_stb         ),
+  .i_read_data                (w_dma_sink_data        )
 );
 
-cross_clock_strobe clk_stb (
-  .rst                                (rst                         ),
-  .in_clk                             (clk                         ),
-  .in_stb                             (r_1sec_stb_100mhz           ),
 
-  .out_clk                            (clk_62p5                    ),
-  .out_stb                            (w_1sec_stb_65mhz            )
-);
+assign i_ddr3_cmd_empty   = 1;
+assign i_ddr3_cmd_full    = 0;
+
+assign i_ddr3_wr_full     = 0;
+assign i_ddr3_wr_empty    = 1;
+assign i_ddr3_wr_count    = 0;
+assign i_ddr3_wr_underrun = 0;
+assign i_ddr3_wr_error    = 0;
+
+assign i_ddr3_rd_data     = 32'h01234567;
+assign i_ddr3_rd_full     = 1;
+assign i_ddr3_rd_empty    = 0;
+assign i_ddr3_rd_count    = 63;
+assign i_ddr3_rd_overflow = 0;
+assign i_ddr3_rd_error    = 0;
 
 //Asynchronous Logic
-//assign  fc_sel                 = 3'h0;
+assign  w_odma_flush      = 0;
+assign  w_idma_flush      = 0;
 
-//assign  cfg_dwaddr             = 10'h0;
-//assign  cfg_rd_en              = 1'b0;
+assign  w_usr_interrupt_value = 32'h0;
 
-assign  cfg_err_ur             = 0;
-assign  cfg_err_cor            = 0;
-assign  cfg_err_ecrc           = 0;
-assign  cfg_err_cpl_timeout    = 0;
-assign  cfg_err_cpl_abort      = 0;
-assign  cfg_err_posted         = 0;
-assign  cfg_err_locked         = 0;
-assign  cfg_err_tlp_cpl_header = 0;
 
-//assign  cfg_interrupt          = 0;
-//assign  cfg_interrupt_assert   = 0;
-//assign  cfg_interrupt_di       = 0;
-
-//assign  cfg_turnoff_ok         = 0;
-assign  cfg_pm_wake             = 0;
-assign  o_pcie_wake_n           = 1;
 assign  w_lcl_mem_en            = ((i_wbs_adr >= `LOCAL_BUFFER_OFFSET) &&
-                                   (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + DATA_BUFFER_SIZE)));
+                                   (i_wbs_adr < (`LOCAL_BUFFER_OFFSET + CONTROL_BUFFER_SIZE)));
 
-assign  w_lcl_mem_addr          = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
-//assign  !i_pcie_reset_n          = r_enable_ext_reset ? !i_pcie_reset_n : r_manual_pcie_reset;
-//assign  !i_pcie_reset_n          = i_pcie_reset_n;
-assign  o_62p5_clk              = clk_62p5;
+assign  w_bram_addr             = w_lcl_mem_en ? (i_wbs_adr - `LOCAL_BUFFER_OFFSET) : 0;
 
-assign  o_debug_data            = { 26'h0,
-                                    pll_lock_detect,
-                                    pcie_reset,
-                                    user_lnk_up,
-                                    cfg_ltssm_state};
-
-assign  w_usr_interrupt_stb     = 0;
-assign  w_usr_interrupt_value   = 0;
 //Synchronous Logic
 
-always @ (posedge clk_62p5) begin
-  if (!i_pcie_reset_n) begin
-    r_clock_1_sec                <= 0;
-    r_clock_count                <= 0;
-    cfg_turnoff_ok               <= 0;
-    trn_pending                  <= 0;
-    r_dbg_reg                    <= 0;
+always @ (posedge clk) begin
+  if (rst) begin
+    r_per_data    <=  0;
+    r_per_ack     <=  0;
   end
   else begin
-    r_clock_count                             <=  r_clock_count + 1;
-    if (w_1sec_stb_65mhz) begin
-      r_clock_1_sec                           <=  r_clock_count;
-      r_clock_count                           <=  0;
+    if (!w_per_stb && r_per_ack) begin
+      r_per_ack   <=  0;
     end
-
-    //Power Controller
-    if (cfg_to_turnoff && !trn_pending) begin
-      cfg_turnoff_ok                          <=  1;
+    if (w_per_cyc && w_per_stb && !r_per_ack) begin
+      r_per_ack   <=  1;
+      r_per_data  <=  r_per_data + 1;
     end
-    else begin
-      cfg_turnoff_ok                          <=  0;
-    end
-
-    if(dbg_reg_detected_correctable) begin
-        r_dbg_reg[`DBG_DTCT_CRCT]             <= 1;
-    end
-    if(dbg_reg_detected_fatal) begin
-        r_dbg_reg[`DBG_DTCT_FATL]             <= 1;
-    end
-    if(dbg_reg_detected_non_fatal) begin
-        r_dbg_reg[`DBG_DTCT_NFTL]             <= 1;
-    end
-    if(dbg_reg_detected_unsupported) begin
-        r_dbg_reg[`DBG_DTCT_UNSP]             <= 1;
-    end
-
-    if(dbg_bad_dllp_status) begin
-        r_dbg_reg[`DBG_DLLP_STS]              <= 1;
-    end
-    if(dbg_bad_tlp_lcrc) begin
-        r_dbg_reg[`DBG_BD_TLP_LCRC]           <= 1;
-    end
-    if(dbg_bad_tlp_seq_num) begin
-        r_dbg_reg[`DBG_BD_TLP_SQNM]           <= 1;
-    end
-    if(dbg_bad_tlp_status) begin
-        r_dbg_reg[`DBG_BD_TLP_STS]            <= 1;
-    end
-    if(dbg_dl_protocol_status) begin
-        r_dbg_reg[`DBG_DL_PTCL_STS]           <= 1;
-    end
-    if(dbg_fc_protocol_err_status) begin
-        r_dbg_reg[`DBG_FC_PTCL_STS]           <= 1;
-    end
-    if(dbg_mlfrmd_length) begin
-        r_dbg_reg[`DBG_MLFM_LEN]              <= 1;
-    end
-    if(dbg_mlfrmd_mps) begin
-        r_dbg_reg[`DBG_MLFM_MPS]              <= 1;
-    end
-    if(dbg_mlfrmd_tcvc) begin
-        r_dbg_reg[`DBG_MLFM_TCVC]             <= 1;
-    end
-    if(dbg_mlfrmd_tlp_status) begin
-        r_dbg_reg[`DBG_MLFM_TLP_STS]          <= 1;
-    end
-    if(dbg_mlfrmd_unrec_type) begin
-        r_dbg_reg[`DBG_MLFM_TLP_UNREC]        <= 1;
-    end
-    if(dbg_poistlpstatus) begin
-        r_dbg_reg[`DBG_PLP_STS]               <= 1;
-    end
-    if(dbg_rcvr_overflow_status) begin
-        r_dbg_reg[`DBG_RCVR_OVFL_STS]         <= 1;
-    end
-    if(dbg_rply_rollover_status) begin
-        r_dbg_reg[`DBG_RCVR_RLVR_STS]         <= 1;
-    end
-    if(dbg_rply_timeout_status) begin
-        r_dbg_reg[`DBG_RCVR_TMT_STS]          <= 1;
-    end
-    if(dbg_ur_no_bar_hit) begin
-        r_dbg_reg[`DBG_UR_NO_BAR]             <= 1;
-    end
-    if(dbg_ur_pois_cfg_wr) begin
-        r_dbg_reg[`DBG_UR_POIS]               <= 1;
-    end
-    if(dbg_ur_status) begin
-        r_dbg_reg[`DBG_UR_STS]                <= 1;
-    end
-    if(dbg_ur_unsup_msg) begin
-        r_dbg_reg[`DBG_UR_UNSUP_MSG]          <= 1;
-    end
-    if (tx_buf_av == 6'b0) begin
-        r_dbg_reg[`DBG_TX_BUF_EMPTY]          <= 1;
-    end
-    if (tx_err_drop) begin
-        r_dbg_reg[`DBG_TX_ERR_DROP]           <= 1;
-    end
-    if (dbg_rerrfwd) begin
-        r_dbg_reg[`DBG_RX_ERR_FWD]            <= 1;
-    end
-    if (dbg_ready_drop) begin
-        r_dbg_reg[`DBG_READY_DROP]            <= 1;
-    end
-    if (w_unknown_tlp_stb) begin
-        r_dbg_reg[`DBG_UNKNOWN_TLP]           <= 1;
-    end
-    if (w_unexpected_end_stb) begin
-        r_dbg_reg[`DBG_UNEXPECTED_END]        <= 1;
-    end
-    if (w_dbg_reenable_stb) begin
-        r_dbg_reg[`DBG_REENABLE]              <= 1;
-    end
-    if (w_dbg_reenable_nzero_stb) begin
-        r_dbg_reg[`DBG_REENABLE_NZERO]        <= 1;
-    end
-
-
-
-
-    if (r_rst_dbg) begin
-      r_dbg_reg                               <= 0;
-    end
-
   end
 end
 
-
 always @ (posedge clk) begin
-
-  //Deassert Strobes
-  r_mem_2_ppfifo_stb            <=  0;
-  r_cancel_write_stb            <=  0;
-  r_lcl_mem_we                  <=  0;
-  r_1sec_stb_100mhz             <=  0;
-
-  //THis might need to be moved into the 62.5MHz clock
-  //r_cfg_trn_pending             <=  0;
-  r_irq_stb                     <=  0;
-
+  r_mem_2_ppfifo_stb      <= 0;
+  r_cancel_write_stb      <= 0;
+  r_bram_we               <=  0;
   if (rst) begin
-    o_wbs_dat                   <=  32'h0;
-    o_wbs_ack                   <=  0;
-    o_wbs_int                   <=  0;
-    r_ppfifo_2_mem_en           <=  1;
-    r_enable_pcie               <=  1;
-    //r_enable_ext_reset          <=  1;
-    //r_manual_pcie_reset         <=  0;
+    o_wbs_dat             <= 32'h0;
+    o_wbs_ack             <= 0;
+    o_wbs_int             <= 0;
+    r_bram_din            <= 0;
 
-    r_lcl_mem_din               <=  0;
-    r_host_clock_count          <=  0;
-
-    r_rx_equalizer_ctrl         <=  2'b11;
-    r_tx_diff_ctrl              <=  4'b1001;
-    r_tx_pre_emphasis           <=  3'b00;
-
-    r_bar_hit_temp              <=  0;
-    r_rst_dbg                   <=  0;
-    r_egress_fifo_send_en       <=  0;
-
+    r_snk_en              <= 1;
   end
   else begin
-    if (r_dbg_reg == 0) begin
-      r_rst_dbg                 <=  0;
-    end
-    if ((r_bar_hit_temp == 0) && (w_bar_hit != 0)) begin
-      r_bar_hit_temp           <= w_bar_hit;
-    end
     //when the master acks our ack, then put our ack down
     if (o_wbs_ack && ~i_wbs_stb)begin
-      if (i_wbs_adr == DBG_FLAGS) begin
-        r_rst_dbg               <=  1;
-      end
       o_wbs_ack <= 0;
     end
 
@@ -828,226 +534,117 @@ always @ (posedge clk) begin
           case (i_wbs_adr)
             CONTROL: begin
               $display("ADDR: %h user wrote %h", i_wbs_adr, i_wbs_dat);
-              r_enable_pcie         <=  i_wbs_dat[`CTRL_BIT_ENABLE];
-              r_mem_2_ppfifo_stb    <=  i_wbs_dat[`CTRL_BIT_SEND_CONTROL_BLOCK];
-              r_cancel_write_stb    <=  i_wbs_dat[`CTRL_BIT_CANCEL_SEND_BLOCK];
-              r_ppfifo_2_mem_en     <=  i_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ];
-              //r_reset_dbg_regs      <=  i_wbs_dat[`CTRL_BIT_RESET_DBG_REGS];
-              //r_enable_ext_reset    <=  i_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET];
-              //r_manual_pcie_reset   <=  i_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET];
-              //r_read_bar_addr_stb_a <=  i_wbs_dat[`CTRL_BIT_READ_BAR_ADDR_STB];
-              r_egress_fifo_send_en <=  i_wbs_dat[`CTRL_BIT_SEND_TO_HOST_EN];
-              r_irq_stb             <=  i_wbs_dat[`CTRL_BIT_SEND_IRQ];
-
-            end
-            TX_DIFF_CTRL: begin
-              r_tx_diff_ctrl      <=  i_wbs_dat[3:0];
-            end
-            TX_DIFF_CTRL: begin
-              r_tx_pre_emphasis   <=  i_wbs_dat[2:0];
-            end
-            RX_EQUALIZER_CTRL: begin
-              r_rx_equalizer_ctrl <=  i_wbs_dat[1:0];
+              r_mem_2_ppfifo_stb                  <=  i_wbs_dat[`CTRL_BIT_SOURCE_EN];
+              r_cancel_write_stb                  <=  i_wbs_dat[`CTRL_BIT_CANCEL_WRITE];
+              r_snk_en                            <=  i_wbs_dat[`CTRL_BIT_SINK_EN];
             end
             default: begin
               if (w_lcl_mem_en) begin
-                r_lcl_mem_we                          <=  1;
-                r_lcl_mem_din                         <=  i_wbs_dat;
+                r_bram_we                          <=  1;
+                r_bram_din                         <=  i_wbs_dat;
               end
+
             end
           endcase
-          o_wbs_ack <= 1;
+          o_wbs_ack                                 <= 1;
         end
         else begin
           //read request
           case (i_wbs_adr)
             CONTROL: begin
-              o_wbs_dat                               <=  0;
-              o_wbs_dat[`CTRL_BIT_ENABLE_LOCAL_READ]  <=  r_ppfifo_2_mem_en;
-              o_wbs_dat[`CTRL_BIT_ENABLE]             <=  r_enable_pcie;
-              //o_wbs_dat[`CTRL_BIT_ENABLE_EXT_RESET]   <=  r_enable_ext_reset;
-              //o_wbs_dat[`CTRL_BIT_MANUAL_USER_RESET]  <=  r_manual_pcie_reset;
+              o_wbs_dat <= 0;
+              o_wbs_dat[`CTRL_BIT_SOURCE_EN]      <= r_mem_2_ppfifo_stb;
+              o_wbs_dat[`CTRL_BIT_CANCEL_WRITE]   <= r_cancel_write_stb;
+              o_wbs_dat[`CTRL_BIT_SINK_EN]        <= r_snk_en;
+
             end
             STATUS: begin
-              o_wbs_dat                               <=  0;
-              o_wbs_dat[`STS_BIT_PCIE_RESET]          <=  pcie_reset;
-              o_wbs_dat[`STS_BIT_LINKUP]              <=  user_lnk_up;
-              o_wbs_dat[`STS_BIT_RECEIVED_HOT_RESET]  <=  received_hot_reset;
-              o_wbs_dat[`STS_BITS_PCIE_LINK_STATE]    <=  cfg_pcie_link_state;
-              o_wbs_dat[`STS_BITS_PCIE_BUS_NUM]       <=  cfg_bus_number;
-              o_wbs_dat[`STS_BITS_PCIE_DEV_NUM]       <=  cfg_device_number;
-              o_wbs_dat[`STS_BITS_PCIE_FUNC_NUM]      <=  cfg_function_number;
-              o_wbs_dat[`STS_BIT_GTP_PLL_LOCK_DETECT] <=  gtp_pll_lock_detect;
-              o_wbs_dat[`STS_BIT_PLL_LOCK_DETECT]     <=  pll_lock_detect;
-              o_wbs_dat[`STS_BIT_GTP_RESET_DONE]      <=  gtp_reset_done;
-              o_wbs_dat[`STS_BIT_RX_ELEC_IDLE]        <=  rx_elec_idle;
-              o_wbs_dat[`STS_BIT_CFG_TO_TURNOFF]      <=  cfg_to_turnoff;
-              o_wbs_dat[`STS_BIT_PCIE_EXT_RESET]      <=  !i_pcie_reset_n;
-              o_wbs_dat[`STS_BIT_AXI_RECEIVE_READY]   <=  w_receive_axi_ready;
-            end
-            NUM_BLOCK_READ: begin
-              o_wbs_dat <= w_num_reads;
-            end
-            LOCAL_BUFFER_SIZE: begin
-              o_wbs_dat <= DATA_BUFFER_SIZE;
-            end
-            PCIE_CLOCK_CNT: begin
-              o_wbs_dat <=  r_clock_1_sec;
-            end
-            TEST_CLOCK: begin
-              o_wbs_dat       <=  r_clock_count;
-            end
-            TX_DIFF_CTRL: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat[3:0]  <=  r_tx_diff_ctrl;
-            end
-            TX_PRE_EMPH: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat[3:0]  <=  r_tx_pre_emphasis;
-            end
-            RX_EQUALIZER_CTRL: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat[1:0]  <=  r_rx_equalizer_ctrl;
-            end
-            LTSSM_STATE: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat[4:0]  <=  cfg_ltssm_state;
-            end
-            DBG_DATA: begin
-              o_wbs_dat       <=  0;
-              //o_wbs_dat[`DBG_CORRECTABLE ] <=  dbg_correctable;
-              //o_wbs_dat[`DBG_FATAL       ] <=  dbg_fatal;
-              //o_wbs_dat[`DBG_NON_FATAL   ] <=  dbg_non_fatal;
-              //o_wbs_dat[`DBG_UNSUPPORTED ] <=  dbg_unsupported;
-            end
-            USR_IF_FLAGS: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat[`USR_IF_BIT_PER_BUS_SEL ]  <=  w_per_fifo_sel;
-              o_wbs_dat[`USR_IF_BIT_MEM_BUS_SEL ]  <=  w_mem_fifo_sel;
-              o_wbs_dat[`USR_IF_BIT_DMA_BUS_SEL ]  <=  w_dma_fifo_sel;
-              o_wbs_dat[`USR_IF_BIT_WR_FLAG     ]  <=  w_data_write_flg;
-              o_wbs_dat[`USR_IF_BIT_RD_FLAG     ]  <=  w_data_read_flg;
-              o_wbs_dat[`USR_IF_BIT_FIFO_FLAG   ]  <=  w_data_fifo_flg;
-            end
-            USR_IF_SIZE: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat       <=  w_data_size;
-            end
-            USR_IF_ADDRESS: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat       <=  w_data_address;
-            end
+              o_wbs_dat <= 0;
+              o_wbs_dat[`STS_BIT_LINKUP]          <=  w_user_lnk_up;
+              o_wbs_dat[`STS_BIT_READ_IDLE]       <=  w_read_idle;
 
+              o_wbs_dat[`STS_PER_FIFO_SEL]        <=  w_per_fifo_sel;
+              o_wbs_dat[`STS_MEM_FIFO_SEL]        <=  w_mem_fifo_sel;
+              o_wbs_dat[`STS_DMA_FIFO_SEL]        <=  w_dma_fifo_sel;
+              o_wbs_dat[`STS_WRITE_EN]            <=  w_write_flag;
+              o_wbs_dat[`STS_READ_EN]             <=  w_read_flag;
 
-            CONFIG_COMMAND: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_command};
-            end
-            CONFIG_STATUS: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_status};
-            end
-            CONFIG_DSTATUS: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_dstatus};
-            end
-            CONFIG_DCOMMAND: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_dcommand};
-            end
-            CONFIG_LSTATUS: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_lstatus};
-            end
-            CONFIG_LCOMMAND: begin
-              o_wbs_dat       <=  0;
-              o_wbs_dat                       <=  {16'h0000, cfg_lcommand};
-            end
-
-
-
-            DBG_FLAGS: begin
-              o_wbs_dat                         <=  r_dbg_reg;
-            end
-            BAR_SELECT: begin
-              //o_wbs_dat                         <=  {24'h0, r_unrecognized_bar};
-              o_wbs_dat                         <=  {25'h0, r_bar_hit_temp};
-              r_bar_hit_temp                    <=  0;
-            end
-            BAR_ADDR0: begin
-              o_wbs_dat                         <=  w_bar_addr0;
-            end
-            BAR_ADDR1: begin
-              o_wbs_dat                         <=  w_bar_addr1;
-            end
-            BAR_ADDR2: begin
-              o_wbs_dat                         <=  w_bar_addr2;
-            end
-            BAR_ADDR3: begin
-              o_wbs_dat                         <=  w_bar_addr3;
-            end
-            BAR_ADDR4: begin
-              o_wbs_dat                         <=  w_bar_addr4;
-            end
-            BAR_ADDR5: begin
-              o_wbs_dat                         <=  w_bar_addr5;
             end
             CFG_READ_EXEC: begin
-              o_wbs_dat                         <=  {24'h00, w_cfg_read_exec};
+              o_wbs_dat <= 0;
+              o_wbs_dat[7:0]  <=   o_cfg_read_exec;
             end
             CFG_SM_STATE: begin
-              o_wbs_dat                         <=  {28'h00, w_cfg_sm_state};
+              o_wbs_dat <= 0;
+              o_wbs_dat[3:0]  <=   o_cfg_sm_state;
             end
             CTR_SM_STATE: begin
-              o_wbs_dat                         <=  {28'h00, w_sm_state};
+              o_wbs_dat <= 0;
+              o_wbs_dat[3:0]  <=   o_sm_state;
             end
             INGRESS_COUNT: begin
-              o_wbs_dat                         <=  {24'h00, w_ingress_count};
+              o_wbs_dat <= 0;
+              o_wbs_dat[7:0]  <=   o_ingress_count;
             end
             INGRESS_STATE: begin
-              o_wbs_dat                         <=  {28'h00, w_ingress_state};
+              o_wbs_dat <= 0;
+              o_wbs_dat[3:0]  <=   o_ingress_state;
             end
             INGRESS_RI_COUNT: begin
-              o_wbs_dat                         <=  {24'h00, w_ingress_ri_count};
+              o_wbs_dat <= 0;
+              o_wbs_dat[7:0]  <=   o_ingress_ri_count;
             end
             INGRESS_CI_COUNT: begin
-              o_wbs_dat                         <=  {24'h00, w_ingress_ci_count};
-            end
-            INGRESS_CMPLT_COUNT: begin
-              o_wbs_dat                         <=  w_ingress_cmplt_count;
+              o_wbs_dat <= 0;
+              o_wbs_dat[7:0]  <=   o_ingress_ci_count;
             end
             INGRESS_ADDR: begin
-              o_wbs_dat                         <=  w_ingress_addr;
+              o_wbs_dat <= 0;
+              o_wbs_dat[31:0]  <=  o_ingress_addr;
             end
-            INGRESS_TAG_DONE: begin
-              o_wbs_dat                         <=  {16'h0, dbg_tag_ingress_fin};
+            INGRESS_CMPLT_COUNT: begin
+              o_wbs_dat <= 0;
+              o_wbs_dat[31:0]  <=  o_ingress_cmplt_count;
             end
-            INGRESS_TAG_EN: begin
-              o_wbs_dat                         <=  {16'h0, dbg_tag_en};
+            IH_STATE: begin
+              o_wbs_dat         <= 0;
+              o_wbs_dat[3:0]    <=  w_ih_state;
             end
-            CMPLT_STS: begin
-              o_wbs_dat                         <=  {28'h0, w_cplt_sts};
+            OH_STATE: begin
+              o_wbs_dat         <= 0;
+              o_wbs_dat[3:0]    <=  w_oh_state;
             end
+            BRAM_NUM_READS: begin
+              o_wbs_dat         <=  w_num_reads;
+            end
+            LOCAL_BUFFER_SIZE: begin
+              o_wbs_dat         <= CONTROL_BUFFER_SIZE;
+            end
+            DBG_ID_VALUE: begin
+              o_wbs_dat         <=  w_id_value;
+            end
+            DBG_COMMAND_VALUE: begin
+              o_wbs_dat         <=  w_command_value;
+            end
+            DBG_COUNT_VALUE: begin
+              o_wbs_dat         <=  w_count_value;
+            end
+            DBG_ADDRESS_VALUE: begin
+              o_wbs_dat         <=  w_address_value;
+            end
+            //add as many ADDR_X you need here
             default: begin
               if (w_lcl_mem_en) begin
-                o_wbs_dat                       <=  w_lcl_mem_dout;
+                o_wbs_dat         <=  w_bram_dout;
               end
             end
           endcase
-          if (w_lcl_mem_valid) begin
-            o_wbs_ack <= 1;
+          if (w_bram_valid) begin
+            o_wbs_ack             <=  1;
           end
         end
       end
     end
-    if (r_host_clock_count < `CLOCK_RATE) begin
-      r_host_clock_count                        <= r_host_clock_count + 1;
-    end
-    else begin
-      r_host_clock_count                        <= 0;
-      r_1sec_stb_100mhz                         <= 1;
-    end
-
   end
 end
 

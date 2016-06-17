@@ -227,8 +227,8 @@ wire  [23:0]  w_func_size;
 assign  pcie_exp_txp              = 0;
 assign  pcie_exp_txn              = 0;
 
-assign  user_clk_out              = clk;
-assign  user_reset_out            = rst;
+//assign  user_clk_out              = clk;
+//assign  user_reset_out            = rst;
 
 assign  w_func_size_map[CONTROL_FUNCTION_ID ] = CONTROL_PACKET_SIZE;
 assign  w_func_size_map[DATA_FUNCTION_ID    ] = DATA_PACKET_SIZE;
@@ -246,7 +246,7 @@ assign  received_hot_reset        = 0;
 
 //  input       [2:0]         fc_sel,
 assign  fc_nph      = VC0_TOTAL_CREDITS_NPH;
-assign  fc_npd      = VC0_TOTAL_CREDITS_NPD;
+assign  fc_npd      = 10;
 assign  fc_ph       = VC0_TOTAL_CREDITS_PH;
 assign  fc_pd       = 100;
 assign  fc_cplh     = VC0_TOTAL_CREDITS_CH;

@@ -88,41 +88,22 @@ class Test (unittest.TestCase):
 
     def test_device(self):
 
-        self.s.Info("Ingress State:         0x%04X" % self.driver.get_ingress_state())
-        self.s.Info("Ingress Count:         %d" % self.driver.get_ingress_count())
+        self.s.Info("Ingress State:          0x%04X" % self.driver.get_ingress_state())
+        self.s.Info("Ingress Count:          %d" % self.driver.get_ingress_count())
         print ""
-        self.s.Info("Ingress RI Count:      %d" % self.driver.get_ingress_ri_count())
-        self.s.Info("Ingress CI Count:      %d" % self.driver.get_ingress_ci_count())
-        self.s.Info("Ingress CMPLT Count:   %d" % self.driver.get_ingress_cmplt_count())
-        self.s.Info("Ingress Address:       0x%08X" % self.driver.get_ingress_addr())
+        self.s.Info("Ingress RI Count:       %d" % self.driver.get_ingress_ri_count())
+        self.s.Info("Ingress CI Count:       %d" % self.driver.get_ingress_ci_count())
+        self.s.Info("Ingress CMPLT Count:    %d" % self.driver.get_ingress_cmplt_count())
+        self.s.Info("Ingress Address:        0x%08X" % self.driver.get_ingress_addr())
         print ""
-        self.s.Info("Config Read Count:     %d" % self.driver.get_config_state_read_count())
-        self.s.Info("Config State:          0x%04X" % self.driver.get_config_state())
+        self.s.Info("Config Read Count:      %d" % self.driver.get_config_state_read_count())
+        self.s.Info("Config State:           0x%04X" % self.driver.get_config_state())
         print ""
-        self.s.Info("PCIE Controller State: 0x%04X" % self.driver.get_control_state())
+        self.s.Info("PCIE Controller State:  0x%04X" % self.driver.get_control_state())
         print ""
-        self.s.Info("HI Input State:        0x%04X" % self.driver.get_ih_state())
-        self.s.Info("HI Output State:       0x%04X" % self.driver.get_oh_state())
-        print ""
-        self.s.Info("ID:                    0x%08X" % self.driver.get_dbg_id_value())
-        self.s.Info("COMMAND:               0x%08X" % self.driver.get_dbg_command_value())
-        self.s.Info("COUNT:                 0x%08X" % self.driver.get_dbg_count_value())
-        self.s.Info("ADDRESS:               0x%08X" % self.driver.get_dbg_address_value())
-        print ""
-        self.s.Info("Peripheral Bus:        %s" % self.driver.is_peripheral_bus_selected())
-        self.s.Info("Memory Bus:            %s" % self.driver.is_memory_bus_selected())
-        self.s.Info("DMA Bus:               %s" % self.driver.is_dma_bus_selected())
-        print ""
-        self.s.Info("Write Enabled:         %s" % self.driver.is_write_enabled())
-        self.s.Info("Read Enabled:          %s" % self.driver.is_read_enabled())
+        self.s.Info("HI Input State:         0x%04X" % self.driver.get_ih_state())
+        self.s.Info("HI Output State:        0x%04X" % self.driver.get_oh_state())
 
-
-        #print "%s" % list_to_hex_string(self.driver.read_local_buffer())
-        data = self.driver.read_local_buffer()
-        print "Buffer:"
-        #for i in range(0, len(data), 4):
-        for i in range(0, 4 * 8, 4):
-            print "[%04X] 0x%08X" % (i, array_to_dword(data[i:i + 4]))
 
         count = self.driver.get_local_buffer_size()
         data = Array('B')
@@ -134,8 +115,12 @@ class Test (unittest.TestCase):
             data.append(0xFF)
  
         self.driver.write_local_buffer(data)
-        self.driver.generate_dma_data()
+        data = self.driver.read_local_buffer()
 
+        print "Buffer:"
+        #for i in range(0, len(data), 4):
+        for i in range(0, 4 * 8, 4):
+            print "[%04X] 0x%08X" % (i, array_to_dword(data[i:i + 4]))
 
 
 

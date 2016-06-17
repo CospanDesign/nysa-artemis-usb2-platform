@@ -22,7 +22,7 @@
 
 `define CMD_OFFSET                32'h00000080
 
-`define COMMAND_RESET             32'h00000080
+`define PCIE_COMMAND_RESET        32'h00000080
 `define PERIPHERAL_WRITE          32'h00000081
 `define PERIPHERAL_WRITE_FIFO     32'h00000082
 `define PERIPHERAL_READ           32'h00000083

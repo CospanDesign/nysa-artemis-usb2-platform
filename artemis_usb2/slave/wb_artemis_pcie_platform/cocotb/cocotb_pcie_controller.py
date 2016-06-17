@@ -192,8 +192,8 @@ class CocotbPCIE (object):
         self.dut = dut
         self.clk = dut.clk
         self.busy_event = Event("%s_busy" % NAME)
-        self.axm = AXIStreamMaster(self.dut.s1.api.pcie_interface, 'm_axis_rx', self.dut.s1.api.pcie_interface.clk)
-        self.axs = AXIStreamSlave (self.dut.s1.api.pcie_interface, 's_axis_tx', self.dut.s1.api.pcie_interface.clk)
+        self.axm = AXIStreamMaster(self.dut.s1.host_interface.api.pcie_interface, 'm_axis_rx', self.dut.s1.host_interface.api.pcie_interface.user_clk_out)
+        self.axs = AXIStreamSlave (self.dut.s1.host_interface.api.pcie_interface, 's_axis_tx', self.dut.s1.host_interface.api.pcie_interface.user_clk_out)
         self.tm_out = TLPManager()
         self.w = None
         self.r = None
@@ -206,6 +206,7 @@ class CocotbPCIE (object):
         self.max_packet_size = MAX_PACKET_SIZE
         self.backthread = None
         self.data_fifo = []
+        self.pcie_data = Array('B')
 
     def finish_background(self):
         self.dut.log.info("Finish Background thread")
@@ -371,7 +372,7 @@ class CocotbPCIE (object):
         return self.data
 
     @cocotb.coroutine
-    def read_pcie_data_command(self, count, address):
+    def read_pcie_data_command(self, address, count):
         self.write_command(CMD_PERIPHERAL_READ, count, address);
         yield RisingEdge(self.dut.clk)
 
@@ -394,15 +395,43 @@ class CocotbPCIE (object):
         yield RisingEdge(self.dut.clk)
 
     @cocotb.coroutine
+    def write_pcie_mem_command(self, address, count):
+        self.write_command(CMD_MEMORY_WRITE, count, address)
+        yield RisingEdge(self.dut.clk)
+
+    @cocotb.coroutine
+    def read_pcie_mem_command(self, address, count):
+        self.write_command(CMD_MEMORY_READ, count, address)
+        yield RisingEdge(self.dut.clk)
+
+    @cocotb.coroutine
+    def write_pcie_dma_command(self, address, count):
+        self.write_command(CMD_DMA_WRITE, count, address)
+        yield RisingEdge(self.dut.clk)
+
+    @cocotb.coroutine
+    def read_pcie_dma_command(self, address, count):
+        self.write_command(CMD_DMA_READ, count, address)
+        yield RisingEdge(self.dut.clk)
+
+    @cocotb.coroutine
     def sleep(self, value):
         for i in range (value):
             yield RisingEdge(self.dut.clk)
             yield ReadOnly()
 
+    def get_pcie_read_data(self):
+        return self.pcie_data
+
     @cocotb.coroutine
-    def read_pcie_data(self, address, count):
-        yield self.read_pcie_data_command(count, address)
-        data = Array('B')
+    def read_pcie_data(self, address, count, mem = False, dma = False):
+        if mem:
+            yield self.read_pcie_mem_command(address, count)
+        elif dma:
+            yield self.read_pcie_dma_command(address, count)
+        else:
+            yield self.read_pcie_data_command(address, count)
+        self.pcie_data = Array('B')
         self.set_buffer_ready_status(0x03)
         while True:
             yield self.sleep(10)
@@ -412,22 +441,32 @@ class CocotbPCIE (object):
                 status = NysaPCIEConfig(self.tm_out)
                 buf_hst_rdy = status.get_value(HDR_BUFFER_READY)
                 #buf_dev_sts = status.get_value(STS_BUF_RDY)
-                print status.pretty_print()
+                #print status.pretty_print()
                 if status.get_status_bit("done"):
                     return
                 host_buffer = 0x3 & (~buf_hst_rdy)
                 self.set_buffer_ready_status(host_buffer)
-
+            else:
+                d = self.get_read_data()
+                #print "Read Data: %s" % d[16:]
+                self.pcie_data.extend(self.get_read_data()[12:])
+                #self.pcie_data.extend(self.get_read_data())
+                
         yield self.sleep(10)
 
     @cocotb.coroutine
-    def write_pcie_data(self, address, data):
+    def write_pcie_data(self, address, data, mem = False, dma = False):
         count = len(data)
         data_pos = 0
         pos = 0
         data_sent = 0
         byte_length = self.dword_buffer_size << 2
-        yield self.write_pcie_data_command(address, (len(data) / 4))
+        if mem:
+            yield self.write_pcie_mem_command(address, (len(data) / 4))
+        elif dma:
+            yield self.write_pcie_dma_command(address, (len(data) / 4))
+        else:
+            yield self.write_pcie_data_command(address, (len(data) / 4))
         yield self.sleep(50)
 
         tag = 0
@@ -477,7 +516,7 @@ class CocotbPCIE (object):
                 status = NysaPCIEConfig(self.tm_out)
                 #buf_hst_rdy = status.get_value(HDR_BUFFER_READY)
                 buf_dev_sts = status.get_value(STS_BUF_RDY)
-                print status.pretty_print()
+                #print status.pretty_print()
                 if status.get_status_bit("done"):
                     return
 
@@ -576,6 +615,7 @@ class CocotbPCIE (object):
                 #Need to construct a completion packet
         #self.finish_background()
         print "Finished"
+
 
 
 

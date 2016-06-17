@@ -95,6 +95,8 @@ module artemis_pcie_controller #(
   input                     pci_exp_rxp,
   input                     pci_exp_rxn,
 
+  input                     i_pcie_reset,
+
   // Transaction (TRN) Interface
   output                    user_lnk_up,
  (* KEEP = "TRUE" *) output clk_62p5,
@@ -114,7 +116,7 @@ module artemis_pcie_controller #(
   input                     cfg_pm_wake,
 
   // System Interface
-  output                    pcie_reset,
+  output                    o_pcie_reset,
   output                    received_hot_reset,
   output                    gtp_reset_done,
   output                    gtp_pll_lock_detect,
@@ -141,7 +143,6 @@ module artemis_pcie_controller #(
   output      [2:0]         cfg_function_number,
 
 
-
   output      [15:0]        cfg_status,
   output      [15:0]        cfg_command,
   output      [15:0]        cfg_dstatus,
@@ -159,7 +160,6 @@ module artemis_pcie_controller #(
   input                     cfg_err_locked,
   input       [47:0]        cfg_err_tlp_cpl_header,
   output                    cfg_err_cpl_rdy,
-
 
   //Debug
   output      [7:0]         o_cfg_read_exec,
@@ -208,6 +208,9 @@ module artemis_pcie_controller #(
   output                    o_mem_fifo_sel,
   output                    o_dma_fifo_sel,
 
+  input                     i_write_fin,
+  input                     i_read_fin,
+
   output      [31:0]        o_data_size,
   output      [31:0]        o_data_address,
   output                    o_data_fifo_flg,
@@ -228,6 +231,7 @@ module artemis_pcie_controller #(
   output      [23:0]        o_ingress_fifo_size,
   input                     i_ingress_fifo_stb,
   output      [31:0]        o_ingress_fifo_data,
+  output                    o_ingress_fifo_idle,
 
   //Egress FIFO
   output      [1:0]         o_egress_fifo_rdy,
@@ -267,18 +271,17 @@ wire                        d_out_rd_activate;
 wire  [23:0]                d_out_rd_size;
 wire  [31:0]                d_out_rd_data;
 
-
-wire          [31:0]        m_axis_rx_tdata;
-wire          [3:0]         m_axis_rx_tkeep;
+wire  [31:0]                m_axis_rx_tdata;
+wire  [3:0]                 m_axis_rx_tkeep;
 wire                        m_axis_rx_tlast;
 wire                        m_axis_rx_tvalid;
 wire                        m_axis_rx_tready;
-wire          [21:0]        m_axis_rx_tuser;
+wire  [21:0]                m_axis_rx_tuser;
 
 wire                        s_axis_tx_tready;
-wire          [31:0]        s_axis_tx_tdata;
-wire          [3:0]         s_axis_tx_tkeep;
-wire          [3:0]         s_axis_tx_tuser;
+wire  [31:0]                s_axis_tx_tdata;
+wire  [3:0]                 s_axis_tx_tkeep;
+wire  [3:0]                 s_axis_tx_tuser;
 wire                        s_axis_tx_tlast;
 wire                        s_axis_tx_tvalid;
 
@@ -289,42 +292,39 @@ wire                        cfg_interrupt_stb;
 wire                        cfg_interrupt;
 wire                        cfg_interrupt_rdy;
 wire                        cfg_interrupt_assert;
-wire          [7:0]         cfg_interrupt_do;
-wire          [7:0]         cfg_interrupt_di;
-wire          [2:0]         cfg_interrupt_mmenable;
+wire  [7:0]                 cfg_interrupt_do;
+wire  [7:0]                 cfg_interrupt_di;
+wire  [2:0]                 cfg_interrupt_mmenable;
 wire                        cfg_interrupt_msienable;
 
-wire          [7:0]         w_interrupt_msi_value;
+wire  [7:0]                 w_interrupt_msi_value;
 wire                        w_interrupt_stb;
 
 //XXX: Configuration Registers this should be read in by the controller
-wire          [31:0]        w_write_a_addr;
-wire          [31:0]        w_write_b_addr;
-wire          [31:0]        w_read_a_addr;
-wire          [31:0]        w_read_b_addr;
-wire          [31:0]        w_status_addr;
-wire          [31:0]        w_buffer_size;
-wire          [31:0]        w_ping_value;
-wire          [31:0]        w_dev_addr;
-wire          [1:0]         w_update_buf;
+wire  [31:0]                w_write_a_addr;
+wire  [31:0]                w_write_b_addr;
+wire  [31:0]                w_read_a_addr;
+wire  [31:0]                w_read_b_addr;
+wire  [31:0]                w_status_addr;
+wire  [31:0]                w_buffer_size;
+wire  [31:0]                w_ping_value;
+wire  [31:0]                w_dev_addr;
+wire  [1:0]                 w_update_buf;
 wire                        w_update_buf_stb;
 
 //XXX: Control SM Signals
-wire          [31:0]        w_control_addr_base;
-wire          [31:0]        w_cmd_data_count;
-wire          [31:0]        w_cmd_data_address;
+wire  [31:0]                w_control_addr_base;
+wire  [31:0]                w_cmd_data_count;
+wire  [31:0]                w_cmd_data_address;
 
 assign  w_control_addr_base = o_bar_addr0;
 
 
 //XXX: These signals are controlled by the buffer controller
 //BUFFER Interface
-wire          [31:0]        w_buf_offset; //Should be connected to buffer controller to indicate where the buffer is located
 wire                        w_buf_we;
-wire          [31:0]        w_buf_addr;
-wire          [31:0]        w_buf_dat;
-
-assign  w_buf_offset  = 32'h00000000;     //DEBUG Configuration
+wire  [31:0]                w_buf_addr;
+wire  [31:0]                w_buf_dat;
 
 wire                        s_axis_tx_discont;
 wire                        s_axis_tx_stream;
@@ -415,6 +415,7 @@ wire  [12:0]                w_ibm_buf_offset;
 wire                        w_bb_buf_we;
 wire  [10:0]                w_bb_buf_addr;
 wire  [31:0]                w_bb_buf_data;
+wire  [23:0]                w_bb_data_count;
 
 wire  [1:0]                 w_i_data_fifo_rdy;
 wire  [1:0]                 w_o_data_fifo_act;
@@ -429,8 +430,12 @@ wire  [23:0]                w_e_data_fifo_size;
 wire                        w_e_data_fifo_stb;
 wire  [31:0]                w_e_data_fifo_data;
 
+wire                        w_egress_inactive;
 wire                        w_dat_fifo_sel;
 
+wire  [23:0]                w_buf_max_size;
+
+assign  w_buf_max_size  = 2**DATA_INGRESS_FIFO_DEPTH;
 
 
 //Credit Manager
@@ -474,6 +479,25 @@ wire                        w_bld_buf_fin;
 
 
 
+wire                        w_wr_fin;
+wire                        w_rd_fin;
+
+cross_clock_enable rd_fin_en (
+  .rst                               (o_pcie_reset                  ),
+  .in_en                             (i_read_fin                    ),
+
+  .out_clk                           (clk_62p5                      ),
+  .out_en                            (w_rd_fin                      )
+);
+
+cross_clock_enable wr_fin_en (
+  .rst                               (o_pcie_reset                  ),
+  .in_en                             (i_write_fin                   ),
+
+  .out_clk                           (clk_62p5                      ),
+  .out_en                            (w_wr_fin                      )
+);
+
 /****************************************************************************
  * Interrupt State Machine Signals
  ****************************************************************************/
@@ -499,7 +523,7 @@ pcie_axi_bridge pcie_interface
   .s_axis_tx_tvalid                  (s_axis_tx_tvalid              ),
 
   .tx_cfg_gnt                        (tx_cfg_gnt                    ),
-  .user_enable_comm                  (user_enable_comm              ),
+//  .user_enable_comm                  (user_enable_comm              ),
 
   // Rx
   .m_axis_rx_tdata                   (m_axis_rx_tdata               ),
@@ -572,9 +596,9 @@ pcie_axi_bridge pcie_interface
   // System Interface
   .sys_clk_p                         (gtp_clk_p                     ),
   .sys_clk_n                         (gtp_clk_n                     ),
-  .sys_reset                         (rst                           ),
+  .sys_reset                         (i_pcie_reset                  ),
   .user_clk_out                      (clk_62p5                      ),
-  .user_reset_out                    (pcie_reset                    ),
+  .user_reset_out                    (o_pcie_reset                  ),
   .received_hot_reset                (received_hot_reset            ),
 
   .pll_lock_detect                   (pll_lock_detect               ),
@@ -621,7 +645,7 @@ pcie_axi_bridge pcie_interface
  ****************************************************************************/
 config_parser cfg (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   .i_en                       (w_enable_config_read       ),
   .o_finished                 (w_finished_config_read     ),
@@ -645,7 +669,7 @@ buffer_builder #(
   .DATA_WIDTH                 (32                         )
 ) bb (
   .mem_clk                    (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   .i_ppfifo_wr_en             (w_bld_buf_en               ),
   .o_ppfifo_wr_fin            (w_bld_buf_fin              ),
@@ -655,6 +679,8 @@ buffer_builder #(
   .i_bram_din                 (w_bb_buf_data              ),
 
   .ppfifo_clk                 (clk_62p5                   ),
+
+  .i_data_count               (w_bb_data_count            ),
 
   .i_write_ready              (w_i_data_fifo_rdy          ),
   .o_write_activate           (w_o_data_fifo_act          ),
@@ -666,7 +692,7 @@ buffer_builder #(
 
 credit_manager cm (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   //Credits
   .o_fc_sel                   (fc_sel                     ),
@@ -687,7 +713,7 @@ credit_manager cm (
 
 ingress_buffer_manager buf_man (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   //Host Interface
   .i_hst_buf_rdy_stb          (w_update_buf_stb           ),
@@ -727,7 +753,7 @@ ingress_buffer_manager buf_man (
 
 pcie_control controller (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   //Configuration Values
   .i_pcie_bus_num             (cfg_bus_number             ),
@@ -769,6 +795,10 @@ pcie_control controller (
   .o_per_sel                  (o_per_fifo_sel             ),
   .o_mem_sel                  (o_mem_fifo_sel             ),
   .o_dma_sel                  (o_dma_fifo_sel             ),
+  //.i_write_fin                (i_write_fin                ),
+  .i_write_fin                (w_wr_fin                   ),
+//  .i_read_fin                 (i_read_fin & w_egress_inactive ),
+  .i_read_fin                 (w_rd_fin & w_egress_inactive     ),
 
   .o_data_fifo_sel            (w_dat_fifo_sel             ),
 
@@ -821,9 +851,11 @@ pcie_control controller (
   .i_ibm_idle                 (w_ctr_idle                 ),
 
 
+  .i_buf_max_size             (w_buf_max_size             ),
+  .o_buf_data_count           (w_bb_data_count            ),
 
   //System Interface
-  .o_sys_rst                  (o_sys_rst                  ),
+//  .o_sys_rst                  (o_sys_rst                  ),
 
   .i_fc_ready                 (w_pcie_ctr_fc_ready        ),
   .o_fc_cmt_stb               (w_pcie_ctr_cmt_stb         ),
@@ -849,7 +881,7 @@ ppfifo #(
   .DATA_WIDTH                 (32                         ),
   .ADDRESS_WIDTH              (DATA_INGRESS_FIFO_DEPTH    ) // 1024 32-bit values (4096 Bytes)
 ) i_data_fifo (
-  .reset                      (pcie_reset || rst          ),
+  .reset                      (o_pcie_reset || rst        ),
   //Write Side
   .write_clock                (clk_62p5                   ),
   .write_ready                (w_i_data_fifo_rdy          ),
@@ -864,7 +896,8 @@ ppfifo #(
   .read_activate              (i_ingress_fifo_act         ),
   .read_count                 (o_ingress_fifo_size        ),
   .read_strobe                (i_ingress_fifo_stb         ),
-  .read_data                  (o_ingress_fifo_data        )
+  .read_data                  (o_ingress_fifo_data        ),
+  .inactive                   (o_ingress_fifo_idle        )
 );
 
 //EGRESS FIFOs
@@ -872,7 +905,7 @@ ppfifo #(
   .DATA_WIDTH                 (32                         ),
   .ADDRESS_WIDTH              (DATA_EGRESS_FIFO_DEPTH     ) // 64 32-bit values (256 Bytes)
 ) e_data_fifo (
-  .reset                      (pcie_reset || rst          ),
+  .reset                      (o_pcie_reset || rst        ),
   //Write Side
   .write_clock                (i_data_clk                 ),
   .write_ready                (o_egress_fifo_rdy          ),
@@ -887,12 +920,13 @@ ppfifo #(
   .read_activate              (w_e_data_fifo_act          ),
   .read_count                 (w_e_data_fifo_size         ),
   .read_strobe                (w_e_data_fifo_stb          ),
-  .read_data                  (w_e_data_fifo_data         )
+  .read_data                  (w_e_data_fifo_data         ),
+  .inactive                   (w_egress_inactive          )
 );
 
 pcie_ingress ingress (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   //AXI Stream Host 2 Device
   .o_axi_ingress_ready        (m_axis_rx_tready           ),
@@ -967,7 +1001,7 @@ pcie_ingress ingress (
 
 pcie_egress egress (
   .clk                        (clk_62p5                   ),
-  .rst                        (pcie_reset                 ),
+  .rst                        (o_pcie_reset               ),
 
   .i_enable                   (w_egress_enable            ),
   .o_finished                 (w_egress_finished          ),
@@ -1082,7 +1116,6 @@ assign  cfg_interrupt_di  = w_interrupt_msi_value;
 //assign  cfg_interrupt_stb = w_interrupt_stb;
 
 assign  w_rcb_128B_sel    = cfg_lcommand[3];
-
 /****************************************************************************
  * Interrupt State Machine
  ****************************************************************************/
@@ -1095,7 +1128,7 @@ reg int_state = IDLE;
 
 /*
 always @ (posedge clk_62p5) begin
-  if (pcie_reset) begin
+  if (o_pcie_reset) begin
     cfg_interrupt         <=  0;
     int_state             <=  IDLE;
   end

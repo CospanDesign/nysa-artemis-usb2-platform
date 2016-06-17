@@ -85,9 +85,10 @@ module pcie_ingress (
   output  reg [9:0]         o_cplt_pkt_cnt,
 
   //Buffer Manager
-  output  reg [7:0]         o_cplt_pkt_tag,
-//  output      [11:0]        o_cplt_pkt_byte_count,
-  output  reg [6:0]         o_cplt_pkt_lwr_addr,
+  //output  reg [7:0]         o_cplt_pkt_tag,
+  output      [7:0]         o_cplt_pkt_tag,
+  //output  reg [6:0]         o_cplt_pkt_lwr_addr,
+  output      [6:0]         o_cplt_pkt_lwr_addr,
 
   //Buffer Interface
   input       [12:0]        i_buf_offset,
@@ -115,9 +116,10 @@ localparam  WRITE_REG_CMD           = 4'h3;
 localparam  READ_ADDR               = 4'h4;
 localparam  READ_CMPLT              = 4'h5;
 localparam  READ_CMPLT_DATA         = 4'h6;
-localparam  SEND_DATA               = 4'h7;
-localparam  READ_BAR_ADDR           = 4'h8;
-localparam  FLUSH                   = 4'h9;
+localparam  GET_CMPLT_ADDR          = 4'h7;
+localparam  SEND_DATA               = 4'h8;
+localparam  READ_BAR_ADDR           = 4'h9;
+localparam  FLUSH                   = 4'hA;
 
 //Commands
 localparam  CMD_MEM_READ            = 8'h00;
@@ -226,13 +228,18 @@ assign  w_cmplt_lower_addr    = r_hdr[2][`CMPLT_LOWER_ADDR_RANGE];
 assign  w_reg_addr            = (i_control_addr_base >= 0) ? ((w_pkt_addr - i_control_addr_base) >> 2): 32'h00;
 assign  w_cmd_en              = (w_reg_addr >= `CMD_OFFSET);
 //assign  w_buf_pkt_addr_base   = i_buf_offset - (w_pkt_addr + w_cmplt_lower_addr);
-assign  w_buf_pkt_addr_base   = i_buf_offset - w_cmplt_lower_addr;
+//assign  w_buf_pkt_addr_base   = i_buf_offset - w_cmplt_lower_addr;
+assign  w_buf_pkt_addr_base   = i_buf_offset;
 
 assign  w_cplt_pkt_tag        = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][15:8] : 8'h00;
 //assign  o_cplt_pkt_byte_count = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[1][11:0] : 12'h00;
 assign  w_cplt_pkt_lwr_addr   = (r_hdr_cmd == CMD_COMPLETE_DATA) ? r_hdr[2][6:0]  : 7'h0;
 
 assign  w_cplt_sts            = r_hdr[1][15:13];
+
+assign  o_cplt_pkt_tag        =  w_cplt_pkt_tag;
+assign  o_cplt_pkt_lwr_addr   =  w_cplt_pkt_lwr_addr;
+
 
 integer i;
 //synchronous logic
@@ -291,8 +298,8 @@ always @ (posedge clk) begin
     o_ingress_ci_count        <=  0;
     o_ingress_cmplt_count     <=  0;
     o_ingress_addr            <=  0;
-    o_cplt_pkt_tag            <=  0;
-    o_cplt_pkt_lwr_addr       <=  0;
+    //o_cplt_pkt_tag            <=  0;
+    //o_cplt_pkt_lwr_addr       <=  0;
 
     //Complete
     o_cplt_pkt_cnt            <=  0;
@@ -361,7 +368,7 @@ always @ (posedge clk) begin
           o_cmd_flg_sel_dma_stb               <=  0;
 
           case (w_reg_addr)
-            `COMMAND_RESET: begin
+            `PCIE_COMMAND_RESET: begin
               r_config_space_done             <=  0;
               o_cmd_rst_stb                   <=  1;
             end
@@ -444,6 +451,7 @@ always @ (posedge clk) begin
             end
             `HDR_DEV_ADDR: begin
               o_dev_addr              <=  i_axi_ingress_data;
+              o_cmd_data_address      <=  i_axi_ingress_data;
             end
             default: begin
               o_ingress_ri_count      <=  o_ingress_ri_count + 1;
@@ -472,8 +480,12 @@ always @ (posedge clk) begin
         o_buf_data                    <=  i_axi_ingress_data;
         r_buf_cnt                     <=  r_buf_cnt + 1;
         o_ingress_cmplt_count         <=  o_ingress_cmplt_count + 1;
-        o_cplt_pkt_tag                <=  w_cplt_pkt_tag;
-        o_cplt_pkt_lwr_addr           <=  w_cplt_pkt_lwr_addr;
+        //o_cplt_pkt_tag                <=  w_cplt_pkt_tag;
+        //o_cplt_pkt_lwr_addr           <=  w_cplt_pkt_lwr_addr;
+        //state                         <=  GET_CMPLT_ADDR;
+        state                         <=  SEND_DATA;
+      end
+      GET_CMPLT_ADDR: begin
         state                         <=  SEND_DATA;
       end
       SEND_DATA: begin

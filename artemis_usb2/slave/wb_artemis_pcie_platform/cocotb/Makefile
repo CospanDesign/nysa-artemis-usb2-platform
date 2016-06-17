@@ -37,12 +37,19 @@ VERILOG_SOURCES += ${TOPDIR}/rtl/buffer_builder.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_controller.v
 
 
+
 VERILOG_SOURCES += ${NYSA}/verilog/wishbone/slave/wb_bram/rtl/wb_bram.v
 VERILOG_SOURCES += $(NYSA)/verilog/sim/wishbone/interconnect/example_2port_interconnect/wishbone_interconnect.v
 VERILOG_SOURCES += ${TOPDIR}/sim/arbiter_2_masters.v
 VERILOG_SOURCES += ${TOPDIR}/sim/wishbone_mem_interconnect.v
 
 #Simulation Devices
+VERILOG_SOURCES += ${NYSA}/verilog/wishbone/slave/wb_dma_reader/rtl/ppfifo_data_generator.v
+VERILOG_SOURCES += ${NYSA}/verilog/wishbone/slave/wb_dma_writer/rtl/ppfifo_data_sink.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/ppfifo_pcie_host_interface.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/adapter_ppfifo_2_ppfifo.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/ddr3_pcie_controller.v
+VERILOG_SOURCES += ${TOPDIR}/rtl/artemis_pcie_host_interface.v
 VERILOG_SOURCES += ${TOPDIR}/rtl/wb_artemis_pcie_platform.v
 #DUT
 #Test Benches

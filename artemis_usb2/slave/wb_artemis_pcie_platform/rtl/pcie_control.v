@@ -84,6 +84,9 @@ module pcie_control (
   output  reg               o_dma_sel,
   output                    o_data_fifo_sel,
 
+  input                     i_write_fin,
+  input                     i_read_fin,
+
   output  reg [31:0]        o_data_size,
   output  reg [31:0]        o_data_address,
   output  reg               o_data_fifo_flg,
@@ -132,6 +135,10 @@ module pcie_control (
   input                     i_ibm_buf_sel,
   input                     i_ibm_idle,
 
+  //Buffer Builder
+  input       [23:0]        i_buf_max_size,
+  output  reg [23:0]        o_buf_data_count,
+
   output  reg [9:0]         o_dword_req_cnt,
 
   output                    o_sys_rst,
@@ -149,12 +156,13 @@ localparam      WAIT_FOR_HOST_EGRESS_BUFFER   = 4'h2;
 localparam      WAIT_FOR_FPGA_EGRESS_FIFO     = 4'h3;
 localparam      SEND_EGRESS_DATA              = 4'h4;
 localparam      SEND_EGRESS_STATUS            = 4'h5;
-localparam      INGRESS_DATA_FLOW             = 4'h6;
-localparam      WAIT_FOR_HOST_INGRESS_TAG     = 4'h7;
-localparam      WAIT_FOR_FLOW_CONTROL         = 4'h8;
-localparam      REQUEST_INGRESS_DATA          = 4'h9;
-localparam      SEND_INGRESS_STATUS           = 4'hA;
-localparam      SEND_CONFIG                   = 4'hB;
+localparam      INGRESS_PREPARE               = 4'h6;
+localparam      INGRESS_DATA_FLOW             = 4'h7;
+localparam      WAIT_FOR_HOST_INGRESS_TAG     = 4'h8;
+localparam      WAIT_FOR_FLOW_CONTROL         = 4'h9;
+localparam      REQUEST_INGRESS_DATA          = 4'hA;
+localparam      SEND_INGRESS_STATUS           = 4'hB;
+localparam      SEND_CONFIG                   = 4'hC;
 
 
 localparam      PREPARE                       = 4'h1;
@@ -227,6 +235,10 @@ reg                         r_cfg_chan_en;
 //Convenience Signals
 wire                        w_valid_bus_select;
 wire                        w_cfg_req;
+
+wire   [23:0]               w_ingress_count_left;
+
+assign  w_ingress_count_left  = (o_data_size - r_data_count);
 
 wire  [31:0]                write_buf_map [0:1];
 assign  write_buf_map[0]  = i_write_a_addr;
@@ -328,6 +340,7 @@ assign  o_sm_state                          = state;
 assign  w_sts_ready                         = (state == IDLE);
 assign  w_sts_hst_buf_stall                 = (state == WAIT_FOR_HOST_EGRESS_BUFFER)  ||
                                               (state == WAIT_FOR_HOST_INGRESS_TAG)    ||
+                                              (state == INGRESS_PREPARE)              ||
                                               (state == INGRESS_DATA_FLOW);
 assign  w_sts_flg_fifo_stall                = (state == WAIT_FOR_FPGA_EGRESS_FIFO);
 
@@ -392,6 +405,7 @@ always @ (posedge clk) begin
     r_sts_read_cfg      <=  0;
     r_sts_interrupt     <=  0;
     r_sts_unknown_cmd   <=  0;
+    o_buf_data_count    <=  0;
 
   end
   else begin
@@ -411,6 +425,7 @@ always @ (posedge clk) begin
 
     case (state)
       IDLE: begin
+        o_buf_data_count    <= i_buf_max_size;
         o_ibm_en            <= 0;
         o_data_write_flg    <= 0;
         o_data_read_flg     <= 0;
@@ -435,13 +450,14 @@ always @ (posedge clk) begin
         r_index_valuea      <=  0;
         r_index_valueb      <=  0;
 
-        o_data_address      <= i_cmd_data_address;
+        //o_data_address      <= i_cmd_data_address;
+        o_data_address      <= i_dev_addr;
         o_data_size         <= i_cmd_data_count;
 
         if (i_cmd_wr_stb) begin
           if (w_valid_bus_select) begin
             o_data_write_flg<=  1;
-            state           <=  INGRESS_DATA_FLOW;
+            state           <=  INGRESS_PREPARE;
           end
           else begin
             //XXX: SEND AN ERROR TELLING THE USER THEY NEED TO SELET A BUS
@@ -484,7 +500,8 @@ always @ (posedge clk) begin
       EGRESS_DATA_FLOW: begin
         r_tlp_command                   <=  `PCIE_MWR_32B;
         r_tlp_flags                     <=  (`FLAG_NORMAL);
-        if (r_data_count < o_data_size) begin
+        //if (r_data_count < o_data_size) begin
+        if (!i_read_fin) begin
           //More data to send
           state                         <=  WAIT_FOR_HOST_EGRESS_BUFFER;
         end
@@ -519,7 +536,8 @@ always @ (posedge clk) begin
       end
       WAIT_FOR_FPGA_EGRESS_FIFO: begin
         //Send data to the host
-        if ((r_data_count < o_data_size) && (r_block_count < i_buffer_size)) begin
+        //if ((r_data_count < o_data_size) && (r_block_count < i_buffer_size)) begin
+        if (!i_read_fin && (r_block_count < i_buffer_size)) begin
           if (i_e_fifo_rdy) begin
             r_fifo_size                 <=  i_e_fifo_size;
             r_tlp_address               <=  read_buf_map[r_buf_sel] + r_block_count;
@@ -528,7 +546,8 @@ always @ (posedge clk) begin
         end
         else begin
           r_buf_done[r_buf_sel]         <=  1;
-          if (r_data_count >= o_data_size) begin
+          //if (r_data_count >= o_data_size) begin
+          if (i_read_fin) begin
             r_sts_done                  <=  1;
           end
           state                         <=  SEND_EGRESS_STATUS;
@@ -560,6 +579,15 @@ always @ (posedge clk) begin
 
 
       //Ingress Flow
+      INGRESS_PREPARE: begin
+        if (w_ingress_count_left < i_buf_max_size) begin
+          o_buf_data_count              <= w_ingress_count_left;
+        end
+        else begin
+          o_buf_data_count              <= i_buf_max_size;
+        end
+        state                           <= INGRESS_DATA_FLOW;
+      end
       INGRESS_DATA_FLOW: begin
         o_ibm_en                        <= 1;
         r_tlp_command                   <= `PCIE_MRD_32B;
@@ -570,7 +598,8 @@ always @ (posedge clk) begin
         end
         else begin
           o_ibm_dat_fin                 <= 1;
-          if (i_ibm_idle) begin
+          //if (i_ibm_idle) begin
+          if (i_write_fin && i_ibm_idle) begin
             o_ibm_dat_fin               <= 0;
             r_sts_done                  <= 1;
             state                       <= SEND_CONFIG;
@@ -597,6 +626,11 @@ always @ (posedge clk) begin
             r_index_valueb              <= r_index_valueb + 1;
           end
           r_tmp_done                    <=  0;
+
+          if (w_ingress_count_left < i_buf_max_size) begin
+            o_buf_data_count            <=  w_ingress_count_left;
+          end
+
           state                         <= SEND_INGRESS_STATUS;
         end
       end

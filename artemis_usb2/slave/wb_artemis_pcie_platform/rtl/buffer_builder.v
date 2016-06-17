@@ -61,6 +61,8 @@ module buffer_builder #(
   //Ping Pong FIFO Interface
   input                               ppfifo_clk,
 
+  input           [23:0]              i_data_count,
+
   input           [1:0]               i_write_ready,
   output  reg     [1:0]               o_write_activate,
   input           [23:0]              i_write_size,
@@ -151,7 +153,8 @@ always @ (posedge ppfifo_clk) begin
         end
       end
       WRITE: begin
-        if (count < i_write_size) begin
+        //if (count < i_write_size) begin
+        if (count < i_data_count) begin
           r_addr                  <= r_addr + 1;
           o_write_stb             <= 1;
           count                   <= count + 1;

@@ -69,4 +69,3 @@ class TLPManager(object):
         output_str = self.header.pretty_print()
         print output_str
 
-

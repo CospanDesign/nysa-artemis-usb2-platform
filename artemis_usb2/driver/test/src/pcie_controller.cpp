@@ -34,6 +34,18 @@
 #define PING                  0x089
 #define READ_CONFIG           0x08A
 
+
+#define ID										0xCD15DBE5
+#define HDR_ID								0
+#define HDR_COMMAND						1
+#define HDR_DATA_COUNT				2
+#define HDR_ADDRESS						3
+
+#define HDR_SIZE 							4
+
+#include <stdint.h>
+using namespace std;
+
 //Constructor
 PCIE::PCIE (char * filename)
 {
@@ -129,6 +141,40 @@ ssize_t PCIE::read_periph_data(unsigned int address, unsigned char *buf, unsigne
 
 ssize_t PCIE::write_periph_data(unsigned int address, unsigned char * buf, unsigned int count)
 {
-	write_command(PERIPHERAL_WRITE, count / 4, address);
-	return write(fn, buf, count);
+	size_t	retval = 0;
+	uint32_t id;
+	uint32_t command;
+	uint32_t address_u32;
+	uint32_t data_count;
+
+	id = ID;
+	command = 0x00000001;
+	address_u32 = address;
+	data_count = (HDR_SIZE * 4) + count;
+	while (data_count %4 != 0)
+	{
+		data_count += 1;
+	}
+
+
+	uint8_t *periph_buf = new uint8_t [data_count]; //Fugly
+	std::memcpy(&periph_buf[HDR_ID 					* 4], id, 				sizeof(uint32_t));
+	std::memcpy(&periph_buf[HDR_COMMAND 		* 4], command, 		sizeof(uint32_t));
+	std::memcpy(&periph_buf[HDR_DATA_COUNT 	* 4], address_u32,sizeof(uint32_t));
+	std::memcpy(&periph_buf[HDR_ADDRESS 		* 4], data_count, sizeof(uint32_t));
+	std::memcpy(&periph_buf[HDR_SIZE				* 4], buf,				count						);
+
+	printf("peripheral buffer:\n", periph_buf);
+	for (int i = 0; i < data_count; i = i + 4)
+	{
+		printf("\t0x%02X%02X%02X%02X\n", periph_buf[i + 0], periph_buf[i + 1], periph_buf[i + 2], periph_buf[i + 3])
+	}
+
+	/*
+	write_command(PERIPHERAL_WRITE, data_count / 4, address);
+
+	retval = write(fn, buf, count);
+	delete periph_buf; //XXX: Fugly
+	*/
+	return retval;
 }

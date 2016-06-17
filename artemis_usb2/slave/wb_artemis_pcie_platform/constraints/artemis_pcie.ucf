@@ -20,13 +20,13 @@
 
 
 # User Clock Constraints
-NET "pcie/api/pcie_interface/mgt_clk" TNM_NET = "tn_mgt_clk";
+NET "pcie/host_interface/api/pcie_interface/mgt_clk" TNM_NET = "tn_mgt_clk";
 TIMESPEC "TS_tn_mgt_clk" = PERIOD "tn_mgt_clk" 8.0;
 
-NET "pcie/api/pcie_interface/mgt_clk_2x" TNM_NET = "tn_mgt_clk_2x";
+NET "pcie/host_interface/api/pcie_interface/mgt_clk_2x" TNM_NET = "tn_mgt_clk_2x";
 TIMESPEC "TS_mgt_clk_2x" = PERIOD "tn_mgt_clk_2x" 16.0;
 
-NET "pcie/api/clk_62p5" TNM_NET = "tn_user_clk_out";
+NET "pcie/host_interface/api/clk_62p5" TNM_NET = "tn_user_clk_out";
 TIMESPEC "TS_user_clk_out" = PERIOD "tn_user_clk_out" 16.0;
 
 #NET "pcie/api/pcie_interface/pcie_sys_clk" TNM_NET = "tn_pcie_sys_clk";
@@ -56,10 +56,10 @@ NET o_pcie_phy_tx_n LOC=A8 | IOB = FALSE;
 ################################# mgt wrapper constraints #####################
 
 ##---------- Set placement for tile0_rocketio_wrapper_i/GTPA1_DUAL ------
-INST pcie/api/pcie_interface/GT_i LOC=GTPA1_DUAL_X0Y0;
+INST pcie/host_interface/api/pcie_interface/GT_i LOC=GTPA1_DUAL_X0Y0;
 
 #NET sys_reset_n TIG;
 #NET sys_clk_c PERIOD = 10ns;
-NET pcie/api/pcie_interface/gt_refclk_out(0) TNM_NET = GT_REFCLK_OUT;
+NET pcie/host_interface/api/pcie_interface/gt_refclk_out(0) TNM_NET = GT_REFCLK_OUT;
 TIMESPEC TS_GT_REFCLK_OUT = PERIOD GT_REFCLK_OUT 10ns HIGH 50 % ;
 

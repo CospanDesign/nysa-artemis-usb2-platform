@@ -501,8 +501,8 @@ cross_clock_enable wr_fin_en (
 /****************************************************************************
  * Interrupt State Machine Signals
  ****************************************************************************/
-pcie_axi_bridge pcie_interface
-//sim_pcie_axi_bridge pcie_interface
+//pcie_axi_bridge pcie_interface
+sim_pcie_axi_bridge pcie_interface
 (
 
   // PCI Express Fabric Interface

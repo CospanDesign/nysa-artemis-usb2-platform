@@ -41,7 +41,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
                              os.pardir))
 
 import nysa
-from nysa.ibuilder.lib.xilinx_utils import find_xilinx_path
+from nysa.ibuilder.xilinx_utils import find_xilinx_path
 from artemis_usb2 import Artemis
 
 class ArtemisUSB2Platform(Platform):

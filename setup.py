@@ -24,7 +24,6 @@ setup(
     packages=find_packages('.'),
     url="http://artemis.cospandesign.com",
     package_data={'' : ["*.json", "*.png", "*.ucf", "*.rules"]},
-    dependency_links = ["https://github.com/CospanDesign/nysa/tarball/master#egg=nysa"],
     requires=['nysa',
               'pyusb (>= 1.0.0b1)',
               'pyserial (>= 2.6)'],
